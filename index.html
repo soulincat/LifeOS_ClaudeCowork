@@ -8,14 +8,57 @@
 </head>
 <body>
     <div class="os-grid">
-        <!-- Left Sidebar: AI Notepad + GitHub -->
+        <!-- Left Sidebar: Today + Emails + GitHub -->
         <div class="os-sidebar">
-            <div class="ai-notepad">
-                <div class="ai-notepad-header">Morning Log</div>
-                <textarea class="ai-notepad-input" placeholder="Type your thoughts, tasks, ideas...
+            <!-- Quick Tasks -->
+            <div class="info-section">
+                <div class="info-header">Today (4/8)</div>
+                <div class="info-row" style="border: none; padding: 6px 0;">
+                    <span class="info-label" style="font-size: 11px;">Push API updates</span>
+                </div>
+                <div class="info-row" style="border: none; padding: 6px 0;">
+                    <span class="info-label" style="font-size: 11px;">Review client feedback</span>
+                </div>
+                <div class="info-row" style="border: none; padding: 6px 0;">
+                    <span class="info-label" style="font-size: 11px;">Update portfolio</span>
+                </div>
+                <div class="info-row" style="border: none; padding: 6px 0;">
+                    <span class="info-label" style="font-size: 11px;">Schedule dentist</span>
+                </div>
+            </div>
 
-AI will process and organize these for you."></textarea>
-                <button class="ai-notepad-btn">Send to AI</button>
+            <!-- Important Emails -->
+            <div class="info-section">
+                <div class="info-header">Important Emails (3)</div>
+                <div class="email-item">
+                    <div class="email-subject email-urgent">Payment overdue - Invoice #4521</div>
+                    <div class="email-from">Client Corp • 2h ago</div>
+                </div>
+                <div class="email-item">
+                    <div class="email-subject">Contract review needed</div>
+                    <div class="email-from">Legal Team • 5h ago</div>
+                </div>
+                <div class="email-item">
+                    <div class="email-subject">Intro: Potential collaboration</div>
+                    <div class="email-from">Sarah Chen • 1d ago</div>
+                </div>
+            </div>
+
+            <!-- Upcoming Deadlines & Meetings -->
+            <div class="info-section">
+                <div class="info-header">Upcoming</div>
+                <div class="email-item">
+                    <div class="email-subject">Q1 Report Deadline</div>
+                    <div class="email-from">Jan 31 • 2 days</div>
+                </div>
+                <div class="email-item">
+                    <div class="email-subject">Client Strategy Call</div>
+                    <div class="email-from">Tomorrow 3pm • TechCorp</div>
+                </div>
+                <div class="email-item">
+                    <div class="email-subject">Project Kickoff Meeting</div>
+                    <div class="email-from">Feb 3 • 5 days</div>
+                </div>
             </div>
             
             <div class="github-calendar">
@@ -55,16 +98,12 @@ AI will process and organize these for you."></textarea>
                 <div class="social-queue">
                     <div class="social-queue-header">Scheduled Posts</div>
                     <div class="social-post">
-                        Just shipped a major performance update to the client portal. 40% faster load times 🚀
+                        Building resilient APIs with retry logic and circuit breakers
                         <div class="social-post-meta">Twitter + LinkedIn • Today 2pm</div>
                     </div>
                     <div class="social-post">
-                        New blog post: Building resilient APIs with retry logic and circuit breakers
-                        <div class="social-post-meta">Twitter + LinkedIn • Tomorrow 10am</div>
-                    </div>
-                    <div class="social-post">
                         Behind the scenes: My daily workflow as a solo developer
-                        <div class="social-post-meta">LinkedIn • Jan 29 9am</div>
+                        <div class="social-post-meta">LinkedIn • Tomorrow 10am</div>
                     </div>
                 </div>
             </div>
@@ -72,6 +111,7 @@ AI will process and organize these for you."></textarea>
             <!-- Project Cards -->
             <div class="projects-grid">
                 <div class="project-card">
+                    <div class="project-card-updated">Updated: Jan 24</div>
                     <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23203EAE%22 width=%22100%22 height=%22100%22/></svg>');"></div>
                     <div class="project-card-content">
                         <div class="project-card-name">Client Portal Rebuild</div>
@@ -89,6 +129,7 @@ AI will process and organize these for you."></textarea>
                 </div>
 
                 <div class="project-card">
+                    <div class="project-card-updated">Updated: Jan 25</div>
                     <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23B8C9E5%22 width=%22100%22 height=%22100%22/></svg>');"></div>
                     <div class="project-card-content">
                         <div class="project-card-name">Newsletter System</div>
@@ -106,6 +147,7 @@ AI will process and organize these for you."></textarea>
                 </div>
 
                 <div class="project-card">
+                    <div class="project-card-updated">Updated: Jan 26</div>
                     <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23203EAE%22 width=%22100%22 height=%22100%22/></svg>');"></div>
                     <div class="project-card-content">
                         <div class="project-card-name">API Integration</div>
@@ -123,6 +165,7 @@ AI will process and organize these for you."></textarea>
                 </div>
 
                 <div class="project-card">
+                    <div class="project-card-updated">Updated: Jan 22</div>
                     <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23B8C9E5%22 width=%22100%22 height=%22100%22/></svg>');"></div>
                     <div class="project-card-content">
                         <div class="project-card-name">Content Strategy</div>
@@ -139,7 +182,10 @@ AI will process and organize these for you."></textarea>
                     </div>
                 </div>
             </div>
+        </div>
 
+        <!-- Right Sidebar: Finance + Health + Morning Log -->
+        <div class="os-right">
             <!-- Finance Quick View -->
             <div class="info-section">
                 <div class="info-header">Finance • January</div>
@@ -152,17 +198,30 @@ AI will process and organize these for you."></textarea>
                     <span class="info-value accent">$13.4k</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">Outstanding</span>
-                    <span class="info-value">$6.5k</span>
+                    <span class="info-label">Expense</span>
+                    <span class="info-value">$4.8k</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Spending</span>
+                    <span class="info-value">$3.2k</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Investment</span>
+                    <span class="info-value accent">$45.5k</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Asset</span>
+                    <span class="info-value accent">$120.3k</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Total Net</span>
+                    <span class="info-value accent">$165.8k</span>
                 </div>
             </div>
-        </div>
 
-        <!-- Right Sidebar: Health + Emails -->
-        <div class="os-right">
             <!-- Health Compact -->
             <div class="info-section">
-                <div class="info-header">Health</div>
+                <div class="info-header">Health • Late-stage recovery</div>
                 <div class="info-row">
                     <span class="info-label">Recovery</span>
                     <span class="info-value accent">82%</span>
@@ -177,42 +236,18 @@ AI will process and organize these for you."></textarea>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Cycle</span>
-                    <span class="info-value">Day 14</span>
+                    <span class="info-value">Luteal Phase (low energy)</span>
+                </div>
+                <div class="health-alert" id="healthAlert" style="display: none;">
+                    <!-- Alert message will be populated by JavaScript -->
                 </div>
             </div>
 
-            <!-- Important Emails -->
-            <div class="info-section">
-                <div class="info-header">Important Emails (3)</div>
-                <div class="email-item">
-                    <div class="email-subject email-urgent">Payment overdue - Invoice #4521</div>
-                    <div class="email-from">Client Corp • 2h ago</div>
-                </div>
-                <div class="email-item">
-                    <div class="email-subject">Contract review needed</div>
-                    <div class="email-from">Legal Team • 5h ago</div>
-                </div>
-                <div class="email-item">
-                    <div class="email-subject">Intro: Potential collaboration</div>
-                    <div class="email-from">Sarah Chen • 1d ago</div>
-                </div>
-            </div>
-
-            <!-- Quick Tasks -->
-            <div class="info-section">
-                <div class="info-header">Today (4/8)</div>
-                <div class="info-row" style="border: none; padding: 6px 0;">
-                    <span class="info-label" style="font-size: 11px;">Push API updates</span>
-                </div>
-                <div class="info-row" style="border: none; padding: 6px 0;">
-                    <span class="info-label" style="font-size: 11px;">Review client feedback</span>
-                </div>
-                <div class="info-row" style="border: none; padding: 6px 0;">
-                    <span class="info-label" style="font-size: 11px;">Update portfolio</span>
-                </div>
-                <div class="info-row" style="border: none; padding: 6px 0;">
-                    <span class="info-label" style="font-size: 11px;">Schedule dentist</span>
-                </div>
+            <!-- Agent Chat (moved to bottom) -->
+            <div class="ai-notepad">
+                <div class="ai-notepad-header">AGENT</div>
+                <textarea class="ai-notepad-input" placeholder=""></textarea>
+                <button class="ai-notepad-btn">Send</button>
             </div>
         </div>
     </div>
