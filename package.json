@@ -1,0 +1,21 @@
+{
+  "name": "life-os",
+  "version": "1.0.0",
+  "description": "Personal Life OS Dashboard - A local dashboard that loads when your laptop opens",
+  "main": "index.html",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "dashboard",
+    "life-os",
+    "personal",
+    "productivity"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

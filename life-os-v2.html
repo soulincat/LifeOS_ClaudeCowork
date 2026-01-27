@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life OS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #F5F5F5;
+            --surface: #ffffff;
+            --border: #e0e0e0;
+            --text: #1a1a1a;
+            --text-dim: #6b7280;
+            --accent: #203EAE;
+            --secondary: #B8C9E5;
+            --warn: #dc2626;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, sans-serif;
+            font-weight: 300;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .os-grid {
+            display: grid;
+            grid-template-columns: 340px 1fr 320px;
+            height: 100vh;
+            gap: 1px;
+            background: var(--border);
+        }
+
+        .os-sidebar {
+            background: var(--surface);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .os-main {
+            background: var(--bg);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .os-right {
+            background: var(--surface);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        /* AI Notepad */
+        .ai-notepad {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .ai-notepad-header {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+
+        .ai-notepad-input {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px;
+            font-family: ui-monospace, monospace;
+            font-size: 13px;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .ai-notepad-input:focus {
+            border-color: var(--accent);
+        }
+
+        .ai-notepad-btn {
+            margin-top: 8px;
+            padding: 8px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .ai-notepad-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* GitHub Calendar */
+        .github-calendar {
+            padding: 16px;
+            background: var(--surface);
+        }
+
+        .github-calendar-header {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+
+        .github-embed {
+            width: 100%;
+            height: 140px;
+            background: var(--bg);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        /* Project Cards */
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .project-card {
+            background: var(--surface);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            height: 180px;
+        }
+
+        .project-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        .project-card-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.15;
+        }
+
+        .project-card-content {
+            position: relative;
+            padding: 20px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .project-card-name {
+            font-size: 16px;
+            font-weight: 400;
+            margin-bottom: 4px;
+        }
+
+        .project-card-metrics {
+            display: flex;
+            gap: 24px;
+        }
+
+        .project-metric {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .project-metric-value {
+            font-size: 28px;
+            font-weight: 300;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .project-metric-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        /* Social Media Panel */
+        .social-panel {
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .social-panel-header {
+            font-size: 14px;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+
+        .social-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .social-metric {
+            text-align: center;
+        }
+
+        .social-metric-value {
+            font-size: 24px;
+            font-weight: 300;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .social-metric-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        .social-queue {
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+        }
+
+        .social-queue-header {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+
+        .social-post {
+            background: rgba(184, 201, 229, 0.1);
+            border-left: 3px solid var(--secondary);
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 2px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .social-post-meta {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 6px;
+            font-family: ui-monospace, monospace;
+        }
+
+        /* Finance & Health Compact */
+        .info-section {
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .info-header {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .info-row:last-child {
+            border: none;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 300;
+            font-family: ui-monospace, monospace;
+        }
+
+        .info-value.accent {
+            color: var(--accent);
+        }
+
+        /* Emails Compact */
+        .email-item {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+
+        .email-item:last-child {
+            border: none;
+        }
+
+        .email-subject {
+            font-size: 12px;
+            margin-bottom: 2px;
+        }
+
+        .email-from {
+            font-size: 10px;
+            color: var(--text-dim);
+            font-family: ui-monospace, monospace;
+        }
+
+        .email-urgent {
+            color: var(--warn);
+            font-weight: 400;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--secondary);
+            border-radius: 3px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .project-card {
+            animation: fadeIn 0.4s ease-out backwards;
+        }
+
+        .project-card:nth-child(1) { animation-delay: 0.05s; }
+        .project-card:nth-child(2) { animation-delay: 0.1s; }
+        .project-card:nth-child(3) { animation-delay: 0.15s; }
+        .project-card:nth-child(4) { animation-delay: 0.2s; }
+    </style>
+</head>
+<body>
+    <div class="os-grid">
+        <!-- Left Sidebar: AI Notepad + GitHub -->
+        <div class="os-sidebar">
+            <div class="ai-notepad">
+                <div class="ai-notepad-header">Morning Log</div>
+                <textarea class="ai-notepad-input" placeholder="Type your thoughts, tasks, ideas...
+
+AI will process and organize these for you."></textarea>
+                <button class="ai-notepad-btn">Send to AI</button>
+            </div>
+            
+            <div class="github-calendar">
+                <div class="github-calendar-header">Code Activity</div>
+                <div class="github-embed">
+                    <!-- GitHub contribution calendar embed -->
+                    <img src="https://ghchart.rshah.org/203EAE/yourusername" alt="GitHub Contributions" style="width: 100%; border-radius: 4px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content: Projects + Social -->
+        <div class="os-main">
+            <!-- Social Media Panel (Top Priority) -->
+            <div class="social-panel">
+                <div class="social-panel-header">Social Media</div>
+                
+                <div class="social-metrics">
+                    <div class="social-metric">
+                        <div class="social-metric-value">24.8k</div>
+                        <div class="social-metric-label">Followers</div>
+                    </div>
+                    <div class="social-metric">
+                        <div class="social-metric-value">156</div>
+                        <div class="social-metric-label">Posts</div>
+                    </div>
+                    <div class="social-metric">
+                        <div class="social-metric-value">342k</div>
+                        <div class="social-metric-label">Impressions</div>
+                    </div>
+                    <div class="social-metric">
+                        <div class="social-metric-value">8.2k</div>
+                        <div class="social-metric-label">Clicks</div>
+                    </div>
+                </div>
+
+                <div class="social-queue">
+                    <div class="social-queue-header">Scheduled Posts</div>
+                    <div class="social-post">
+                        Just shipped a major performance update to the client portal. 40% faster load times 🚀
+                        <div class="social-post-meta">Twitter + LinkedIn • Today 2pm</div>
+                    </div>
+                    <div class="social-post">
+                        New blog post: Building resilient APIs with retry logic and circuit breakers
+                        <div class="social-post-meta">Twitter + LinkedIn • Tomorrow 10am</div>
+                    </div>
+                    <div class="social-post">
+                        Behind the scenes: My daily workflow as a solo developer
+                        <div class="social-post-meta">LinkedIn • Jan 29 9am</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Cards -->
+            <div class="projects-grid">
+                <div class="project-card">
+                    <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23203EAE%22 width=%22100%22 height=%22100%22/></svg>');"></div>
+                    <div class="project-card-content">
+                        <div class="project-card-name">Client Portal Rebuild</div>
+                        <div class="project-card-metrics">
+                            <div class="project-metric">
+                                <div class="project-metric-value">2.4k</div>
+                                <div class="project-metric-label">Users</div>
+                            </div>
+                            <div class="project-metric">
+                                <div class="project-metric-value">$8.2k</div>
+                                <div class="project-metric-label">MRR</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="project-card">
+                    <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23B8C9E5%22 width=%22100%22 height=%22100%22/></svg>');"></div>
+                    <div class="project-card-content">
+                        <div class="project-card-name">Newsletter System</div>
+                        <div class="project-card-metrics">
+                            <div class="project-metric">
+                                <div class="project-metric-value">8.9k</div>
+                                <div class="project-metric-label">Subscribers</div>
+                            </div>
+                            <div class="project-metric">
+                                <div class="project-metric-value">$3.5k</div>
+                                <div class="project-metric-label">MRR</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="project-card">
+                    <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23203EAE%22 width=%22100%22 height=%22100%22/></svg>');"></div>
+                    <div class="project-card-content">
+                        <div class="project-card-name">API Integration</div>
+                        <div class="project-card-metrics">
+                            <div class="project-metric">
+                                <div class="project-metric-value">1.2k</div>
+                                <div class="project-metric-label">API Calls</div>
+                            </div>
+                            <div class="project-metric">
+                                <div class="project-metric-value">$2.8k</div>
+                                <div class="project-metric-label">MRR</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="project-card">
+                    <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23B8C9E5%22 width=%22100%22 height=%22100%22/></svg>');"></div>
+                    <div class="project-card-content">
+                        <div class="project-card-name">Content Strategy</div>
+                        <div class="project-card-metrics">
+                            <div class="project-metric">
+                                <div class="project-metric-value">18.3k</div>
+                                <div class="project-metric-label">Reach</div>
+                            </div>
+                            <div class="project-metric">
+                                <div class="project-metric-value">$1.9k</div>
+                                <div class="project-metric-label">Revenue</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Finance Quick View -->
+            <div class="info-section">
+                <div class="info-header">Finance • January</div>
+                <div class="info-row">
+                    <span class="info-label">Revenue</span>
+                    <span class="info-value accent">$18.2k</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Profit</span>
+                    <span class="info-value accent">$13.4k</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Outstanding</span>
+                    <span class="info-value">$6.5k</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar: Health + Emails -->
+        <div class="os-right">
+            <!-- Health Compact -->
+            <div class="info-section">
+                <div class="info-header">Health</div>
+                <div class="info-row">
+                    <span class="info-label">Recovery</span>
+                    <span class="info-value accent">82%</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Sleep</span>
+                    <span class="info-value">7h 24m</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">HRV</span>
+                    <span class="info-value">64ms</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Cycle</span>
+                    <span class="info-value">Day 14</span>
+                </div>
+            </div>
+
+            <!-- Important Emails -->
+            <div class="info-section">
+                <div class="info-header">Important Emails (3)</div>
+                <div class="email-item">
+                    <div class="email-subject email-urgent">Payment overdue - Invoice #4521</div>
+                    <div class="email-from">Client Corp • 2h ago</div>
+                </div>
+                <div class="email-item">
+                    <div class="email-subject">Contract review needed</div>
+                    <div class="email-from">Legal Team • 5h ago</div>
+                </div>
+                <div class="email-item">
+                    <div class="email-subject">Intro: Potential collaboration</div>
+                    <div class="email-from">Sarah Chen • 1d ago</div>
+                </div>
+            </div>
+
+            <!-- Quick Tasks -->
+            <div class="info-section">
+                <div class="info-header">Today (4/8)</div>
+                <div class="info-row" style="border: none; padding: 6px 0;">
+                    <span class="info-label" style="font-size: 11px;">Push API updates</span>
+                </div>
+                <div class="info-row" style="border: none; padding: 6px 0;">
+                    <span class="info-label" style="font-size: 11px;">Review client feedback</span>
+                </div>
+                <div class="info-row" style="border: none; padding: 6px 0;">
+                    <span class="info-label" style="font-size: 11px;">Update portfolio</span>
+                </div>
+                <div class="info-row" style="border: none; padding: 6px 0;">
+                    <span class="info-label" style="font-size: 11px;">Schedule dentist</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // AI Notepad submission
+        document.querySelector('.ai-notepad-btn').addEventListener('click', async function() {
+            const textarea = document.querySelector('.ai-notepad-input');
+            const text = textarea.value.trim();
+            
+            if (!text) return;
+            
+            // Visual feedback
+            this.textContent = 'Processing...';
+            this.disabled = true;
+            
+            // In production, this would call Claude API
+            // For now, simulate processing
+            setTimeout(() => {
+                textarea.value = '';
+                this.textContent = 'Sent ✓';
+                setTimeout(() => {
+                    this.textContent = 'Send to AI';
+                    this.disabled = false;
+                }, 1500);
+            }, 1000);
+        });
+
+        // Project card clicks
+        document.querySelectorAll('.project-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const name = this.querySelector('.project-card-name').textContent;
+                console.log('Opening project:', name);
+            });
+        });
+
+        // Email clicks
+        document.querySelectorAll('.email-item').forEach(email => {
+            email.addEventListener('click', function() {
+                const subject = this.querySelector('.email-subject').textContent;
+                console.log('Opening email:', subject);
+            });
+        });
+    </script>
+</body>
+</html>
