@@ -4,3 +4,6 @@ node_modules/
 .env
 dist/
 build/
+*.db
+*.db-shm
+*.db-wal

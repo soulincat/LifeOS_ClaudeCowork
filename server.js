@@ -2,6 +2,17 @@ const express = require('express');
 const path = require('path');
 require('dotenv').config();
 
+// Initialize database
+require('./db/database');
+
+// Seed initial data if database is empty
+const db = require('./db/database');
+const todoCount = db.prepare('SELECT COUNT(*) as count FROM todos').get();
+if (todoCount.count === 0) {
+    console.log('Database is empty, seeding initial data...');
+    require('./db/seed')();
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -9,8 +20,18 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Claude API endpoint - Try Claude Cowork first, then fall back to Claude API
+// API Routes
+app.use('/api/health', require('./routes/health'));
+app.use('/api/finance', require('./routes/finance'));
+app.use('/api/projects', require('./routes/projects'));
+app.use('/api/social', require('./routes/social'));
+app.use('/api/todos', require('./routes/todos'));
+app.use('/api/upcoming', require('./routes/upcoming'));
+app.use('/api/sync', require('./routes/sync'));
+
+// Agent conversations - Save to database
 app.post('/api/agent', async (req, res) => {
+    const db = require('./db/database');
     const { message } = req.body;
     
     if (!message) {
@@ -52,8 +73,17 @@ app.post('/api/agent', async (req, res) => {
             if (coworkResponse.ok) {
                 const coworkData = await coworkResponse.json();
                 console.log(`✅ Connected to Claude Cowork via ${path}`);
+                const coworkResponseText = coworkData.response || coworkData.text || coworkData.content || coworkData.message || 'Response received';
+                
+                // Save conversation to database
+                const stmt = db.prepare(`
+                    INSERT INTO agent_conversations (message, response, source)
+                    VALUES (?, ?, ?)
+                `);
+                stmt.run(message, coworkResponseText, 'cowork');
+                
                 return res.json({
-                    response: coworkData.response || coworkData.text || coworkData.content || coworkData.message || 'Response received',
+                    response: coworkResponseText,
                     source: 'cowork',
                     usage: coworkData.usage || null
                 });
@@ -91,8 +121,17 @@ app.post('/api/agent', async (req, res) => {
             });
 
             console.log('✅ Using Claude API');
+            const agentResponse = response.content[0].text;
+            
+            // Save conversation to database
+            const stmt = db.prepare(`
+                INSERT INTO agent_conversations (message, response, source)
+                VALUES (?, ?, ?)
+            `);
+            stmt.run(message, agentResponse, 'api');
+            
             return res.json({ 
-                response: response.content[0].text,
+                response: agentResponse,
                 source: 'api',
                 usage: response.usage
             });

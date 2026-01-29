@@ -2,6 +2,16 @@
 
 A personal dashboard that loads automatically when you open your laptop. Built as a local web application that displays your projects, health metrics, finances, emails, and more in a clean, organized interface.
 
+## 🎉 New Features!
+
+See [README-FEATURES.md](README-FEATURES.md) for a complete guide to all new features including:
+- Dark mode toggle 🌙
+- Add/edit todos inline ✏️
+- Finance entry forms 💰
+- Historical charts 📊
+- Toast notifications 🔔
+- Auto-launch setup 🚀
+
 ## Features
 
 - **AI Notepad**: Morning log for thoughts, tasks, and ideas
@@ -21,7 +31,22 @@ A personal dashboard that loads automatically when you open your laptop. Built a
 npm install
 ```
 
-### 2. Configure Claude API (Optional but Recommended)
+### 2. Setup Desktop Reminders (Optional)
+
+To get automatic reminders for weekly updates and monthly finance input:
+
+```bash
+cd notifications
+./setup.sh
+```
+
+This sets up:
+- **Weekly reminder**: Every Monday morning (8-10 AM) to check dashboard updates
+- **Monthly reminder**: End of month (last 3 days, 9-11 AM) to input financial data
+
+See `notifications/README.md` for more details.
+
+### 3. Configure Claude API (Optional but Recommended)
 
 To enable the AGENT chat functionality:
 
@@ -152,18 +177,102 @@ Set up an MCP (Model Context Protocol) server to bridge Claude Cowork to your da
 - Setting up a local bridge endpoint
 - More complex but allows deeper integration
 
+## Database & API Integration
+
+The dashboard now uses SQLite for data persistence and supports multiple API integrations.
+
+### Database
+
+- **Location**: `lifeos.db` in project root
+- **Type**: SQLite (file-based, no server needed)
+- **Auto-initialization**: Tables are created automatically on first run
+- **Seeding**: Initial data is seeded automatically if database is empty
+
+### API Integrations
+
+**Configured Integrations:**
+- **Whoop** (Health): Daily sync for recovery, sleep, HRV
+- **GitHub** (Projects): On-demand sync for commit dates
+- **Soulinsocial** (Social): Reads from local project files/DB
+- **Stripe** (Finance): Optional, for business revenue
+- **Wise** (Finance): Optional, for personal spending
+
+**Setup API Keys:**
+
+Add to your `.env` file:
+```bash
+# Health
+WHOOP_API_TOKEN=your_whoop_token
+
+# Finance (optional)
+STRIPE_SECRET_KEY=your_stripe_key
+WISE_API_TOKEN=your_wise_token
+
+# Projects
+GITHUB_TOKEN=your_github_token
+```
+
+### Data Logging Frequency
+
+- **Daily**: Health metrics (Whoop), Spending (Wise/manual), Social followers
+- **Weekly**: Revenue/Profit (Stripe/manual), Social metrics snapshot
+- **Monthly**: Investment, Asset (snapshots), Finance aggregation
+- **Real-time**: Todos, Emails, Upcoming items, Scheduled posts, Agent conversations
+- **On-demand**: Projects (GitHub commits), Finance manual entries
+
+### API Endpoints
+
+- `GET /api/health` - Latest health metrics
+- `GET /api/health/history` - Health history (for charts)
+- `POST /api/health` - Update health metrics manually
+- `GET /api/finance` - Current month finance summary
+- `GET /api/projects` - All projects with last updated dates
+- `POST /api/projects/refresh` - Refresh project commit dates from GitHub
+- `GET /api/social/metrics` - Social media metrics
+- `GET /api/social/scheduled-posts` - Next 3 scheduled posts
+- `GET /api/todos` - Get all todos
+- `POST /api/todos` - Create todo
+- `PATCH /api/todos/:id` - Update todo
+- `GET /api/upcoming` - Get upcoming deadlines/meetings
+
+## Manual Finance Input
+
+To set up your initial finance data manually:
+
+### Quick Setup (Recommended for first time)
+```bash
+npm run setup-finance
+```
+This guides you through entering common finance entries for the current month.
+
+### Detailed Input (For multiple entries)
+```bash
+npm run input-finance
+```
+This allows you to add multiple finance entries with full control over dates, types, and amounts.
+
+### Finance Types
+- **Revenue**: Business income (month-to-date: 1st to today, from Stripe API)
+- **Profit**: Revenue minus expenses (auto-calculated, month-to-date)
+- **Expense**: Business costs (month-to-date: 1st to today, from Stripe API)
+- **Spending**: Personal spending (month-to-date: 1st to today, from Wise API)
+- **Investment**: Total investments (monthly snapshot)
+- **Asset**: Total assets (monthly snapshot)
+- **Total Net**: Net worth (monthly snapshot)
+
 ## Future Enhancements
 
 - [x] Claude API integration for AGENT
-- [ ] Real GitHub API for contribution calendar
+- [x] Database setup with SQLite
+- [x] API endpoints for all data
+- [x] Whoop integration for health
+- [x] GitHub integration for projects
+- [x] Stripe/Wise integration
+- [x] Auto-refresh functionality
+- [x] Dark mode toggle
+- [x] Historical charts/graphs
+- [x] Manual finance input tools
 - [ ] Email API integration (Gmail, etc.)
-- [ ] Health tracker API integration
-- [ ] Finance API integration
-- [ ] Scheduled posts API integration
-- [ ] Data persistence (localStorage or database)
-- [ ] Auto-refresh functionality
-- [ ] Dark mode toggle
-- [ ] Claude Cowork direct integration
 
 ## License
 

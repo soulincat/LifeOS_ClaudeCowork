@@ -6,24 +6,79 @@
     <title>Life OS</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="light-theme">
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+    
+    <!-- Header Controls -->
+    <div class="header-controls">
+        <button class="btn-refresh" id="refreshBtn" title="Refresh Data">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 2V6L12 2L8 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8 14V10L4 14L8 14Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+        </button>
+        <button class="btn-theme-toggle" id="themeToggle" title="Toggle Dark Mode">
+            <svg class="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M8 1V3M8 13V15M15 8H13M3 8H1M13.657 2.343L12.243 3.757M3.757 12.243L2.343 13.657M13.657 13.657L12.243 12.243M3.757 3.757L2.343 2.343" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <svg class="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                <path d="M6.5 2C6.5 4.48528 8.51472 6.5 11 6.5C11.3296 6.5 11.6513 6.47028 11.9623 6.41421C11.3296 8.41421 9.41421 10 7 10C4.51472 10 2.5 7.98528 2.5 5.5C2.5 3.08579 4.08579 1.17036 6.08579 0.537735C6.02972 0.848735 6 1.17036 6 1.5C6 1.82964 6.02972 2.15127 6.08579 2.46227C6.08579 2.46227 6.08579 2.46227 6.5 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </div>
+    
     <div class="os-grid">
         <!-- Left Sidebar: Today + Emails + GitHub -->
         <div class="os-sidebar">
-            <!-- Quick Tasks -->
+            <!-- Todo List -->
             <div class="info-section">
-                <div class="info-header">Today (4/8)</div>
-                <div class="info-row" style="border: none; padding: 6px 0;">
-                    <span class="info-label" style="font-size: 11px;">Push API updates</span>
+                <div class="info-header">
+                    Today <span id="todoCount">4/8</span>
+                    <button class="btn-add-todo" id="addTodoBtn" title="Add Todo">+</button>
                 </div>
-                <div class="info-row" style="border: none; padding: 6px 0;">
-                    <span class="info-label" style="font-size: 11px;">Review client feedback</span>
+                <div class="todo-add-form" id="todoAddForm" style="display: none;">
+                    <input type="text" class="todo-input" id="todoInput" placeholder="Add new todo...">
+                    <div class="todo-form-actions">
+                        <button class="btn-save" id="saveTodoBtn">Add</button>
+                        <button class="btn-cancel" id="cancelTodoBtn">Cancel</button>
+                    </div>
                 </div>
-                <div class="info-row" style="border: none; padding: 6px 0;">
-                    <span class="info-label" style="font-size: 11px;">Update portfolio</span>
-                </div>
-                <div class="info-row" style="border: none; padding: 6px 0;">
-                    <span class="info-label" style="font-size: 11px;">Schedule dentist</span>
+                <div class="todo-list" id="todoList">
+                    <label class="todo-item">
+                        <input type="checkbox" class="todo-checkbox" checked>
+                        <span class="todo-text">Push API updates</span>
+                    </label>
+                    <label class="todo-item">
+                        <input type="checkbox" class="todo-checkbox" checked>
+                        <span class="todo-text">Review client feedback</span>
+                    </label>
+                    <label class="todo-item">
+                        <input type="checkbox" class="todo-checkbox" checked>
+                        <span class="todo-text">Update portfolio</span>
+                    </label>
+                    <label class="todo-item">
+                        <input type="checkbox" class="todo-checkbox" checked>
+                        <span class="todo-text">Schedule dentist</span>
+                    </label>
+                    <label class="todo-item">
+                        <input type="checkbox" class="todo-checkbox">
+                        <span class="todo-text">Write blog post</span>
+                    </label>
+                    <label class="todo-item">
+                        <input type="checkbox" class="todo-checkbox">
+                        <span class="todo-text">Team standup prep</span>
+                    </label>
+                    <label class="todo-item">
+                        <input type="checkbox" class="todo-checkbox">
+                        <span class="todo-text">Review PRs</span>
+                    </label>
+                    <label class="todo-item">
+                        <input type="checkbox" class="todo-checkbox">
+                        <span class="todo-text">Update documentation</span>
+                    </label>
                 </div>
             </div>
 
@@ -45,27 +100,38 @@
             </div>
 
             <!-- Upcoming Deadlines & Meetings -->
-            <div class="info-section">
-                <div class="info-header">Upcoming</div>
-                <div class="email-item">
-                    <div class="email-subject">Q1 Report Deadline</div>
-                    <div class="email-from">Jan 31 • 2 days</div>
+            <div class="info-section" id="upcomingSection">
+                <div class="info-header">
+                    Upcoming
+                    <button class="btn-add-todo" id="addUpcomingBtn" title="Add Item">+</button>
                 </div>
-                <div class="email-item">
-                    <div class="email-subject">Client Strategy Call</div>
-                    <div class="email-from">Tomorrow 3pm • TechCorp</div>
+                <div class="todo-add-form" id="upcomingAddForm" style="display: none;">
+                    <input type="text" class="todo-input" id="upcomingTitleInput" placeholder="Title...">
+                    <select class="todo-input" id="upcomingTypeInput">
+                        <option value="deadline">Deadline</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="call">Call</option>
+                    </select>
+                    <input type="datetime-local" class="todo-input" id="upcomingDateInput">
+                    <input type="text" class="todo-input" id="upcomingDescInput" placeholder="Description (optional)">
+                    <div class="todo-form-actions">
+                        <button class="btn-save" id="saveUpcomingBtn">Add</button>
+                        <button class="btn-cancel" id="cancelUpcomingBtn">Cancel</button>
+                    </div>
                 </div>
-                <div class="email-item">
-                    <div class="email-subject">Project Kickoff Meeting</div>
-                    <div class="email-from">Feb 3 • 5 days</div>
-                </div>
-            </div>
-            
-            <div class="github-calendar">
-                <div class="github-calendar-header">Code Activity</div>
-                <div class="github-embed">
-                    <!-- GitHub contribution calendar embed -->
-                    <img src="https://ghchart.rshah.org/203EAE/yourusername" alt="GitHub Contributions" style="width: 100%; border-radius: 4px;">
+                <div id="upcomingContainer">
+                    <div class="email-item">
+                        <div class="email-subject">Q1 Report Deadline</div>
+                        <div class="email-from">Jan 31 • 2 days</div>
+                    </div>
+                    <div class="email-item">
+                        <div class="email-subject">Client Strategy Call</div>
+                        <div class="email-from">Tomorrow 3pm • TechCorp</div>
+                    </div>
+                    <div class="email-item">
+                        <div class="email-subject">Project Kickoff Meeting</div>
+                        <div class="email-from">Feb 3 • 5 days</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -97,13 +163,19 @@
 
                 <div class="social-queue">
                     <div class="social-queue-header">Scheduled Posts</div>
-                    <div class="social-post">
-                        Building resilient APIs with retry logic and circuit breakers
-                        <div class="social-post-meta">Twitter + LinkedIn • Today 2pm</div>
-                    </div>
-                    <div class="social-post">
-                        Behind the scenes: My daily workflow as a solo developer
-                        <div class="social-post-meta">LinkedIn • Tomorrow 10am</div>
+                    <div id="scheduledPostsContainer">
+                        <div class="social-post">
+                            Building resilient APIs with retry logic and circuit breakers
+                            <div class="social-post-meta">Twitter + LinkedIn • Today 2pm</div>
+                        </div>
+                        <div class="social-post">
+                            Behind the scenes: My daily workflow as a solo developer
+                            <div class="social-post-meta">LinkedIn • Tomorrow 10am</div>
+                        </div>
+                        <div class="social-post">
+                            Just shipped a major performance update to the client portal. 40% faster load times 🚀
+                            <div class="social-post-meta">Twitter + LinkedIn • Jan 29 2pm</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -182,13 +254,93 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Social Media Platform Cards -->
+            <div class="social-platforms-grid">
+                <div class="social-platform-card">
+                    <svg class="social-platform-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="4" width="20" height="16" rx="2"/>
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                    </svg>
+                    <div class="social-platform-metric">1.2k</div>
+                </div>
+                <div class="social-platform-card">
+                    <svg class="social-platform-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                    </svg>
+                    <div class="social-platform-metric">8.5k</div>
+                </div>
+                <div class="social-platform-card">
+                    <svg class="social-platform-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/>
+                    </svg>
+                    <div class="social-platform-metric">12.3k</div>
+                </div>
+                <div class="social-platform-card">
+                    <svg class="social-platform-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                        <circle cx="12" cy="12" r="4" fill="white"/>
+                        <circle cx="17.5" cy="6.5" r="1.5" fill="white"/>
+                    </svg>
+                    <div class="social-platform-metric">4.1k</div>
+                </div>
+                <div class="social-platform-card">
+                    <svg class="social-platform-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm0-16c-3.314 0-6 2.686-6 6s2.686 6 6 6 6-2.686 6-6-2.686-6-6-6zm0 10c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <div class="social-platform-metric">2.8k</div>
+                </div>
+                <div class="social-platform-card">
+                    <svg class="social-platform-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z"/>
+                    </svg>
+                    <div class="social-platform-metric">890</div>
+                </div>
+                <div class="social-platform-card">
+                    <svg class="social-platform-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    <div class="social-platform-metric">3.2k</div>
+                </div>
+            </div>
         </div>
 
         <!-- Right Sidebar: Finance + Health + Morning Log -->
         <div class="os-right">
             <!-- Finance Quick View -->
-            <div class="info-section">
-                <div class="info-header">Finance • January</div>
+            <div class="info-section" id="financeSection">
+                <div class="info-header">
+                    Finance • <span id="financeMonth">January</span>
+                    <button class="btn-add-todo" id="addFinanceBtn" title="Add Entry">+</button>
+                </div>
+                <canvas id="financeChart" style="display: none; max-height: 120px; margin-top: 8px;"></canvas>
+                <div class="todo-add-form" id="financeAddForm" style="display: none;">
+                    <select class="todo-input" id="financeTypeInput">
+                        <option value="revenue">Revenue</option>
+                        <option value="profit">Profit</option>
+                        <option value="expense">Expense</option>
+                        <option value="spending">Spending</option>
+                        <option value="investment">Investment</option>
+                        <option value="passive_yield">Passive Yield</option>
+                        <option value="asset">Asset</option>
+                        <option value="total_net">Total Net</option>
+                    </select>
+                    <input type="number" class="todo-input" id="financeAmountInput" placeholder="Amount" step="0.01">
+                    <select class="todo-input" id="financeCurrencyInput" style="display: none;">
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                    </select>
+                    <select class="todo-input" id="financeAccountInput">
+                        <option value="business">Business</option>
+                        <option value="personal">Personal</option>
+                    </select>
+                    <input type="date" class="todo-input" id="financeDateInput">
+                    <div class="todo-form-actions">
+                        <button class="btn-save" id="saveFinanceBtn">Add</button>
+                        <button class="btn-cancel" id="cancelFinanceBtn">Cancel</button>
+                    </div>
+                </div>
                 <div class="info-row">
                     <span class="info-label">Revenue</span>
                     <span class="info-value accent">$18.2k</span>
@@ -210,6 +362,10 @@
                     <span class="info-value accent">$45.5k</span>
                 </div>
                 <div class="info-row">
+                    <span class="info-label">Passive Yield</span>
+                    <span class="info-value" id="passiveYieldValue">$0 (0.0%)</span>
+                </div>
+                <div class="info-row">
                     <span class="info-label">Asset</span>
                     <span class="info-value accent">$120.3k</span>
                 </div>
@@ -221,7 +377,17 @@
 
             <!-- Health Compact -->
             <div class="info-section">
-                <div class="info-header">Health • Late-stage recovery</div>
+                <div class="info-header">
+                    Health • <span id="healthMonthlyPhase">Late-stage recovery</span>
+                    <button class="btn-chart-toggle" id="healthChartToggle" title="Show Chart">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="8" width="3" height="4" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                            <rect x="6" y="5" width="3" height="7" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                            <rect x="10" y="3" width="3" height="9" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                        </svg>
+                    </button>
+                </div>
+                <canvas id="healthChart" style="display: none; max-height: 120px; margin-top: 8px;"></canvas>
                 <div class="info-row">
                     <span class="info-label">Recovery</span>
                     <span class="info-value accent">82%</span>
@@ -243,15 +409,44 @@
                 </div>
             </div>
 
-            <!-- Agent Chat (moved to bottom) -->
+            <!-- Code Activity -->
+            <div class="github-calendar">
+                <div class="github-calendar-header">Code Activity</div>
+                <div class="github-widget-container">
+                    <div class="github-widget">
+                        <img id="githubContributionGraph" src="" alt="GitHub Contributions" class="github-contribution-graph">
+                    </div>
+                </div>
+            </div>
+
+            <!-- AGENT Chat (moved to bottom) -->
             <div class="ai-notepad">
                 <div class="ai-notepad-header">AGENT</div>
-                <textarea class="ai-notepad-input" placeholder=""></textarea>
-                <button class="ai-notepad-btn">Send</button>
+                <div class="ai-notepad-input-wrapper">
+                    <textarea class="ai-notepad-input" placeholder="Ask anything..."></textarea>
+                    <button class="ai-notepad-btn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2 8L14 2L10 8L14 14L2 8Z" fill="currentColor"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        // Ensure DOM is ready before loading scripts
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('DOM loaded, initializing scripts...');
+            });
+        } else {
+            console.log('DOM already loaded');
+        }
+    </script>
     <script src="app.js"></script>
+    <script src="app-features.js"></script>
+    <script src="app-charts.js"></script>
 </body>
 </html>

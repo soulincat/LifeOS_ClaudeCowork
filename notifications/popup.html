@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life OS Reminder</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .popup {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        
+        h1 {
+            font-size: 28px;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        
+        p {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .reminder-type {
+            display: inline-block;
+            padding: 6px 12px;
+            background: #f0f4ff;
+            color: #667eea;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup">
+        <div class="icon">📊</div>
+        <div class="reminder-type" id="reminderType">Weekly Reminder</div>
+        <h1 id="title">Check Your Dashboard</h1>
+        <p id="message">Time to review your updates and see what's happening!</p>
+        <div class="buttons">
+            <button class="btn-primary" onclick="openDashboard()">Open Dashboard</button>
+            <button class="btn-secondary" onclick="closePopup()">Remind Me Later</button>
+        </div>
+    </div>
+    
+    <script>
+        // Check URL parameters for reminder type
+        const params = new URLSearchParams(window.location.search);
+        const type = params.get('type') || 'weekly';
+        
+        const reminderTypeEl = document.getElementById('reminderType');
+        const titleEl = document.getElementById('title');
+        const messageEl = document.getElementById('message');
+        
+        if (type === 'monthly') {
+            reminderTypeEl.textContent = 'Monthly Reminder';
+            reminderTypeEl.style.background = '#fff4e6';
+            reminderTypeEl.style.color = '#d97706';
+            titleEl.textContent = 'Monthly Finance Update';
+            messageEl.textContent = 'It\'s the end of the month! Time to input your financial data manually.';
+        } else {
+            reminderTypeEl.textContent = 'Weekly Reminder';
+            titleEl.textContent = 'Check Your Dashboard';
+            messageEl.textContent = 'Time to review your updates and see what\'s happening this week!';
+        }
+        
+        function openDashboard() {
+            const port = new URLSearchParams(window.location.search).get('port') || '3000';
+            window.location.href = `http://localhost:${port}`;
+        }
+        
+        function closePopup() {
+            window.close();
+        }
+        
+        // Auto-open dashboard after 5 seconds if no interaction
+        setTimeout(() => {
+            if (document.hasFocus()) {
+                openDashboard();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

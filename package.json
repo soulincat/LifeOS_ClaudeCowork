@@ -5,7 +5,10 @@
   "main": "index.html",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "seed": "node db/seed.js",
+    "input-finance": "node scripts/input-finance.js",
+    "setup-finance": "node scripts/quick-finance-setup.js"
   },
   "keywords": [
     "dashboard",
@@ -16,8 +19,11 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
     "@anthropic-ai/sdk": "^0.20.0",
-    "dotenv": "^16.3.1"
+    "better-sqlite3": "^12.6.2",
+    "chart.js": "^4.5.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "stripe": "^20.3.0"
   }
 }
