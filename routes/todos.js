@@ -4,12 +4,13 @@ const db = require('../db/database');
 
 /**
  * GET /api/todos
- * Get todos: undone first, then 2 most recent completed (non-archived)
- * Query param: showAll=true to show all completed tasks (including archived)
+ * Get todos: undone first, then all completed from today
+ * Query param: showAll=true to show all completed tasks (including archived/older)
  */
 router.get('/', (req, res) => {
     try {
         const showAll = req.query.showAll === 'true';
+        const today = new Date().toISOString().split('T')[0];
         
         // Get all undone todos
         const undoneStmt = db.prepare(`
@@ -30,14 +31,14 @@ router.get('/', (req, res) => {
             `);
             doneTodos = doneStmt.all();
         } else {
-            // Show only 2 most recent completed (non-archived)
+            // Show all completed from today (non-archived)
             const doneStmt = db.prepare(`
                 SELECT * FROM todos 
                 WHERE completed = 1 AND archived = 0
+                AND DATE(completed_at) = ?
                 ORDER BY completed_at DESC
-                LIMIT 2
             `);
-            doneTodos = doneStmt.all();
+            doneTodos = doneStmt.all(today);
         }
         
         // Combine: undone first, then done
@@ -99,31 +100,15 @@ router.patch('/:id', (req, res) => {
                 `);
                 completionStmt.run(id, now);
                 
-                // Check if we need to archive old completed tasks
-                // Count current non-archived completed tasks
-                const countStmt = db.prepare(`
-                    SELECT COUNT(*) as count FROM todos 
-                    WHERE completed = 1 AND archived = 0
+                // Archive completed tasks from previous days (keep today's visible)
+                const archiveStmt = db.prepare(`
+                    UPDATE todos 
+                    SET archived = 1
+                    WHERE completed = 1 
+                    AND archived = 0 
+                    AND DATE(completed_at) < ?
                 `);
-                const count = countStmt.get().count;
-                
-                // If more than 2 completed tasks, archive the oldest ones (keep 2 most recent)
-                if (count > 2) {
-                    // Archive all except the 2 most recent (including the one we just completed)
-                    const archiveStmt = db.prepare(`
-                        UPDATE todos 
-                        SET archived = 1
-                        WHERE completed = 1 
-                        AND archived = 0 
-                        AND id NOT IN (
-                            SELECT id FROM todos 
-                            WHERE completed = 1 AND archived = 0
-                            ORDER BY completed_at DESC
-                            LIMIT 2
-                        )
-                    `);
-                    archiveStmt.run();
-                }
+                archiveStmt.run(now);
             } else {
                 // Uncomplete: remove from archived if it was archived
                 const uncompleteStmt = db.prepare(`

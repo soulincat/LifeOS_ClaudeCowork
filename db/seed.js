@@ -34,10 +34,10 @@ function seedDatabase() {
     `);
     
     const projects = [
-        { name: 'Client Portal Rebuild', github_repo: null, last_updated: '2025-01-24', metrics: JSON.stringify({ users: 2400, mrr: 8200 }) },
-        { name: 'Newsletter System', github_repo: null, last_updated: '2025-01-25', metrics: JSON.stringify({ subscribers: 8900, mrr: 3500 }) },
-        { name: 'API Integration', github_repo: null, last_updated: '2025-01-26', metrics: JSON.stringify({ api_calls: 1200, mrr: 2800 }) },
-        { name: 'Content Strategy', github_repo: null, last_updated: '2025-01-22', metrics: JSON.stringify({ reach: 18300, revenue: 1900 }) }
+        { name: 'Soulin Social', github_repo: null, last_updated: '2025-01-24', metrics: JSON.stringify({ users: 2400, mrr: 8200 }) },
+        { name: 'KINS', github_repo: null, last_updated: '2025-01-25', metrics: JSON.stringify({ subscribers: 8900, mrr: 3500 }) },
+        { name: 'Cathy K', github_repo: null, last_updated: '2025-01-26', metrics: JSON.stringify({ api_calls: 1200, mrr: 2800 }) },
+        { name: 'Soulful Academy', github_repo: null, last_updated: '2025-01-22', metrics: JSON.stringify({ reach: 18300, revenue: 1900 }) }
     ];
     
     projects.forEach(project => {

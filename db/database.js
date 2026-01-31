@@ -13,6 +13,82 @@ const schemaPath = path.join(__dirname, 'schema.sql');
 if (fs.existsSync(schemaPath)) {
     const schema = fs.readFileSync(schemaPath, 'utf8');
     db.exec(schema);
+    // Migrate existing scenarios table: add decision columns if missing
+    try {
+        const cols = db.prepare("PRAGMA table_info(scenarios)").all().map(r => r.name);
+        const add = (name, type) => { if (!cols.includes(name)) { db.exec("ALTER TABLE scenarios ADD COLUMN " + name + " " + type); cols.push(name); } };
+        add('pros', 'TEXT');
+        add('cons', 'TEXT');
+        add('long_term_upside', 'TEXT');
+        add('priority', 'INTEGER');
+        add('thesis', 'TEXT');
+        add('time_available_hrs_per_week', 'DECIMAL');
+        add('project_id', 'INTEGER REFERENCES projects(id)');
+        add('business_model', 'TEXT');
+        add('monthly_fee_usd', 'DECIMAL');
+        add('client_count_target', 'INTEGER');
+        add('client_target_months', 'INTEGER');
+        add('growth_rate_pct', 'DECIMAL');
+        add('marketing_fee_monthly', 'DECIMAL');
+        add('probability_pct', 'DECIMAL');
+        add('prelaunch_budget', 'DECIMAL');
+        add('prelaunch_weeks', 'INTEGER');
+    } catch (e) { /* table may not exist yet */ }
+    // Migrate scenario_projects: add experiment per-project columns + SaaS model
+    try {
+        const spCols = db.prepare("PRAGMA table_info(scenario_projects)").all().map(r => r.name);
+        const addSp = (name, type) => { if (!spCols.includes(name)) { db.exec("ALTER TABLE scenario_projects ADD COLUMN " + name + " " + type); spCols.push(name); } };
+        addSp('likelihood', 'TEXT');
+        addSp('tags', 'TEXT');
+        addSp('time_allocation_pct', 'DECIMAL');
+        addSp('budget_allocation', 'DECIMAL');
+        addSp('executed_hours_so_far', 'DECIMAL');
+        addSp('rev_projection', 'DECIMAL');
+        addSp('expected_rev_after_notes', 'TEXT');
+        addSp('exponential_growth', 'INTEGER');
+        addSp('model_type', 'TEXT');
+        addSp('monthly_fee_usd', 'DECIMAL');
+        addSp('client_target_months', 'INTEGER');
+        addSp('client_count_target', 'INTEGER');
+        addSp('growth_rate_pct', 'DECIMAL');
+        addSp('marketing_fee_monthly', 'DECIMAL');
+        addSp('probability_pct', 'DECIMAL');
+        addSp('willingness_alignment_notes', 'TEXT');
+    } catch (e) { /* */ }
+    // Migrate projects: add default revenue projections (Worst/Base/Best per project) + planning fields
+    try {
+        const pCols = db.prepare("PRAGMA table_info(projects)").all().map(r => r.name);
+        const addP = (name, type) => { if (!pCols.includes(name)) { db.exec("ALTER TABLE projects ADD COLUMN " + name + " " + type); pCols.push(name); } };
+        addP('revenue_worst', 'DECIMAL');
+        addP('revenue_base', 'DECIMAL');
+        addP('revenue_lucky', 'DECIMAL');
+        addP('hours_per_week', 'INTEGER');
+        addP('budget_to_invest', 'DECIMAL');
+        addP('months_to_results', 'INTEGER');
+        addP('business_model', 'TEXT');
+        addP('ai_assumptions', 'TEXT');
+        addP('description', 'TEXT');
+        addP('ai_analysis', 'TEXT');
+    } catch (e) { /* */ }
+    // Migrate wishlist_items: add savings progress and purchase conditions
+    try {
+        const wlCols = db.prepare("PRAGMA table_info(wishlist_items)").all().map(r => r.name);
+        const addWl = (name, type) => { if (!wlCols.includes(name)) { db.exec("ALTER TABLE wishlist_items ADD COLUMN " + name + " " + type); wlCols.push(name); } };
+        addWl('saved_amount', 'DECIMAL DEFAULT 0');
+        addWl('purchase_condition', 'TEXT');
+        addWl('condition_type', 'TEXT DEFAULT \'none\'');
+        addWl('condition_value', 'DECIMAL');
+    } catch (e) { /* */ }
+    // Migrate goals: add priority (1 = highest)
+    try {
+        const gCols = db.prepare("PRAGMA table_info(goals)").all().map(r => r.name);
+        if (!gCols.includes('priority')) db.exec('ALTER TABLE goals ADD COLUMN priority INTEGER DEFAULT 3');
+    } catch (e) { /* */ }
+    // Migrate goal_uncertainties: add sort_order for drag reorder
+    try {
+        const uCols = db.prepare("PRAGMA table_info(goal_uncertainties)").all().map(r => r.name);
+        if (!uCols.includes('sort_order')) db.exec('ALTER TABLE goal_uncertainties ADD COLUMN sort_order INTEGER DEFAULT 0');
+    } catch (e) { /* */ }
 } else {
     createTables();
 }

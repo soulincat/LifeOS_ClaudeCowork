@@ -28,15 +28,88 @@ app.use('/api/social', require('./routes/social'));
 app.use('/api/todos', require('./routes/todos'));
 app.use('/api/upcoming', require('./routes/upcoming'));
 app.use('/api/sync', require('./routes/sync'));
+app.use('/api/wishlist', require('./routes/wishlist'));
+app.use('/api/goals', require('./routes/goals'));
+
+// Agent: build context from last N conversations (suggestion 6 - agent memory)
+function getAgentContext(db, limit = 5) {
+    const rows = db.prepare(`
+        SELECT message, response FROM agent_conversations
+        ORDER BY id DESC LIMIT ?
+    `).all(limit);
+    if (rows.length === 0) return '';
+    const lines = rows.reverse().map(r => `User: ${r.message}\nAssistant: ${(r.response || '').slice(0, 200)}`).join('\n---\n');
+    return 'Recent conversation (for context):\n' + lines + '\n---\n';
+}
+
+// Agent: execute a simple command and return result (wishlist, goals, scenarios)
+async function executeAgentCommand(command, params, db) {
+    const baseUrl = 'http://localhost:' + (process.env.PORT || 3000);
+    try {
+        if (command === 'list_wishlist') {
+            const res = await fetch(baseUrl + '/api/wishlist');
+            const data = await res.json();
+            return JSON.stringify(data.length ? data.map(i => ({ name: i.name, price_usd: i.price_usd, priority: i.priority })) : []);
+        }
+        if (command === 'add_wishlist_item') {
+            const res = await fetch(baseUrl + '/api/wishlist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+            });
+            const data = await res.json();
+            return res.ok ? 'Added: ' + (data.name || 'item') : (data.error || 'Failed');
+        }
+        if (command === 'list_goals') {
+            const res = await fetch(baseUrl + '/api/goals');
+            const data = await res.json();
+            return JSON.stringify(data.length ? data.map(g => ({ title: g.title, period_label: g.period_label, aspect: g.aspect })) : []);
+        }
+        if (command === 'add_goal') {
+            const res = await fetch(baseUrl + '/api/goals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+            });
+            const data = await res.json();
+            return res.ok ? 'Added goal: ' + (data.title || '') : (data.error || 'Failed');
+        }
+        if (command === 'list_scenarios') {
+            return '[]';
+        }
+        if (command === 'get_scenario_comparison') {
+            return '[]';
+        }
+        if (command === 'get_current_focus') {
+            return JSON.stringify({ scenario: null, lastMonthlyReport: null });
+        }
+    } catch (e) {
+        return 'Error: ' + e.message;
+    }
+    return 'Unknown command';
+}
 
 // Agent conversations - Save to database
 app.post('/api/agent', async (req, res) => {
     const db = require('./db/database');
-    const { message } = req.body;
+    const { message, command, params } = req.body;
+    const userMessage = typeof message === 'string' ? message : (req.body.content || '');
     
-    if (!message) {
+    if (!userMessage && !command) {
         return res.status(400).json({ error: 'Message is required' });
     }
+
+    // If front-end sent a structured command (e.g. from parsed agent response), execute it
+    if (command && typeof executeAgentCommand === 'function') {
+        try {
+            const result = await executeAgentCommand(command, params || {}, db);
+            return res.json({ response: result, source: 'command', usage: null });
+        } catch (e) {
+            return res.status(500).json({ error: e.message });
+        }
+    }
+
+    const agentContext = getAgentContext(db, 5);
 
     // Option 1: Try Claude Cowork local endpoint first
     const coworkEndpoint = process.env.CLAUDE_COWORK_ENDPOINT || 'http://localhost:8700';
@@ -63,9 +136,10 @@ app.post('/api/agent', async (req, res) => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    message: message,
+                    message: userMessage,
                     role: 'user',
-                    content: message
+                    content: userMessage,
+                    context: agentContext
                 }),
                 signal: AbortSignal.timeout(3000) // 3 second timeout
             });
@@ -80,7 +154,7 @@ app.post('/api/agent', async (req, res) => {
                     INSERT INTO agent_conversations (message, response, source)
                     VALUES (?, ?, ?)
                 `);
-                stmt.run(message, coworkResponseText, 'cowork');
+                stmt.run(userMessage, coworkResponseText, 'cowork');
                 
                 return res.json({
                     response: coworkResponseText,
@@ -109,15 +183,19 @@ app.post('/api/agent', async (req, res) => {
                 apiKey: process.env.ANTHROPIC_API_KEY,
             });
 
+            const systemWithContext = `You are a helpful assistant integrated into a Life OS dashboard.
+Help the user with their tasks, thoughts, and ideas. Be concise and actionable.
+The user can manage: Wishlist (things to buy, with name, image URL, price USD, priority), Goals (life goals with yearly/quarterly/monthly, aspects: health, wealth, relationships, work, art; each goal has "No" section with why/lessons learned and "Uncertainties" section), and Scenarios A/B/C (business path experiments linked to goals, with premise, hypothesis, worst/base/lucky revenue).
+${agentContext}
+When the user asks to add a wishlist item, create a goal, or list goals/wishlist/scenarios, describe what you would add and suggest they use the Wishlist or Goals tab, or use the exact format: COMMAND: command_name and then JSON params on the next line, so the app can execute it.`;
             const response = await anthropic.messages.create({
                 model: 'claude-3-5-sonnet-20241022',
                 max_tokens: 1024,
                 messages: [{
                     role: 'user',
-                    content: message
+                    content: userMessage
                 }],
-                system: `You are a helpful assistant integrated into a Life OS dashboard. 
-                Help the user with their tasks, thoughts, and ideas. Be concise and actionable.`
+                system: systemWithContext
             });
 
             console.log('✅ Using Claude API');
@@ -128,7 +206,7 @@ app.post('/api/agent', async (req, res) => {
                 INSERT INTO agent_conversations (message, response, source)
                 VALUES (?, ?, ?)
             `);
-            stmt.run(message, agentResponse, 'api');
+            stmt.run(userMessage, agentResponse, 'api');
             
             return res.json({ 
                 response: agentResponse,

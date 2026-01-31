@@ -136,8 +136,94 @@
             </div>
         </div>
 
+        <!-- Full-screen modal: Project planning (describe project → AI analyzes and suggests realistic plan) -->
+        <div id="projectModal" class="projections-modal" aria-hidden="true" style="display: none;" data-project-id="">
+            <div class="projections-modal-backdrop"></div>
+            <div class="projections-modal-box project-modal-box">
+                <div class="projections-modal-header">
+                    <input type="text" id="projectModalName" class="project-modal-name-input" placeholder="Project name">
+                    <button type="button" class="projections-modal-close" id="projectModalClose" aria-label="Close">×</button>
+                </div>
+
+                <section class="project-modal-section">
+                    <h3 class="project-modal-section-title">What are you building?</h3>
+                    <textarea id="pmDescription" class="pm-textarea" rows="3" placeholder="Describe your project in detail. What problem does it solve? Who is it for? What makes it different? The more detail, the better the projections."></textarea>
+                </section>
+
+                <section class="project-modal-section">
+                    <h3 class="project-modal-section-title">Business Model</h3>
+                    <div class="pm-model-options">
+                        <label class="pm-model-option"><input type="radio" name="pmModel" value="saas" checked> <span>SaaS</span><small>Subscription software</small></label>
+                        <label class="pm-model-option"><input type="radio" name="pmModel" value="consulting"> <span>Consulting</span><small>Services/freelance</small></label>
+                        <label class="pm-model-option"><input type="radio" name="pmModel" value="product"> <span>Product</span><small>One-time purchase</small></label>
+                        <label class="pm-model-option"><input type="radio" name="pmModel" value="content"> <span>Content</span><small>Ads, courses, sponsors</small></label>
+                    </div>
+                </section>
+
+                <section class="project-modal-section">
+                    <h3 class="project-modal-section-title">Your Capacity</h3>
+                    <p class="project-modal-section-hint">Solo founder. How much time can you dedicate?</p>
+                    <div class="pm-constraints-grid">
+                        <label class="pm-constraint"><span>Hours per week</span><input type="number" id="pmHoursWeek" min="1" max="60" value="10" class="pm-input"></label>
+                        <label class="pm-constraint"><span>Timeline (months)</span><input type="number" id="pmMonths" min="1" max="24" value="6" class="pm-input"></label>
+                    </div>
+                </section>
+
+                <section class="project-modal-section pm-section-analysis">
+                    <div class="pm-analysis-header">
+                        <h3 class="project-modal-section-title">Business Plan Analysis</h3>
+                        <button type="button" class="btn-generate-projections" id="pmGenerateProjections">Analyze with AI</button>
+                    </div>
+                    <div id="pmAnalysisResult" class="pm-analysis-result">
+                        <p class="pm-analysis-placeholder">Describe your project above, then click "Analyze with AI" to get:<br>
+                        • Suggested pricing based on your market<br>
+                        • Realistic customer acquisition estimates<br>
+                        • Required budget breakdown (tools, marketing, etc.)<br>
+                        • Probability assessment<br>
+                        • Revenue projections with reasoning</p>
+                    </div>
+                </section>
+
+                <section class="project-modal-section pm-section-numbers" id="pmNumbersSection" style="display:none;">
+                    <h3 class="project-modal-section-title">The Numbers</h3>
+                    <div class="pm-numbers-grid">
+                        <div class="pm-number-card">
+                            <span class="pm-number-label">Suggested Price</span>
+                            <span class="pm-number-value" id="pmSuggestedPrice">—</span>
+                        </div>
+                        <div class="pm-number-card">
+                            <span class="pm-number-label">Target Customers</span>
+                            <span class="pm-number-value" id="pmTargetCustomers">—</span>
+                        </div>
+                        <div class="pm-number-card">
+                            <span class="pm-number-label">Budget Needed</span>
+                            <span class="pm-number-value" id="pmBudgetNeeded">—</span>
+                        </div>
+                        <div class="pm-number-card">
+                            <span class="pm-number-label">Success Probability</span>
+                            <span class="pm-number-value" id="pmProbability">—</span>
+                        </div>
+                    </div>
+                    <div class="pm-forecast-summary">
+                        <div class="pm-forecast-item pm-forecast-worst"><span class="pm-forecast-label">Worst case</span><span class="pm-forecast-value" id="pmForecastWorst">—</span></div>
+                        <div class="pm-forecast-item pm-forecast-base"><span class="pm-forecast-label">Realistic</span><span class="pm-forecast-value" id="pmForecastBase">—</span></div>
+                        <div class="pm-forecast-item pm-forecast-best"><span class="pm-forecast-label">Best case</span><span class="pm-forecast-value" id="pmForecastBest">—</span></div>
+                    </div>
+                    <div class="projections-modal-chart-wrap">
+                        <canvas id="projectionsChart"></canvas>
+                    </div>
+                </section>
+
+                <div class="pm-actions">
+                    <button type="button" class="btn-save" id="projectModalSave">Save Plan</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content: Projects + Social -->
         <div class="os-main">
+            <!-- Panel: Dashboard -->
+            <div id="panel-dashboard" class="main-panel">
             <!-- Social Media Panel (Top Priority) -->
             <div class="social-panel">
                 <div class="social-panel-header">Social Media</div>
@@ -182,11 +268,11 @@
 
             <!-- Project Cards -->
             <div class="projects-grid">
-                <div class="project-card">
-                    <div class="project-card-updated">Updated: Jan 24</div>
+                <div class="project-card" title="Click for revenue projections">
+                    <div class="project-card-tag">main</div>
                     <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23203EAE%22 width=%22100%22 height=%22100%22/></svg>');"></div>
                     <div class="project-card-content">
-                        <div class="project-card-name">Client Portal Rebuild</div>
+                        <div class="project-card-name">Soulin Social</div>
                         <div class="project-card-metrics">
                             <div class="project-metric">
                                 <div class="project-metric-value">2.4k</div>
@@ -197,14 +283,15 @@
                                 <div class="project-metric-label">MRR</div>
                             </div>
                         </div>
+                        <div class="project-card-updated">Updated: Jan 24</div>
                     </div>
                 </div>
 
-                <div class="project-card">
-                    <div class="project-card-updated">Updated: Jan 25</div>
+                <div class="project-card" title="Click for revenue projections">
+                    <div class="project-card-tag">pending</div>
                     <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23B8C9E5%22 width=%22100%22 height=%22100%22/></svg>');"></div>
                     <div class="project-card-content">
-                        <div class="project-card-name">Newsletter System</div>
+                        <div class="project-card-name">KINS</div>
                         <div class="project-card-metrics">
                             <div class="project-metric">
                                 <div class="project-metric-value">8.9k</div>
@@ -215,14 +302,15 @@
                                 <div class="project-metric-label">MRR</div>
                             </div>
                         </div>
+                        <div class="project-card-updated">Updated: Jan 25</div>
                     </div>
                 </div>
 
-                <div class="project-card">
-                    <div class="project-card-updated">Updated: Jan 26</div>
+                <div class="project-card" title="Click for revenue projections">
+                    <div class="project-card-tag">influencer</div>
                     <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23203EAE%22 width=%22100%22 height=%22100%22/></svg>');"></div>
                     <div class="project-card-content">
-                        <div class="project-card-name">API Integration</div>
+                        <div class="project-card-name">Cathy K</div>
                         <div class="project-card-metrics">
                             <div class="project-metric">
                                 <div class="project-metric-value">1.2k</div>
@@ -233,14 +321,15 @@
                                 <div class="project-metric-label">MRR</div>
                             </div>
                         </div>
+                        <div class="project-card-updated">Updated: Jan 26</div>
                     </div>
                 </div>
 
-                <div class="project-card">
-                    <div class="project-card-updated">Updated: Jan 22</div>
+                <div class="project-card" title="Click for revenue projections">
+                    <div class="project-card-tag">client</div>
                     <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23B8C9E5%22 width=%22100%22 height=%22100%22/></svg>');"></div>
                     <div class="project-card-content">
-                        <div class="project-card-name">Content Strategy</div>
+                        <div class="project-card-name">Soulful Academy</div>
                         <div class="project-card-metrics">
                             <div class="project-metric">
                                 <div class="project-metric-value">18.3k</div>
@@ -251,6 +340,7 @@
                                 <div class="project-metric-label">Revenue</div>
                             </div>
                         </div>
+                        <div class="project-card-updated">Updated: Jan 22</div>
                     </div>
                 </div>
             </div>
@@ -303,6 +393,136 @@
                     </svg>
                     <div class="social-platform-metric">3.2k</div>
                 </div>
+            </div>
+            </div>
+            <!-- /panel-dashboard -->
+
+            <!-- Panel: Goals -->
+            <div id="panel-goals" class="main-panel" style="display: none;">
+                <div class="panel-header panel-header-goals">
+                    <button type="button" class="btn-add-todo" id="addGoalBtn" title="Add goal">+</button>
+                </div>
+                <div class="todo-add-form" id="goalAddForm" style="display: none; flex-wrap: wrap; gap: 8px;">
+                    <input type="text" class="todo-input" id="goalTitleInput" placeholder="Goal title">
+                    <select class="todo-input" id="goalPeriodTypeInput">
+                        <option value="yearly">Yearly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                    <input type="text" class="todo-input" id="goalPeriodLabelInput" placeholder="e.g. 2025, 2025-Q1">
+                    <select class="todo-input" id="goalParentInput">
+                        <option value="">No parent (yearly)</option>
+                    </select>
+                    <select class="todo-input" id="goalAspectInput">
+                        <option value="general">General</option>
+                        <option value="health">Health</option>
+                        <option value="wealth">Wealth</option>
+                        <option value="relationships">Relationships</option>
+                        <option value="work">Work</option>
+                        <option value="art">Art</option>
+                    </select>
+                    <select class="todo-input" id="goalPriorityInput" title="1 = highest priority (for monthly: shows as top priority this month)">
+                        <option value="1">Priority 1 (highest)</option>
+                        <option value="2">2</option>
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                        <option value="5">5 (lowest)</option>
+                    </select>
+                    <div class="todo-form-actions" style="width: 100%;">
+                        <button type="button" class="btn-save" id="saveGoalBtn">Add</button>
+                        <button type="button" class="btn-cancel" id="cancelGoalBtn">Cancel</button>
+                    </div>
+                </div>
+                <div class="goals-two-column">
+                    <div class="goals-left">
+                        <div id="goalsHierarchy" class="goals-structure">
+                            <!-- Single structure: year → yearly → quarterly + scenario → monthly by sector -->
+                        </div>
+                    </div>
+                    <div class="goals-right">
+                        <div class="info-section">
+                            <div class="info-header">Maybe</div>
+                            <div id="goalsMaybeList" class="goals-inline-list goals-maybe-draggable"></div>
+                        </div>
+                        <div class="info-section">
+                            <div class="info-header">No</div>
+                            <div id="goalsNosList" class="goals-inline-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel: Experiments (tab only; content removed) -->
+            <div id="panel-scenarios" class="main-panel" style="display: none;">
+                <div class="panel-header">
+                    <h2 class="panel-title">Experiments</h2>
+                </div>
+            </div>
+
+            <!-- Panel: Wishlist (things you want; click item to edit) -->
+            <div id="panel-wishlist" class="main-panel" style="display: none;">
+                <div class="panel-header">
+                    <h2 class="panel-title">Wishlist</h2>
+                    <button type="button" class="btn-add-todo" id="addWishlistBtn" title="Add item">+</button>
+                </div>
+                <p class="wishlist-intro">Things you want. Click an item to edit name, price, or savings.</p>
+                <div class="todo-add-form wishlist-add-simple" id="wishlistAddForm" style="display: none;">
+                    <input type="text" class="todo-input" id="wishlistNameInput" placeholder="Item name">
+                    <input type="number" class="todo-input" id="wishlistPriceInput" placeholder="Price $ (optional)" step="0.01">
+                    <select class="todo-input" id="wishlistPriorityInput">
+                        <option value="1">P1</option>
+                        <option value="2">P2</option>
+                        <option value="3" selected>P3</option>
+                        <option value="4">P4</option>
+                        <option value="5">P5</option>
+                    </select>
+                    <details class="wishlist-add-more">
+                        <summary>Image, savings, condition</summary>
+                        <input type="url" class="todo-input" id="wishlistImageInput" placeholder="Image URL">
+                        <input type="number" class="todo-input" id="wishlistSavedInput" placeholder="Saved so far $" step="0.01">
+                        <select class="todo-input" id="wishlistConditionTypeInput">
+                            <option value="none">No condition</option>
+                            <option value="fully_saved">When fully saved</option>
+                            <option value="savings_threshold">When net $ reaches</option>
+                            <option value="investment_threshold">When invested $</option>
+                            <option value="asset_threshold">When assets $</option>
+                        </select>
+                        <input type="number" class="todo-input" id="wishlistConditionValueInput" placeholder="Amount (e.g. 350000)" step="1" style="display: none;">
+                        <input type="text" class="todo-input" id="wishlistConditionTextInput" placeholder="Condition note">
+                        <select class="todo-input" id="wishlistGoalInput">
+                            <option value="">Link to goal (optional)</option>
+                        </select>
+                    </details>
+                    <div class="todo-form-actions">
+                        <button type="button" class="btn-save" id="saveWishlistBtn">Add</button>
+                        <button type="button" class="btn-cancel" id="cancelWishlistBtn">Cancel</button>
+                    </div>
+                </div>
+                <div id="wishlistGallery" class="wishlist-gallery">
+                    <!-- Placeholder for Wishlist gallery UI/UX -->
+                    <div class="wishlist-gallery-item wishlist-placeholder-item">
+                        <div class="wishlist-placeholder">📷</div>
+                        <span class="wishlist-priority">P1</span>
+                        <div class="wishlist-overlay"><div class="wishlist-name">Standing desk</div><div class="wishlist-price">$400 USD</div></div>
+                    </div>
+                    <div class="wishlist-gallery-item wishlist-placeholder-item">
+                        <div class="wishlist-placeholder">📷</div>
+                        <span class="wishlist-priority">P2</span>
+                        <div class="wishlist-overlay"><div class="wishlist-name">Monitor arm</div><div class="wishlist-price">$120 USD</div></div>
+                    </div>
+                    <div class="wishlist-gallery-item wishlist-placeholder-item">
+                        <div class="wishlist-placeholder">📷</div>
+                        <span class="wishlist-priority">P3</span>
+                        <div class="wishlist-overlay"><div class="wishlist-name">Keyboard</div><div class="wishlist-price">$180 USD</div></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Tab bar (inside middle section) -->
+            <div class="tab-bar" id="tabBar">
+                <button type="button" class="tab-bar-tab active" data-tab="dashboard">Dashboard</button>
+                <button type="button" class="tab-bar-tab" data-tab="goals">Goals</button>
+                <button type="button" class="tab-bar-tab" data-tab="scenarios">Experiments</button>
+                <button type="button" class="tab-bar-tab" data-tab="wishlist">Wishlist</button>
             </div>
         </div>
 
@@ -448,5 +668,6 @@
     <script src="app.js"></script>
     <script src="app-features.js"></script>
     <script src="app-charts.js"></script>
+    <script src="app-tabs.js"></script>
 </body>
 </html>
