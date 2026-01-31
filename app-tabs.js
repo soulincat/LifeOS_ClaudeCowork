@@ -11,6 +11,7 @@
         if (tabBtn) tabBtn.classList.add('active');
         if (tab === 'wishlist') loadWishlist();
         if (tab === 'goals') loadGoals();
+        if (tab === 'scenarios' && typeof initProjectionTab === 'function') initProjectionTab();
     }
 
     async function loadWishlist() {
@@ -209,6 +210,24 @@
 
     const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+    /** Normalize monthly period_label to YYYY-MM so "February", "Feb", "February 2025", "2025-02" all match. */
+    function normalizeMonthlyPeriodLabel(periodLabel, currentYear) {
+        if (!periodLabel || typeof periodLabel !== 'string') return null;
+        const s = periodLabel.trim();
+        if (/^\d{4}-\d{2}$/.test(s)) return s;
+        const yearMatch = s.match(/(\d{4})/);
+        const y = yearMatch ? yearMatch[1] : String(currentYear);
+        const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+        const short = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+        const lower = s.toLowerCase();
+        for (let i = 0; i < 12; i++) {
+            if (lower.startsWith(months[i]) || lower === short[i] || lower.startsWith(short[i] + ' ')) {
+                return y + '-' + String(i + 1).padStart(2, '0');
+            }
+        }
+        return null;
+    }
+
     function currentPeriodLabels() {
         const now = new Date();
         const y = now.getFullYear();
@@ -262,8 +281,19 @@
 
             const yearly = goals.find(g => g.period_type === 'yearly' && g.period_label === periods.year);
             const quarterly = goals.find(g => g.period_type === 'quarterly' && g.period_label === periods.quarter);
-            const monthlyAll = goals.filter(g => g.period_type === 'monthly' && g.period_label === periods.month);
-            const nextMonthGoals = goals.filter(g => g.period_type === 'monthly' && g.period_label === periods.nextMonth);
+            const currentYear = new Date().getFullYear();
+            const monthlyAll = goals.filter(g => {
+                if (g.period_type !== 'monthly') return false;
+                if (g.period_label === periods.month) return true;
+                const normalized = normalizeMonthlyPeriodLabel(g.period_label, currentYear);
+                return normalized === periods.month;
+            });
+            const nextMonthGoals = goals.filter(g => {
+                if (g.period_type !== 'monthly') return false;
+                if (g.period_label === periods.nextMonth) return true;
+                const normalized = normalizeMonthlyPeriodLabel(g.period_label, currentYear);
+                return normalized === periods.nextMonth;
+            });
             const byAspect = {};
             (monthlyAll || []).forEach(g => {
                 const a = g.aspect || 'general';
@@ -285,8 +315,7 @@
                   '<div class="goals-structure-value goals-structure-priority-value goals-structure-goal-title" data-goal-id="' + topPriorityMonthly.id + '">' + esc(topPriorityMonthly.title) + '</div></div>'
                 : '';
 
-            function buildMonthlyRows(byAspectMap, periodLabel, isNextMonth, hasAnyMonthly) {
-                if (!hasAnyMonthly) return ''; /* empty when no monthly goals */
+            function buildMonthlyRows(byAspectMap, periodLabel, isNextMonth) {
                 const dataPeriod = isNextMonth ? ' data-period-label-override="' + periodLabel + '"' : '';
                 return aspectOrder.map(a => {
                     /* Skip P1 in list (shown as Top priority this month); arrange rest by priority */
@@ -300,8 +329,7 @@
                     return '<div class="goals-structure-aspect" data-aspect="' + a + '"' + dataPeriod + '>' + sectorLabel + goalsHtml + '</div>';
                 }).join('');
             }
-            const hasAnyMonthly = (monthlyAll || []).length > 0;
-            const monthlyRows = buildMonthlyRows(byAspect, periods.month, false, hasAnyMonthly);
+            const monthlyRows = buildMonthlyRows(byAspect, periods.month, false);
 
             hierarchyEl.innerHTML =
                 '<div class="goals-structure-date">' +
@@ -393,7 +421,7 @@
                     const isNew = item._new;
                     const primaryText = (item[primaryKey] || '').trim();
                     const secondaryText = hasSecondary && item[secondaryKey] ? (item[secondaryKey] || '').trim() : '';
-                    const displayText = primaryText ? (primaryText + (secondaryText ? ' — ' + secondaryText : '')) : (isNew ? 'Click to add…' : '');
+                    const displayText = primaryText ? (primaryText + (secondaryText ? ' — ' + secondaryText : '')) : (isNew ? '' : '');
                     const deleteBtn = (deleteUrl && id) ? '<button type="button" class="goals-inline-delete" data-id="' + id + '" title="Delete">×</button>' : '';
                     const dragHandle = (type === 'maybe' && id) ? '<span class="goals-drag-handle" draggable="true" title="Drag to reorder">⋮⋮</span>' : '';
                     return '<div class="goals-inline-row" data-id="' + (id || '') + '" data-type="' + type + '" data-primary="' + (primaryKey) + '" data-secondary="' + (secondaryKey || '') + '" data-new="' + (isNew ? '1' : '0') + '" tabindex="0">' +
@@ -463,7 +491,7 @@
                         const displayEl = this.querySelector('.goals-inline-display');
                         const text = (displayEl && displayEl.textContent) || '';
                         const parts = text.includes(' — ') ? text.split(' — ', 2) : [text, ''];
-                        const primaryVal = parts[0].replace(/^Click to add…$/, '').trim();
+                        const primaryVal = parts[0].trim();
                         const secondaryVal = parts[1] || '';
                         this.classList.add('editing');
                         let inputsHtml = '<input class="goals-inline-input" type="text" placeholder="' + (primary === 'title' ? 'e.g. New product line' : 'No: …') + '" value="' + (primaryVal || '').replace(/"/g, '&quot;') + '">';
@@ -641,7 +669,73 @@
     });
     document.getElementById('cancelWishlistBtn')?.addEventListener('click', function() {
         document.getElementById('wishlistAddForm').style.display = 'none';
+        document.getElementById('wishlistImageInput').value = '';
+        const prev = document.getElementById('wishlistImagePreview');
+        if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; }
     });
+
+    function setWishlistImageFromFile(file, callback) {
+        if (!file || !file.type.startsWith('image/')) {
+            if (typeof showToast === 'function') showToast('Please choose an image file', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function() {
+            const dataUrl = reader.result;
+            const urlInput = document.getElementById('wishlistImageInput');
+            const preview = document.getElementById('wishlistImagePreview');
+            if (urlInput) urlInput.value = dataUrl;
+            if (preview) {
+                preview.innerHTML = '<img src="' + dataUrl + '" alt="Preview">';
+                preview.style.display = 'block';
+            }
+            if (callback) callback();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    document.getElementById('wishlistImageFileInput')?.addEventListener('change', function() {
+        const file = this.files && this.files[0];
+        if (file) setWishlistImageFromFile(file);
+        this.value = '';
+    });
+
+    (function setupWishlistDropZone() {
+        const gallery = document.getElementById('wishlistGallery');
+        const addForm = document.getElementById('wishlistAddForm');
+        const nameInput = document.getElementById('wishlistNameInput');
+        if (!gallery) return;
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'copy';
+            gallery.classList.add('wishlist-gallery-drop-active');
+        }
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!gallery.contains(e.relatedTarget)) gallery.classList.remove('wishlist-gallery-drop-active');
+        }
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            gallery.classList.remove('wishlist-gallery-drop-active');
+            const file = e.dataTransfer.files && e.dataTransfer.files[0];
+            if (!file || !file.type.startsWith('image/')) {
+                if (typeof showToast === 'function') showToast('Drop an image to add to wishlist', 'info');
+                return;
+            }
+            setWishlistImageFromFile(file, function() {
+                if (addForm) addForm.style.display = 'flex';
+                if (nameInput) { nameInput.focus(); nameInput.placeholder = 'Name this item'; }
+                if (typeof showToast === 'function') showToast('Image added — enter name and save', 'info');
+            });
+        }
+        gallery.addEventListener('dragover', handleDragOver);
+        gallery.addEventListener('dragenter', handleDragOver);
+        gallery.addEventListener('dragleave', handleDragLeave);
+        gallery.addEventListener('drop', handleDrop);
+    })();
     // Show/hide condition value input based on condition type
     document.getElementById('wishlistConditionTypeInput')?.addEventListener('change', function() {
         const conditionValueInput = document.getElementById('wishlistConditionValueInput');
@@ -674,10 +768,17 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, image_url, price_usd, saved_amount, priority, condition_type, condition_value, purchase_condition, goal_id })
             });
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 413) {
+                if (typeof showToast === 'function') showToast('Image too large — try a smaller photo or use a URL instead', 'error');
+                return;
+            }
             if (res.ok) {
                 document.getElementById('wishlistAddForm').style.display = 'none';
                 document.getElementById('wishlistNameInput').value = '';
                 document.getElementById('wishlistImageInput').value = '';
+                const prev = document.getElementById('wishlistImagePreview');
+                if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; }
                 document.getElementById('wishlistPriceInput').value = '';
                 document.getElementById('wishlistSavedInput').value = '';
                 document.getElementById('wishlistConditionTypeInput').value = 'none';
@@ -686,9 +787,13 @@
                 document.getElementById('wishlistConditionTextInput').value = '';
                 loadWishlist();
                 if (typeof showToast === 'function') showToast('Added to wishlist', 'success');
-            } else throw new Error('Failed');
+            } else {
+                const msg = data.error || 'Failed to add wishlist item';
+                if (typeof showToast === 'function') showToast(msg, 'error');
+            }
         } catch (e) {
-            if (typeof showToast === 'function') showToast('Failed to add wishlist item', 'error');
+            const msg = e.message || 'Failed to add wishlist item';
+            if (typeof showToast === 'function') showToast(msg, 'error');
         }
     });
 
@@ -728,7 +833,7 @@
     });
 
     async function checkMonthlyReportReminder() {
-        // Experiments/scenarios removed; monthly report reminder disabled
+        // Projections tab; monthly report reminder disabled
         const key = 'lifeos_monthly_reminder_' + new Date().toISOString().slice(0, 7);
         if (sessionStorage.getItem(key)) return;
         try {

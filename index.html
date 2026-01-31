@@ -223,8 +223,9 @@
         <!-- Main Content: Projects + Social -->
         <div class="os-main">
             <!-- Panel: Dashboard -->
-            <div id="panel-dashboard" class="main-panel">
-            <!-- Social Media Panel (Top Priority) -->
+            <div id="panel-dashboard" class="main-panel main-panel-dashboard">
+            <!-- Social section: fills space between project cards and tab bar -->
+            <div class="dashboard-social-fill">
             <div class="social-panel">
                 <div class="social-panel-header">Social Media</div>
                 
@@ -266,81 +267,82 @@
                 </div>
             </div>
 
-            <!-- Project Cards -->
-            <div class="projects-grid">
-                <div class="project-card" title="Click for revenue projections">
-                    <div class="project-card-tag">main</div>
-                    <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23203EAE%22 width=%22100%22 height=%22100%22/></svg>');"></div>
-                    <div class="project-card-content">
-                        <div class="project-card-name">Soulin Social</div>
-                        <div class="project-card-metrics">
-                            <div class="project-metric">
-                                <div class="project-metric-value">2.4k</div>
-                                <div class="project-metric-label">Users</div>
-                            </div>
-                            <div class="project-metric">
-                                <div class="project-metric-value">$8.2k</div>
-                                <div class="project-metric-label">MRR</div>
-                            </div>
+            <!-- Project Cards (projection style: last month → this month, growth) - fixed at top -->
+            <div class="projects-grid" id="dashboardProjectsGrid">
+                <div class="project-card projection-card" data-project-type="saas" title="Click for revenue projections">
+                    <div class="projection-card-type">SAAS</div>
+                    <div class="projection-card-name">Soulin Social</div>
+                    <div class="projection-card-metrics">
+                        <div class="projection-metric">
+                            <span class="projection-metric-now">—</span>
+                            <span class="projection-metric-arrow">→</span>
+                            <span class="projection-metric-target">—</span>
                         </div>
-                        <div class="project-card-updated">Updated: Jan 24</div>
+                        <div class="projection-metric-label">Users • vs last month</div>
+                    </div>
+                    <div class="projection-mini-chart dashboard-mini-chart">
+                        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div class="projection-card-footer">
+                        <span class="projection-effort projection-card-updated">Updated: —</span>
+                        <span class="projection-growth dashboard-growth">—</span>
                     </div>
                 </div>
-
-                <div class="project-card" title="Click for revenue projections">
-                    <div class="project-card-tag">pending</div>
-                    <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23B8C9E5%22 width=%22100%22 height=%22100%22/></svg>');"></div>
-                    <div class="project-card-content">
-                        <div class="project-card-name">KINS</div>
-                        <div class="project-card-metrics">
-                            <div class="project-metric">
-                                <div class="project-metric-value">8.9k</div>
-                                <div class="project-metric-label">Subscribers</div>
-                            </div>
-                            <div class="project-metric">
-                                <div class="project-metric-value">$3.5k</div>
-                                <div class="project-metric-label">MRR</div>
-                            </div>
+                <div class="project-card projection-card" data-project-type="saas" title="Click for revenue projections">
+                    <div class="projection-card-type">SAAS</div>
+                    <div class="projection-card-name">KINS</div>
+                    <div class="projection-card-metrics">
+                        <div class="projection-metric">
+                            <span class="projection-metric-now">—</span>
+                            <span class="projection-metric-arrow">→</span>
+                            <span class="projection-metric-target">—</span>
                         </div>
-                        <div class="project-card-updated">Updated: Jan 25</div>
+                        <div class="projection-metric-label">Subscribers • vs last month</div>
+                    </div>
+                    <div class="projection-mini-chart dashboard-mini-chart">
+                        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div class="projection-card-footer">
+                        <span class="projection-effort projection-card-updated">Updated: —</span>
+                        <span class="projection-growth dashboard-growth">—</span>
                     </div>
                 </div>
-
-                <div class="project-card" title="Click for revenue projections">
-                    <div class="project-card-tag">influencer</div>
-                    <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23203EAE%22 width=%22100%22 height=%22100%22/></svg>');"></div>
-                    <div class="project-card-content">
-                        <div class="project-card-name">Cathy K</div>
-                        <div class="project-card-metrics">
-                            <div class="project-metric">
-                                <div class="project-metric-value">1.2k</div>
-                                <div class="project-metric-label">API Calls</div>
-                            </div>
-                            <div class="project-metric">
-                                <div class="project-metric-value">$2.8k</div>
-                                <div class="project-metric-label">MRR</div>
-                            </div>
+                <div class="project-card projection-card" data-project-type="channel" title="Click for revenue projections">
+                    <div class="projection-card-type">CHANNEL</div>
+                    <div class="projection-card-name">Cathy K</div>
+                    <div class="projection-card-metrics">
+                        <div class="projection-metric">
+                            <span class="projection-metric-now">—</span>
+                            <span class="projection-metric-arrow">→</span>
+                            <span class="projection-metric-target">—</span>
                         </div>
-                        <div class="project-card-updated">Updated: Jan 26</div>
+                        <div class="projection-metric-label">API Calls • vs last month</div>
+                    </div>
+                    <div class="projection-mini-chart dashboard-mini-chart">
+                        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div class="projection-card-footer">
+                        <span class="projection-effort projection-card-updated">Updated: —</span>
+                        <span class="projection-growth dashboard-growth">—</span>
                     </div>
                 </div>
-
-                <div class="project-card" title="Click for revenue projections">
-                    <div class="project-card-tag">client</div>
-                    <div class="project-card-bg" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23B8C9E5%22 width=%22100%22 height=%22100%22/></svg>');"></div>
-                    <div class="project-card-content">
-                        <div class="project-card-name">Soulful Academy</div>
-                        <div class="project-card-metrics">
-                            <div class="project-metric">
-                                <div class="project-metric-value">18.3k</div>
-                                <div class="project-metric-label">Reach</div>
-                            </div>
-                            <div class="project-metric">
-                                <div class="project-metric-value">$1.9k</div>
-                                <div class="project-metric-label">Revenue</div>
-                            </div>
+                <div class="project-card projection-card" data-project-type="freelance" title="Click for revenue projections">
+                    <div class="projection-card-type">FREELANCE</div>
+                    <div class="projection-card-name">Soulful Academy</div>
+                    <div class="projection-card-metrics">
+                        <div class="projection-metric">
+                            <span class="projection-metric-now">—</span>
+                            <span class="projection-metric-arrow">→</span>
+                            <span class="projection-metric-target">—</span>
                         </div>
-                        <div class="project-card-updated">Updated: Jan 22</div>
+                        <div class="projection-metric-label">Reach • vs last month</div>
+                    </div>
+                    <div class="projection-mini-chart dashboard-mini-chart">
+                        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div class="projection-card-footer">
+                        <span class="projection-effort projection-card-updated">Updated: —</span>
+                        <span class="projection-growth dashboard-growth">—</span>
                     </div>
                 </div>
             </div>
@@ -393,6 +395,7 @@
                     </svg>
                     <div class="social-platform-metric">3.2k</div>
                 </div>
+            </div>
             </div>
             </div>
             <!-- /panel-dashboard -->
@@ -452,10 +455,202 @@
                 </div>
             </div>
 
-            <!-- Panel: Experiments (tab only; content removed) -->
-            <div id="panel-scenarios" class="main-panel" style="display: none;">
+            <!-- Panel: Projections (projections per project + combined chart) -->
+            <div id="panel-scenarios" class="main-panel main-panel-projections" style="display: none;">
                 <div class="panel-header">
-                    <h2 class="panel-title">Experiments</h2>
+                    <h2 class="panel-title">Projections</h2>
+                    <div class="panel-header-controls">
+                        <button type="button" class="btn-save btn-small" id="projectionsSaveBtn" title="Save projection plan and month values">Save</button>
+                        <select id="projectionTimeframe" class="projection-select">
+                            <option value="12">12 months</option>
+                            <option value="24">24 months</option>
+                        </select>
+                        <select id="projectionCase" class="projection-select">
+                            <option value="realistic">Realistic</option>
+                            <option value="best">Best Case</option>
+                            <option value="worst">Worst Case</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Starting Position Summary -->
+                <div class="starting-position">
+                    <div class="sp-item">
+                        <span class="sp-label">Cash</span>
+                        <span class="sp-value" id="spCash">$45K</span>
+                    </div>
+                    <div class="sp-item">
+                        <span class="sp-label">Net Worth</span>
+                        <span class="sp-value" id="spNetWorth">$250K</span>
+                    </div>
+                    <div class="sp-item">
+                        <span class="sp-label">Followers</span>
+                        <span class="sp-value" id="spFollowers">14K</span>
+                    </div>
+                    <div class="sp-item">
+                        <span class="sp-label">Hours/Week</span>
+                        <span class="sp-value" id="spHours">15-20</span>
+                    </div>
+                    <div class="sp-item">
+                        <span class="sp-label">Runway</span>
+                        <span class="sp-value" id="spRunway">—</span>
+                    </div>
+                </div>
+
+                <!-- Project Projection Cards (4 columns) -->
+                <div class="projection-cards-grid">
+                    <!-- Channel Growth Project -->
+                    <div class="projection-card" data-project-type="channel">
+                        <div class="projection-card-type">CHANNEL</div>
+                        <div class="projection-card-name">Cathy K</div>
+                        <div class="projection-card-metrics">
+                            <div class="projection-metric">
+                                <span class="projection-metric-now">14K</span>
+                                <span class="projection-metric-arrow">→</span>
+                                <span class="projection-metric-target">100K</span>
+                            </div>
+                            <div class="projection-metric-label">Followers</div>
+                        </div>
+                        <div class="projection-mini-chart" id="miniChartChannel">
+                            <svg viewBox="0 0 100 30" preserveAspectRatio="none">
+                                <polyline points="0,28 15,26 30,23 45,18 60,12 75,6 90,3 100,1" fill="none" stroke="#203EAE" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="projection-card-footer">
+                            <span class="projection-effort">2 hrs/week</span>
+                            <span class="projection-growth">+614%</span>
+                        </div>
+                    </div>
+
+                    <!-- SaaS Project -->
+                    <div class="projection-card" data-project-type="saas">
+                        <div class="projection-card-type">SAAS</div>
+                        <div class="projection-card-name">Soulin Social</div>
+                        <div class="projection-card-metrics">
+                            <div class="projection-metric">
+                                <span class="projection-metric-now">$0</span>
+                                <span class="projection-metric-arrow">→</span>
+                                <span class="projection-metric-target">$15.7K</span>
+                            </div>
+                            <div class="projection-metric-label">MRR (260 basic + 60 agency)</div>
+                        </div>
+                        <div class="projection-mini-chart" id="miniChartSaas">
+                            <svg viewBox="0 0 100 30" preserveAspectRatio="none">
+                                <polyline points="0,29 15,28 30,26 45,22 60,16 75,10 90,5 100,1" fill="none" stroke="#10b981" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="projection-card-footer">
+                            <span class="projection-effort">10-15 hrs/week</span>
+                            <span class="projection-growth">$49/$199</span>
+                        </div>
+                    </div>
+
+                    <!-- Freelance Project -->
+                    <div class="projection-card" data-project-type="freelance">
+                        <div class="projection-card-type">FREELANCE</div>
+                        <div class="projection-card-name">Design Services</div>
+                        <div class="projection-card-metrics">
+                            <div class="projection-metric">
+                                <span class="projection-metric-now">$1K</span>
+                                <span class="projection-metric-arrow">→</span>
+                                <span class="projection-metric-target">$7.2K</span>
+                            </div>
+                            <div class="projection-metric-label">Monthly (2 proj + 5 retainers)</div>
+                        </div>
+                        <div class="projection-mini-chart" id="miniChartFreelance">
+                            <svg viewBox="0 0 100 30" preserveAspectRatio="none">
+                                <polyline points="0,26 15,24 30,21 45,18 60,14 75,10 90,6 100,4" fill="none" stroke="#f59e0b" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="projection-card-footer">
+                            <span class="projection-effort">2 hrs/project</span>
+                            <span class="projection-growth">+625%</span>
+                        </div>
+                    </div>
+
+                    <!-- Total / Combined -->
+                    <div class="projection-card projection-card-total" data-project-type="total">
+                        <div class="projection-card-type">TOTAL</div>
+                        <div class="projection-card-name">Combined Revenue</div>
+                        <div class="projection-card-metrics">
+                            <div class="projection-metric">
+                                <span class="projection-metric-now">$1.2K</span>
+                                <span class="projection-metric-arrow">→</span>
+                                <span class="projection-metric-target">$23K</span>
+                            </div>
+                            <div class="projection-metric-label">Monthly by Month 12</div>
+                        </div>
+                        <div class="projection-mini-chart" id="miniChartTotal">
+                            <svg viewBox="0 0 100 30" preserveAspectRatio="none">
+                                <polyline points="0,28 15,27 30,24 45,19 60,13 75,7 90,3 100,1" fill="none" stroke="#6366f1" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="projection-card-footer">
+                            <span class="projection-effort">~20 hrs/week total</span>
+                            <span class="projection-growth">+1816%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Combined Projection Chart -->
+                <div class="projection-chart-container">
+                    <div class="projection-chart-header">
+                        <h3>12-Month Projection</h3>
+                        <div class="projection-chart-legend">
+                            <span class="legend-item"><span class="legend-dot" style="background:#203EAE"></span>SaaS Revenue</span>
+                            <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Freelance Revenue</span>
+                            <span class="legend-item"><span class="legend-line" style="background:#8b5cf6"></span>Followers (K)</span>
+                            <span class="legend-item"><span class="legend-line" style="background:#10b981"></span>SaaS Subs</span>
+                        </div>
+                    </div>
+                    <div class="projection-chart-canvas-wrap">
+                        <canvas id="projectionChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Month-by-Month Table (collapsible) -->
+                <details class="projection-details">
+                    <summary>Month-by-Month Breakdown</summary>
+                    <div class="projection-table-wrap">
+                        <table class="projection-table" id="projectionTable">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Followers</th>
+                                    <th>SaaS Basic</th>
+                                    <th>SaaS Agency</th>
+                                    <th>SaaS MRR</th>
+                                    <th>Freelance</th>
+                                    <th>Total Rev</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>1</td><td>16K</td><td>5</td><td>1</td><td>$294</td><td>$1,000</td><td>$1,294</td></tr>
+                                <tr><td>2</td><td>20K</td><td>8</td><td>2</td><td>$490</td><td>$1,000</td><td>$1,490</td></tr>
+                                <tr><td>3</td><td>25K</td><td>15</td><td>3</td><td>$882</td><td>$2,049</td><td>$2,931</td></tr>
+                                <tr><td>4</td><td>32K</td><td>25</td><td>5</td><td>$1,470</td><td>$2,236</td><td>$3,706</td></tr>
+                                <tr><td>5</td><td>40K</td><td>35</td><td>7</td><td>$2,058</td><td>$2,947</td><td>$5,005</td></tr>
+                                <tr><td>6</td><td>50K</td><td>50</td><td>10</td><td>$4,440</td><td>$3,398</td><td>$7,838</td></tr>
+                                <tr><td>7</td><td>62K</td><td>70</td><td>15</td><td>$6,415</td><td>$4,090</td><td>$10,505</td></tr>
+                                <tr><td>8</td><td>74K</td><td>95</td><td>20</td><td>$8,635</td><td>$4,139</td><td>$12,774</td></tr>
+                                <tr><td>9</td><td>85K</td><td>130</td><td>25</td><td>$11,320</td><td>$5,196</td><td>$16,516</td></tr>
+                                <tr><td>10</td><td>90K</td><td>170</td><td>35</td><td>$15,295</td><td>$5,396</td><td>$20,691</td></tr>
+                                <tr><td>11</td><td>95K</td><td>210</td><td>45</td><td>$19,245</td><td>$6,144</td><td>$25,389</td></tr>
+                                <tr><td>12</td><td>100K</td><td>260</td><td>60</td><td>$24,690</td><td>$7,245</td><td>$31,935</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+
+                <!-- Synergy Notes -->
+                <div class="projection-synergy">
+                    <h4>Inter-layer Synergies</h4>
+                    <ul>
+                        <li><strong>Channel → SaaS:</strong> 1-2% of followers convert; automated content amplifies this</li>
+                        <li><strong>SaaS → Channel:</strong> Testimonials + product demos drive new followers</li>
+                        <li><strong>Freelance → Channel:</strong> Case studies provide social proof</li>
+                        <li><strong>SaaS → Freelance:</strong> Beta users become freelance clients (design/implementation upsells)</li>
+                    </ul>
                 </div>
             </div>
 
@@ -465,7 +660,7 @@
                     <h2 class="panel-title">Wishlist</h2>
                     <button type="button" class="btn-add-todo" id="addWishlistBtn" title="Add item">+</button>
                 </div>
-                <p class="wishlist-intro">Things you want. Click an item to edit name, price, or savings.</p>
+                <p class="wishlist-intro">Things you want. Click an item to edit name, price, or savings. Drag a photo onto the gallery to add an item with that image.</p>
                 <div class="todo-add-form wishlist-add-simple" id="wishlistAddForm" style="display: none;">
                     <input type="text" class="todo-input" id="wishlistNameInput" placeholder="Item name">
                     <input type="number" class="todo-input" id="wishlistPriceInput" placeholder="Price $ (optional)" step="0.01">
@@ -478,7 +673,12 @@
                     </select>
                     <details class="wishlist-add-more">
                         <summary>Image, savings, condition</summary>
-                        <input type="url" class="todo-input" id="wishlistImageInput" placeholder="Image URL">
+                        <div class="wishlist-image-row">
+                            <input type="text" class="todo-input" id="wishlistImageInput" placeholder="Image URL or upload below">
+                            <input type="file" id="wishlistImageFileInput" accept="image/*" class="wishlist-image-file-input" aria-label="Upload image">
+                            <label for="wishlistImageFileInput" class="wishlist-upload-btn">Upload image</label>
+                            <div id="wishlistImagePreview" class="wishlist-image-preview" style="display: none;"></div>
+                        </div>
                         <input type="number" class="todo-input" id="wishlistSavedInput" placeholder="Saved so far $" step="0.01">
                         <select class="todo-input" id="wishlistConditionTypeInput">
                             <option value="none">No condition</option>
@@ -521,7 +721,7 @@
             <div class="tab-bar" id="tabBar">
                 <button type="button" class="tab-bar-tab active" data-tab="dashboard">Dashboard</button>
                 <button type="button" class="tab-bar-tab" data-tab="goals">Goals</button>
-                <button type="button" class="tab-bar-tab" data-tab="scenarios">Experiments</button>
+                <button type="button" class="tab-bar-tab" data-tab="scenarios">Projections</button>
                 <button type="button" class="tab-bar-tab" data-tab="wishlist">Wishlist</button>
             </div>
         </div>

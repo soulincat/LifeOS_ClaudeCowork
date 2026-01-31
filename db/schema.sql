@@ -295,6 +295,65 @@ CREATE TABLE IF NOT EXISTS agent_audit_log (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ============================================================
+-- PROJECTIONS & MONTHLY ACTUALS (compare projection vs real)
+-- ============================================================
+
+-- One row per projection plan (e.g. "12-month 2026 big picture")
+CREATE TABLE IF NOT EXISTS projection_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    months INTEGER NOT NULL DEFAULT 12,
+    starting_position TEXT,
+    synergy_notes TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Each revenue/growth stream: per project or "total" (project_id NULL)
+CREATE TABLE IF NOT EXISTS projection_streams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL,
+    project_id INTEGER,
+    stream_type TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    unit TEXT DEFAULT 'currency',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (plan_id) REFERENCES projection_plans(id),
+    FOREIGN KEY (project_id) REFERENCES projects(id)
+);
+
+-- Month-by-month projected values (per stream, per case)
+CREATE TABLE IF NOT EXISTS projection_month_values (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stream_id INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    case_type TEXT NOT NULL DEFAULT 'realistic',
+    metric_key TEXT NOT NULL DEFAULT 'primary',
+    value DECIMAL NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (stream_id) REFERENCES projection_streams(id),
+    UNIQUE(stream_id, month, case_type, metric_key)
+);
+
+-- Real outcomes at end of each month (for comparison)
+CREATE TABLE IF NOT EXISTS monthly_actuals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    period TEXT NOT NULL,
+    project_id INTEGER,
+    stream_type TEXT NOT NULL,
+    metric_key TEXT NOT NULL,
+    value DECIMAL NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id),
+    UNIQUE(period, project_id, stream_type, metric_key)
+);
+
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_health_metrics_date ON health_metrics(date);
 CREATE INDEX IF NOT EXISTS idx_finance_entries_date ON finance_entries(date);
@@ -310,3 +369,6 @@ CREATE INDEX IF NOT EXISTS idx_goals_aspect ON goals(aspect);
 CREATE INDEX IF NOT EXISTS idx_scenarios_goal ON scenarios(goal_id);
 CREATE INDEX IF NOT EXISTS idx_scenario_reviews_period ON scenario_reviews(period_end_date);
 CREATE INDEX IF NOT EXISTS idx_monthly_reports_period ON monthly_reports(period_label);
+CREATE INDEX IF NOT EXISTS idx_projection_streams_plan ON projection_streams(plan_id);
+CREATE INDEX IF NOT EXISTS idx_projection_month_values_stream ON projection_month_values(stream_id);
+CREATE INDEX IF NOT EXISTS idx_monthly_actuals_period ON monthly_actuals(period);

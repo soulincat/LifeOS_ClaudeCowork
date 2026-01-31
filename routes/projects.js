@@ -15,10 +15,10 @@ router.get('/', async (req, res) => {
         if (projects.length === 0) {
             const insert = db.prepare('INSERT OR IGNORE INTO projects (name, github_repo, last_updated, metrics) VALUES (?, ?, ?, ?)');
             const defaults = [
-                ['Soulin Social', null, '2025-01-24', JSON.stringify({ users: 2400, mrr: 8200 })],
-                ['KINS', null, '2025-01-25', JSON.stringify({ subscribers: 8900, mrr: 3500 })],
-                ['Cathy K', null, '2025-01-26', JSON.stringify({ api_calls: 1200, mrr: 2800 })],
-                ['Soulful Academy', null, '2025-01-22', JSON.stringify({ reach: 18300, revenue: 1900 })]
+                ['Soulin Social', null, '2025-01-24', JSON.stringify({ current: { users: 2400, mrr: 8200 }, last_month: { users: 2200, mrr: 7800 } })],
+                ['KINS', null, '2025-01-25', JSON.stringify({ current: { subscribers: 8900, mrr: 3500 }, last_month: { subscribers: 8200, mrr: 3200 } })],
+                ['Cathy K', null, '2025-01-26', JSON.stringify({ current: { api_calls: 1200, mrr: 2800 }, last_month: { api_calls: 980, mrr: 2400 } })],
+                ['Soulful Academy', null, '2025-01-22', JSON.stringify({ current: { reach: 18300, revenue: 1900 }, last_month: { reach: 17200, revenue: 1650 } })]
             ];
             defaults.forEach(row => insert.run(...row));
             projects = db.prepare('SELECT * FROM projects ORDER BY last_updated DESC').all();

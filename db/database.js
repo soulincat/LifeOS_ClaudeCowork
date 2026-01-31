@@ -89,6 +89,58 @@ if (fs.existsSync(schemaPath)) {
         const uCols = db.prepare("PRAGMA table_info(goal_uncertainties)").all().map(r => r.name);
         if (!uCols.includes('sort_order')) db.exec('ALTER TABLE goal_uncertainties ADD COLUMN sort_order INTEGER DEFAULT 0');
     } catch (e) { /* */ }
+    // Ensure projection & monthly actuals tables exist (structural save for projections vs real comparison)
+    try {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS projection_plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                months INTEGER NOT NULL DEFAULT 12,
+                starting_position TEXT,
+                synergy_notes TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS projection_streams (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                plan_id INTEGER NOT NULL,
+                project_id INTEGER,
+                stream_type TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                sort_order INTEGER DEFAULT 0,
+                unit TEXT DEFAULT 'currency',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (plan_id) REFERENCES projection_plans(id),
+                FOREIGN KEY (project_id) REFERENCES projects(id)
+            );
+            CREATE TABLE IF NOT EXISTS projection_month_values (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stream_id INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                case_type TEXT NOT NULL DEFAULT 'realistic',
+                metric_key TEXT NOT NULL DEFAULT 'primary',
+                value DECIMAL NOT NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (stream_id) REFERENCES projection_streams(id),
+                UNIQUE(stream_id, month, case_type, metric_key)
+            );
+            CREATE TABLE IF NOT EXISTS monthly_actuals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                period TEXT NOT NULL,
+                project_id INTEGER,
+                stream_type TEXT NOT NULL,
+                metric_key TEXT NOT NULL,
+                value DECIMAL NOT NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id),
+                UNIQUE(period, project_id, stream_type, metric_key)
+            );
+        `);
+    } catch (e) { /* */ }
 } else {
     createTables();
 }

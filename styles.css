@@ -48,6 +48,7 @@ body {
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 .os-right {
@@ -210,11 +211,11 @@ body {
     letter-spacing: 0.3px;
 }
 
-/* Project Cards */
+/* Project Cards (dashboard: projection-card style, last month → this month + growth) */
 .projects-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
     margin-bottom: 10px;
     flex-shrink: 0;
 }
@@ -227,8 +228,21 @@ body {
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     position: relative;
-    min-height: 140px;
     animation: fadeIn 0.4s ease-out backwards;
+}
+
+/* Dashboard project cards use projection-card layout (shared with Projections tab) */
+.project-card.projection-card {
+    padding: 16px;
+    min-height: 0;
+}
+
+.project-card .dashboard-mini-chart {
+    color: var(--accent);
+}
+
+.project-card .dashboard-growth.negative {
+    color: #dc2626;
 }
 
 /* Full-screen projections modal */
@@ -815,6 +829,20 @@ body {
     flex-shrink: 0;
 }
 
+.main-panel-dashboard .dashboard-social-fill .social-platform-card {
+    min-height: 0;
+    padding: 6px 8px;
+}
+
+.main-panel-dashboard .dashboard-social-fill .social-platform-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.main-panel-dashboard .dashboard-social-fill .social-platform-metric {
+    font-size: 12px;
+}
+
 .social-platform-card {
     background: var(--surface);
     border-radius: 6px;
@@ -1171,11 +1199,13 @@ body {
 
 /* Chart Toggle Button */
 
-/* Tab bar (Excel-style, at bottom of middle section) */
+/* Tab bar (stuck to bottom when scrolling; no scroll on dashboard) */
 .tab-bar {
+    flex-shrink: 0;
     position: sticky;
     bottom: 0;
     height: 36px;
+    min-height: 36px;
     background: var(--surface);
     border-top: 1px solid var(--border);
     display: flex;
@@ -1187,6 +1217,7 @@ body {
 
 .tab-bar-tab {
     flex: 1;
+    min-height: 36px;
     max-width: 160px;
     border: none;
     background: transparent;
@@ -1195,6 +1226,10 @@ body {
     font-family: inherit;
     cursor: pointer;
     border-bottom: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
 }
 
 .tab-bar-tab:hover {
@@ -1232,6 +1267,65 @@ body {
     flex: 1;
     min-height: 0;
     overflow: visible;
+}
+
+/* Dashboard: fit viewport, no scroll; project cards top, social fill middle, tab bar bottom */
+.main-panel-dashboard {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.main-panel-dashboard .projects-grid {
+    flex-shrink: 0;
+}
+
+.main-panel-dashboard .dashboard-social-fill {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-panel-dashboard .dashboard-social-fill .social-panel {
+    flex-shrink: 0;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.main-panel-dashboard .dashboard-social-fill .social-panel-header {
+    font-size: 11px;
+    margin-bottom: 8px;
+}
+
+.main-panel-dashboard .dashboard-social-fill .social-metrics {
+    margin-bottom: 8px;
+}
+
+.main-panel-dashboard .dashboard-social-fill .social-metric-value {
+    font-size: 14px;
+}
+
+.main-panel-dashboard .dashboard-social-fill .social-queue {
+    padding-top: 8px;
+    margin-top: 8px;
+}
+
+.main-panel-dashboard .dashboard-social-fill .social-post {
+    padding: 6px;
+    margin-bottom: 4px;
+    font-size: 10px;
+}
+
+.main-panel-dashboard .dashboard-social-fill .social-platforms-grid {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-bottom: 0;
+    align-content: start;
+    grid-auto-rows: minmax(36px, 1fr);
 }
 
 .panel-header-goals {
@@ -1308,6 +1402,56 @@ body {
 
 .wishlist-add-simple .todo-input:first-of-type { flex: 1; min-width: 140px; }
 .wishlist-add-more summary { font-size: 12px; color: var(--text-dim); cursor: pointer; }
+
+.wishlist-image-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.wishlist-image-row .todo-input { flex: 1; min-width: 160px; }
+.wishlist-image-file-input {
+    position: absolute;
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    z-index: -1;
+}
+.wishlist-upload-btn {
+    display: inline-block;
+    padding: 6px 12px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.wishlist-upload-btn:hover {
+    background: var(--bg);
+    border-color: var(--accent);
+}
+.wishlist-image-preview {
+    width: 100%;
+    margin-top: 4px;
+}
+.wishlist-image-preview img {
+    max-width: 120px;
+    max-height: 120px;
+    object-fit: contain;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.wishlist-gallery-drop-active {
+    outline: 2px dashed var(--accent);
+    outline-offset: 4px;
+    background: rgba(32, 62, 174, 0.06);
+    border-radius: 12px;
+}
 
 .wishlist-item-clickable { cursor: pointer; }
 .wishlist-gallery-item.wishlist-editing .wishlist-overlay {
@@ -1448,8 +1592,8 @@ body {
 /* Goals: two columns – tree left, Nos + Uncertainties right */
 .goals-two-column {
     display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 24px;
+    grid-template-columns: 1fr 220px;
+    gap: 20px;
     align-items: start;
 }
 
@@ -1460,6 +1604,20 @@ body {
 .goals-right {
     position: sticky;
     top: 0;
+}
+
+.goals-right .info-section {
+    padding: 6px 8px;
+    margin-bottom: 6px;
+}
+
+.goals-right .info-header {
+    font-size: 10px;
+    margin-bottom: 6px;
+    color: var(--accent);
+    font-weight: 500;
+    color: var(--text-dim);
+    opacity: 0.85;
 }
 
 .goals-column-title {
@@ -1552,7 +1710,7 @@ body {
 }
 
 .goals-date-monthday {
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 400;
     color: var(--text);
     letter-spacing: 0.02em;
@@ -1568,6 +1726,12 @@ body {
 /* Monthly goals: pushed down; can be empty (no rows when none) */
 .goals-structure-monthly-box {
     margin-top: 32px;
+}
+
+.goals-structure-aspect-add {
+    color: var(--text-dim);
+    font-size: 11px;
+    opacity: 0.6;
 }
 
 .goals-inline-priority-select {
@@ -1686,27 +1850,27 @@ body {
     margin: 0 0 8px 0;
 }
 
-/* Maybe / No: same design, stronger readability */
+/* Maybe / No: compact, low emphasis */
 .goals-inline-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .goals-inline-row {
-    min-height: 40px;
-    padding: 10px 10px;
-    border-radius: 4px;
+    min-height: 28px;
+    padding: 4px 6px;
+    border-radius: 3px;
     cursor: text;
     font-family: ui-sans-serif, system-ui, sans-serif;
-    font-size: 15px;
+    font-size: 12px;
     font-weight: 300;
-    line-height: 1.5;
+    line-height: 1.4;
     color: var(--text);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 6px;
     border-bottom: 1px solid var(--border);
 }
 
@@ -1719,7 +1883,7 @@ body {
 }
 
 .goals-inline-row.editing {
-    padding: 10px;
+    padding: 8px;
     background: var(--surface);
     flex-direction: column;
     align-items: stretch;
@@ -1727,16 +1891,17 @@ body {
 
 .goals-inline-display {
     flex: 1;
-    min-height: 24px;
+    min-height: 18px;
     font-weight: 400;
-    font-size: 15px;
-    line-height: 1.5;
+    font-size: 12px;
+    line-height: 1.4;
     color: var(--text);
 }
 
 .goals-inline-row[data-new="1"] .goals-inline-display {
     color: var(--text-dim);
     font-style: italic;
+    opacity: 0.5;
 }
 
 .goals-inline-delete {
@@ -1895,6 +2060,351 @@ body {
 .goal-placeholder .goal-add-uncertainty-btn,
 .wishlist-placeholder-item {
     opacity: 0.9;
+}
+
+/* ==============================
+   PROJECTIONS TAB
+   ============================== */
+
+/* Let panel take natural height so os-main scrolls (not flex: 1) */
+.main-panel-projections {
+    flex: none;
+}
+
+/* Panel header with controls */
+.panel-header-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.projection-select {
+    padding: 4px 8px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+}
+
+/* Starting Position Summary */
+.starting-position {
+    display: flex;
+    gap: 24px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.sp-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sp-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+}
+
+.sp-value {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+    font-family: ui-monospace, monospace;
+}
+
+/* Projection Cards Grid (4 columns) */
+.projection-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.projection-card {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.projection-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.projection-card-type {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+}
+
+.projection-card[data-project-type="channel"] .projection-card-type { color: #203EAE; }
+.projection-card[data-project-type="saas"] .projection-card-type { color: #10b981; }
+.projection-card[data-project-type="freelance"] .projection-card-type { color: #f59e0b; }
+.projection-card[data-project-type="total"] .projection-card-type { color: #6366f1; }
+
+.projection-card-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 12px;
+}
+
+.projection-card-metrics {
+    margin-bottom: 8px;
+}
+
+.projection-metric {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-family: ui-monospace, monospace;
+}
+
+.projection-metric-now {
+    font-size: 14px;
+    color: var(--text-dim);
+}
+
+.projection-metric-arrow {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.projection-metric-target {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.projection-metric-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+.projection-mini-chart {
+    height: 30px;
+    margin: 8px 0;
+}
+
+.projection-mini-chart svg {
+    width: 100%;
+    height: 100%;
+}
+
+.projection-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--text-dim);
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.projection-effort {
+    font-family: ui-monospace, monospace;
+}
+
+.projection-growth {
+    color: #10b981;
+    font-weight: 600;
+}
+
+.projection-card-total {
+    background: linear-gradient(135deg, var(--surface) 0%, rgba(99, 102, 241, 0.05) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+/* Combined Chart Container - chart fits viewport */
+.projection-chart-container {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.projection-chart-canvas-wrap {
+    width: 100%;
+    height: 380px;
+    min-height: 300px;
+}
+
+.projection-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.projection-chart-header h3 {
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0;
+    color: var(--text);
+}
+
+.projection-chart-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--text-dim);
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.legend-line {
+    width: 16px;
+    height: 2px;
+    border-radius: 1px;
+}
+
+/* Month-by-Month Table */
+.projection-details {
+    background: var(--surface);
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.projection-details summary {
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+}
+
+.projection-details summary:hover {
+    color: var(--accent);
+}
+
+.projection-table-wrap {
+    padding: 0 16px 16px;
+    overflow-x: auto;
+}
+
+.projection-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    font-family: ui-monospace, monospace;
+}
+
+.projection-table th,
+.projection-table td {
+    padding: 8px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+}
+
+.projection-table th {
+    text-align: right;
+    font-weight: 500;
+    color: var(--text-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.projection-table th:first-child,
+.projection-table td:first-child {
+    text-align: left;
+}
+
+.projection-table tbody tr:hover {
+    background: rgba(32, 62, 174, 0.03);
+}
+
+.projection-table tbody tr:last-child td {
+    border-bottom: none;
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* Synergy Notes */
+.projection-synergy {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.projection-synergy h4 {
+    font-size: 13px;
+    font-weight: 500;
+    margin: 0 0 12px 0;
+    color: var(--text);
+}
+
+.projection-synergy ul {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.8;
+}
+
+.projection-synergy li strong {
+    color: var(--text);
+}
+
+/* Dark mode adjustments for projections */
+.dark-theme .projection-card {
+    background: var(--surface);
+}
+
+.dark-theme .projection-card-total {
+    background: linear-gradient(135deg, var(--surface) 0%, rgba(99, 102, 241, 0.1) 100%);
+}
+
+.dark-theme .projection-mini-chart svg polyline {
+    opacity: 0.9;
+}
+
+/* Responsive: Stack cards on smaller screens */
+@media (max-width: 1400px) {
+    .projects-grid,
+    .projection-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .projects-grid,
+    .projection-cards-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .starting-position {
+        gap: 16px;
+    }
 }
 
 /* Responsive adjustments */

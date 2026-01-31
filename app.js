@@ -266,36 +266,67 @@ async function loadDashboardData() {
         const projectsResponse = await fetch('/api/projects');
         const projects = await projectsResponse.json();
         
-        // Update project cards - match by name, not index
-        const cards = document.querySelectorAll('.project-card');
-        const tagMap = {
-            'Soulin Social': 'main',
-            'KINS': 'pending',
-            'Cathy K': 'influencer',
-            'Soulful Academy': 'client'
+        // Update project cards (projection style: last month → this month, growth)
+        const cards = document.querySelectorAll('#dashboardProjectsGrid .project-card');
+        const typeMap = {
+            'Soulin Social': 'SAAS',
+            'KINS': 'SAAS',
+            'Cathy K': 'CHANNEL',
+            'Soulful Academy': 'FREELANCE'
         };
         
         projects.forEach((project) => {
-            // Find card by matching project name
-            const card = Array.from(cards).find(card => {
-                const nameEl = card.querySelector('.project-card-name');
+            const card = Array.from(cards).find(c => {
+                const nameEl = c.querySelector('.projection-card-name');
                 return nameEl && nameEl.textContent.trim() === project.name;
             });
-            
-            if (card) {
-                if (project.id != null) card.setAttribute('data-project-id', project.id);
-                // Update last updated date
-                if (project.last_updated) {
-                    const updatedEl = card.querySelector('.project-card-updated');
-                    if (updatedEl) {
-                        const date = new Date(project.last_updated);
-                        updatedEl.textContent = `Updated: ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-                    }
-                }
-                // Update tag based on project name
-                const tagEl = card.querySelector('.project-card-tag');
-                if (tagEl && tagMap[project.name]) {
-                    tagEl.textContent = tagMap[project.name];
+            if (!card) return;
+
+            if (project.id != null) card.setAttribute('data-project-id', project.id);
+
+            const metrics = project.metrics || {};
+            const current = metrics.current != null ? metrics.current : metrics;
+            const lastMonth = metrics.last_month != null ? metrics.last_month : null;
+
+            const typeLabel = typeMap[project.name] || 'PROJECT';
+            const typeEl = card.querySelector('.projection-card-type');
+            if (typeEl) typeEl.textContent = typeLabel;
+            card.setAttribute('data-project-type', typeLabel.toLowerCase());
+
+            const primaryKey = pickPrimaryMetricKey(current, lastMonth);
+            const labelKey = primaryKey ? formatMetricLabel(primaryKey) : '—';
+            const lastVal = lastMonth && primaryKey && lastMonth[primaryKey] != null ? lastMonth[primaryKey] : null;
+            const thisVal = primaryKey && current[primaryKey] != null ? current[primaryKey] : null;
+
+            const nowEl = card.querySelector('.projection-metric-now');
+            const targetEl = card.querySelector('.projection-metric-target');
+            const labelEl = card.querySelector('.projection-metric-label');
+            if (nowEl) nowEl.textContent = lastVal != null ? formatMetricValue(primaryKey, lastVal) : '—';
+            if (targetEl) targetEl.textContent = thisVal != null ? formatMetricValue(primaryKey, thisVal) : '—';
+            if (labelEl) labelEl.textContent = `${labelKey} • vs last month`;
+
+            let growthPct = null;
+            if (lastVal != null && thisVal != null && typeof lastVal === 'number' && typeof thisVal === 'number' && lastVal !== 0) {
+                growthPct = Math.round(((thisVal - lastVal) / lastVal) * 100);
+            }
+            const growthEl = card.querySelector('.dashboard-growth');
+            if (growthEl) {
+                growthEl.textContent = growthPct != null ? (growthPct >= 0 ? `+${growthPct}%` : `${growthPct}%`) : '—';
+                growthEl.classList.toggle('negative', growthPct != null && growthPct < 0);
+            }
+
+            const chartSvg = card.querySelector('.dashboard-mini-chart svg polyline');
+            if (chartSvg) {
+                const y0 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 28 : 8) : 18;
+                const y1 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 8 : 28) : 18;
+                chartSvg.setAttribute('points', `0,${y0} 100,${y1}`);
+            }
+
+            if (project.last_updated) {
+                const updatedEl = card.querySelector('.projection-card-updated');
+                if (updatedEl) {
+                    const date = new Date(project.last_updated);
+                    updatedEl.textContent = `Updated: ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
                 }
             }
         });
@@ -343,6 +374,28 @@ function formatNumber(num) {
         return (num / 1000).toFixed(1) + 'k';
     }
     return num.toString();
+}
+
+function pickPrimaryMetricKey(current, lastMonth) {
+    const obj = current || lastMonth || {};
+    const keys = Object.keys(obj).filter(k => k !== 'current' && k !== 'last_month' && obj[k] != null);
+    if (keys.includes('mrr')) return 'mrr';
+    if (keys.includes('users')) return 'users';
+    if (keys.includes('revenue')) return 'revenue';
+    return keys[0] || null;
+}
+
+function formatMetricLabel(key) {
+    const labels = { mrr: 'MRR', users: 'Users', revenue: 'Revenue', subscribers: 'Subscribers', reach: 'Reach', api_calls: 'API Calls' };
+    return labels[key] || (key && key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')) || '—';
+}
+
+function formatMetricValue(key, value) {
+    if (typeof value !== 'number') return String(value);
+    if (key === 'mrr' || key === 'revenue') return '$' + (value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value.toFixed(0));
+    if (key === 'followers' || key === 'reach') return (value >= 1000 ? (value / 1000).toFixed(1) : value) + 'K';
+    if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
+    return value.toString();
 }
 
 // Initialize health alert on page load
@@ -712,7 +765,7 @@ document.getElementById('panel-dashboard')?.addEventListener('click', function(e
     e.preventDefault();
     let projectId = card.getAttribute('data-project-id');
     if (!projectId) {
-        const nameEl = card.querySelector('.project-card-name');
+        const nameEl = card.querySelector('.projection-card-name') || card.querySelector('.project-card-name');
         const name = nameEl ? nameEl.textContent.trim() : '';
         if (name) {
             fetch('/api/projects').then(r => r.json()).then(projects => {

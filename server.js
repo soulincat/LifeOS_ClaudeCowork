@@ -16,8 +16,8 @@ if (todoCount.count === 0) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.json());
+// Middleware (allow large JSON for wishlist image data URLs)
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(__dirname));
 
 // API Routes
@@ -30,6 +30,7 @@ app.use('/api/upcoming', require('./routes/upcoming'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/wishlist', require('./routes/wishlist'));
 app.use('/api/goals', require('./routes/goals'));
+app.use('/api/projections', require('./routes/projections'));
 
 // Agent: build context from last N conversations (suggestion 6 - agent memory)
 function getAgentContext(db, limit = 5) {
@@ -232,7 +233,8 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, () => {
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
     console.log(`Life OS Dashboard running at http://localhost:${PORT}`);
     console.log(`Open this URL in your browser to view the dashboard.`);
     
