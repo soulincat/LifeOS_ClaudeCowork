@@ -2,7 +2,11 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const dbPath = path.join(__dirname, '..', 'lifeos.db');
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'lifeos.db');
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+    try { fs.mkdirSync(dbDir, { recursive: true }); } catch (e) { /* ignore */ }
+}
 const db = new Database(dbPath);
 
 // Enable foreign keys
@@ -260,6 +264,39 @@ function createTables() {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `);
+
+    // Always upsert today's social metrics so API returns correct numbers (overwrites any old seed data)
+    try {
+        const today = new Date().toISOString().slice(0, 10);
+        const socialStmt = db.prepare(`
+            INSERT INTO social_metrics (platform, metric_type, value, date)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(platform, metric_type, date) DO UPDATE SET value = excluded.value
+        `);
+        const defaults = [
+            ['email', 'subscribers', 2600], ['linkedin', 'followers', 10000], ['twitter', 'followers', 0],
+            ['instagram', 'followers', 0], ['threads', 'followers', 0], ['substack', 'subscribers', 0],
+            ['youtube', 'subscribers', 300], ['brunch', 'followers', 2700]
+        ];
+        for (const [platform, metric_type, value] of defaults) {
+            socialStmt.run(platform, metric_type, value, today);
+        }
+    } catch (e) { /* ignore */ }
+
+    // Your numbers: insert investment 45K & asset 233K when missing (so they show on load)
+    try {
+        const today = new Date().toISOString().slice(0, 10);
+        const stmt = db.prepare(`
+            INSERT INTO finance_entries (date, type, amount, account_type, source)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+        if (!db.prepare("SELECT 1 FROM finance_entries WHERE type = 'investment' LIMIT 1").get()) {
+            stmt.run(today, 'investment', 45000, 'personal', 'manual');
+        }
+        if (!db.prepare("SELECT 1 FROM finance_entries WHERE type = 'asset' LIMIT 1").get()) {
+            stmt.run(today, 'asset', 233000, 'personal', 'manual');
+        }
+    } catch (e) { /* ignore */ }
 
     console.log('✅ Database tables created');
 }

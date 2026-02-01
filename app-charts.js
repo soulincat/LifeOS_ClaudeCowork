@@ -3,11 +3,11 @@ let healthChart = null;
 let financeChart = null;
 let projectionChart = null;
 
-// Projection data (hardcoded for now - will come from API later)
+// Projection data: 12 months base (original working data). For 24-month view we extend on the fly.
 const projectionData = {
     months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     realistic: {
-        followers: [16, 20, 25, 32, 40, 50, 62, 74, 85, 90, 95, 100], // in K
+        followers: [16, 20, 25, 32, 40, 50, 62, 74, 85, 90, 95, 100],
         saasBasic: [5, 8, 15, 25, 35, 50, 70, 95, 130, 170, 210, 260],
         saasAgency: [1, 2, 3, 5, 7, 10, 15, 20, 25, 35, 45, 60],
         saasMrr: [294, 490, 882, 1470, 2058, 4440, 6415, 8635, 11320, 15295, 19245, 24690],
@@ -252,17 +252,27 @@ function getProjectionTimeframeMonths() {
     return sel ? Math.max(1, parseInt(sel.value, 10) || 12) : 12;
 }
 
+// Return array of length n from data (extend with last value if data is shorter than n)
+function getProjectionSeries(arr, n) {
+    if (!arr || !Array.isArray(arr)) return Array.from({ length: n }, () => 0);
+    const len = arr.length;
+    if (len >= n) return arr.slice(0, n);
+    const last = len > 0 ? arr[len - 1] : 0;
+    return arr.concat(Array.from({ length: n - len }, () => last));
+}
+
 // Update projection cards DOM from projectionData for selected case and timeframe
 function updateProjectionCards(caseType, numMonths) {
     const data = projectionData[caseType] || projectionData.realistic;
-    const n = Math.min(numMonths, (data.followers && data.followers.length) || 12);
+    const n = Math.min(numMonths, 24);
     const fmtK = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + 'K' : String(v));
     const fmtDollar = (v) => (v >= 1000 ? '$' + (v / 1000).toFixed(1) + 'K' : '$' + v);
 
+    const followersArr = getProjectionSeries(data.followers, n);
     const channelCard = document.querySelector('.projection-cards-grid .projection-card[data-project-type="channel"]');
-    if (channelCard && data.followers) {
-        const now = data.followers[0] != null ? data.followers[0] : 0;
-        const target = data.followers[n - 1] != null ? data.followers[n - 1] : 0;
+    if (channelCard) {
+        const now = followersArr[0] != null ? followersArr[0] : 0;
+        const target = followersArr[n - 1] != null ? followersArr[n - 1] : 0;
         const nowEl = channelCard.querySelector('.projection-metric-now');
         const targetEl = channelCard.querySelector('.projection-metric-target');
         const growthEl = channelCard.querySelector('.projection-growth');
@@ -271,18 +281,18 @@ function updateProjectionCards(caseType, numMonths) {
         if (targetEl) targetEl.textContent = fmtChannelK(target);
         if (growthEl) growthEl.textContent = now ? '+' + Math.round(((target - now) / now) * 100) + '%' : '—';
         const mini = channelCard.querySelector('.projection-mini-chart polyline');
-        if (mini && data.followers) {
-            const arr = data.followers.slice(0, n);
-            const max = Math.max(...arr, 1);
-            const pts = arr.map((v, i) => [(i / (n - 1 || 1)) * 100, 30 - (v / max) * 28].join(',')).join(' ');
+        if (mini) {
+            const max = Math.max(...followersArr, 1);
+            const pts = followersArr.map((v, i) => [(i / (n - 1 || 1)) * 100, 30 - (v / max) * 28].join(',')).join(' ');
             mini.setAttribute('points', pts);
         }
     }
 
+    const saasMrrArr = getProjectionSeries(data.saasMrr, n);
     const saasCard = document.querySelector('.projection-cards-grid .projection-card[data-project-type="saas"]');
-    if (saasCard && data.saasMrr) {
-        const now = data.saasMrr[0] != null ? data.saasMrr[0] : 0;
-        const target = data.saasMrr[n - 1] != null ? data.saasMrr[n - 1] : 0;
+    if (saasCard) {
+        const now = saasMrrArr[0] != null ? saasMrrArr[0] : 0;
+        const target = saasMrrArr[n - 1] != null ? saasMrrArr[n - 1] : 0;
         const nowEl = saasCard.querySelector('.projection-metric-now');
         const targetEl = saasCard.querySelector('.projection-metric-target');
         const growthEl = saasCard.querySelector('.projection-growth');
@@ -290,18 +300,18 @@ function updateProjectionCards(caseType, numMonths) {
         if (targetEl) targetEl.textContent = fmtDollar(target);
         if (growthEl) growthEl.textContent = now ? '+' + Math.round(((target - now) / now) * 100) + '%' : (data.saasBasic && data.saasAgency ? '$49/$199' : '—');
         const mini = saasCard.querySelector('.projection-mini-chart polyline');
-        if (mini && data.saasMrr) {
-            const arr = data.saasMrr.slice(0, n);
-            const max = Math.max(...arr, 1);
-            const pts = arr.map((v, i) => [(i / (n - 1 || 1)) * 100, 30 - (v / max) * 28].join(',')).join(' ');
+        if (mini) {
+            const max = Math.max(...saasMrrArr, 1);
+            const pts = saasMrrArr.map((v, i) => [(i / (n - 1 || 1)) * 100, 30 - (v / max) * 28].join(',')).join(' ');
             mini.setAttribute('points', pts);
         }
     }
 
+    const freelanceArr = getProjectionSeries(data.freelance, n);
     const freelanceCard = document.querySelector('.projection-cards-grid .projection-card[data-project-type="freelance"]');
-    if (freelanceCard && data.freelance) {
-        const now = data.freelance[0] != null ? data.freelance[0] : 0;
-        const target = data.freelance[n - 1] != null ? data.freelance[n - 1] : 0;
+    if (freelanceCard) {
+        const now = freelanceArr[0] != null ? freelanceArr[0] : 0;
+        const target = freelanceArr[n - 1] != null ? freelanceArr[n - 1] : 0;
         const nowEl = freelanceCard.querySelector('.projection-metric-now');
         const targetEl = freelanceCard.querySelector('.projection-metric-target');
         const growthEl = freelanceCard.querySelector('.projection-growth');
@@ -309,18 +319,17 @@ function updateProjectionCards(caseType, numMonths) {
         if (targetEl) targetEl.textContent = fmtDollar(target);
         if (growthEl) growthEl.textContent = now ? '+' + Math.round(((target - now) / now) * 100) + '%' : '—';
         const mini = freelanceCard.querySelector('.projection-mini-chart polyline');
-        if (mini && data.freelance) {
-            const arr = data.freelance.slice(0, n);
-            const max = Math.max(...arr, 1);
-            const pts = arr.map((v, i) => [(i / (n - 1 || 1)) * 100, 30 - (v / max) * 28].join(',')).join(' ');
+        if (mini) {
+            const max = Math.max(...freelanceArr, 1);
+            const pts = freelanceArr.map((v, i) => [(i / (n - 1 || 1)) * 100, 30 - (v / max) * 28].join(',')).join(' ');
             mini.setAttribute('points', pts);
         }
     }
 
     const totalCard = document.querySelector('.projection-cards-grid .projection-card[data-project-type="total"]');
-    if (totalCard && data.saasMrr && data.freelance) {
-        const now = (data.saasMrr[0] || 0) + (data.freelance[0] || 0);
-        const target = (data.saasMrr[n - 1] || 0) + (data.freelance[n - 1] || 0);
+    if (totalCard) {
+        const now = (saasMrrArr[0] || 0) + (freelanceArr[0] || 0);
+        const target = (saasMrrArr[n - 1] || 0) + (freelanceArr[n - 1] || 0);
         const nowEl = totalCard.querySelector('.projection-metric-now');
         const targetEl = totalCard.querySelector('.projection-metric-target');
         const growthEl = totalCard.querySelector('.projection-growth');
@@ -331,9 +340,9 @@ function updateProjectionCards(caseType, numMonths) {
         if (labelEl) labelEl.textContent = 'Monthly by Month ' + n;
         const mini = totalCard.querySelector('.projection-mini-chart polyline');
         if (mini) {
-            const arr = Array.from({ length: n }, (_, i) => (data.saasMrr[i] || 0) + (data.freelance[i] || 0));
-            const max = Math.max(...arr, 1);
-            const pts = arr.map((v, i) => [(i / (n - 1 || 1)) * 100, 30 - (v / max) * 28].join(',')).join(' ');
+            const totalArr = Array.from({ length: n }, (_, i) => (saasMrrArr[i] || 0) + (freelanceArr[i] || 0));
+            const max = Math.max(...totalArr, 1);
+            const pts = totalArr.map((v, i) => [(i / (n - 1 || 1)) * 100, 30 - (v / max) * 28].join(',')).join(' ');
             mini.setAttribute('points', pts);
         }
     }
@@ -344,14 +353,19 @@ function updateProjectionTable(caseType, numMonths) {
     const data = projectionData[caseType] || projectionData.realistic;
     const tbody = document.querySelector('#projectionTable tbody');
     if (!tbody) return;
-    const n = Math.min(numMonths, (data.followers && data.followers.length) || 12);
+    const n = Math.min(numMonths, 24);
+    const followersArr = getProjectionSeries(data.followers, n);
+    const saasBasicArr = getProjectionSeries(data.saasBasic, n);
+    const saasAgencyArr = getProjectionSeries(data.saasAgency, n);
+    const saasMrrArr = getProjectionSeries(data.saasMrr, n);
+    const freelanceArr = getProjectionSeries(data.freelance, n);
     const rows = [];
     for (let i = 0; i < n; i++) {
-        const followers = (data.followers && data.followers[i] != null) ? data.followers[i] : 0;
-        const saasBasic = (data.saasBasic && data.saasBasic[i] != null) ? data.saasBasic[i] : 0;
-        const saasAgency = (data.saasAgency && data.saasAgency[i] != null) ? data.saasAgency[i] : 0;
-        const saasMrr = (data.saasMrr && data.saasMrr[i] != null) ? data.saasMrr[i] : 0;
-        const freelance = (data.freelance && data.freelance[i] != null) ? data.freelance[i] : 0;
+        const followers = followersArr[i] != null ? followersArr[i] : 0;
+        const saasBasic = saasBasicArr[i] != null ? saasBasicArr[i] : 0;
+        const saasAgency = saasAgencyArr[i] != null ? saasAgencyArr[i] : 0;
+        const saasMrr = saasMrrArr[i] != null ? saasMrrArr[i] : 0;
+        const freelance = freelanceArr[i] != null ? freelanceArr[i] : 0;
         const total = saasMrr + freelance;
         rows.push(
             '<tr><td>' + (i + 1) + '</td><td>' + (followers >= 1000 ? (followers / 1000) + 'K' : followers) + '</td><td>' + saasBasic + '</td><td>' + saasAgency + '</td><td>$' + saasMrr.toLocaleString() + '</td><td>$' + freelance.toLocaleString() + '</td><td>$' + total.toLocaleString() + '</td></tr>'
@@ -380,73 +394,95 @@ function loadProjectionChart(caseType = 'realistic', numMonths) {
     }
     
     const data = projectionData[caseType] || projectionData.realistic;
-    const allMonths = projectionData.months;
-    const n = Math.min(numMonths, allMonths.length, (data.saasMrr && data.saasMrr.length) || 12);
-    const months = allMonths.slice(0, n);
-    
-    const saasSlice = (data.saasMrr || []).slice(0, n);
-    const freelanceSlice = (data.freelance || []).slice(0, n);
-    const followersSlice = (data.followers || []).slice(0, n);
-    const saasBasicSlice = (data.saasBasic || []).slice(0, n);
-    const saasAgencySlice = (data.saasAgency || []).slice(0, n);
+    const n = Math.min(numMonths, 24);
+    const months = Array.from({ length: n }, (_, i) => i + 1);
+    const saasSlice = getProjectionSeries(data.saasMrr, n);
+    const freelanceSlice = getProjectionSeries(data.freelance, n);
+    const followersSlice = getProjectionSeries(data.followers, n);
+    const saasBasicSlice = getProjectionSeries(data.saasBasic, n);
+    const saasAgencySlice = getProjectionSeries(data.saasAgency, n);
     
     // Calculate total revenue for each month
     const totalRevenue = months.map((_, i) => (saasSlice[i] || 0) + (freelanceSlice[i] || 0));
+    
+    // "Got a job" comparison: 3 months search (0), then €4000/mo after tax, 40h/week — separate red line
+    const showGotAJob = document.getElementById('projectionShowGotAJob')?.checked === true;
+    const jobScenarioMonths = 3; // search period from now
+    const jobSalaryAfterTax = 4000; // EUR/month
+    const gotAJobData = months.map((_, i) => (i + 1) <= jobScenarioMonths ? 0 : jobSalaryAfterTax);
+    
+    const datasets = [
+        // Stacked bars for revenue
+        {
+            label: 'SaaS MRR',
+            data: saasSlice,
+            backgroundColor: 'rgba(32, 62, 174, 0.7)',
+            borderColor: '#203EAE',
+            borderWidth: 1,
+            stack: 'revenue',
+            yAxisID: 'y',
+            order: 2
+        },
+        {
+            label: 'Freelance',
+            data: freelanceSlice,
+            backgroundColor: 'rgba(245, 158, 11, 0.7)',
+            borderColor: '#f59e0b',
+            borderWidth: 1,
+            stack: 'revenue',
+            yAxisID: 'y',
+            order: 2
+        },
+        // Lines for counts
+        {
+            label: 'Followers (K)',
+            data: followersSlice,
+            type: 'line',
+            borderColor: '#8b5cf6',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            tension: 0.3,
+            yAxisID: 'y1',
+            pointRadius: 3,
+            pointBackgroundColor: '#8b5cf6',
+            order: 1
+        },
+        {
+            label: 'SaaS Subs',
+            data: months.map((_, i) => (saasBasicSlice[i] || 0) + (saasAgencySlice[i] || 0)),
+            type: 'line',
+            borderColor: '#10b981',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            tension: 0.3,
+            yAxisID: 'y1',
+            pointRadius: 3,
+            pointBackgroundColor: '#10b981',
+            order: 1
+        }
+    ];
+    if (showGotAJob) {
+        datasets.push({
+            label: 'Got a job (€4k/mo)',
+            data: gotAJobData,
+            type: 'line',
+            borderColor: '#dc2626',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            borderDash: [6, 4],
+            tension: 0.2,
+            yAxisID: 'y',
+            pointRadius: 4,
+            pointBackgroundColor: '#dc2626',
+            order: 0
+        });
+    }
     
     projectionChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: months.map(m => `M${m}`),
-            datasets: [
-                // Stacked bars for revenue
-                {
-                    label: 'SaaS MRR',
-                    data: saasSlice,
-                    backgroundColor: 'rgba(32, 62, 174, 0.7)',
-                    borderColor: '#203EAE',
-                    borderWidth: 1,
-                    stack: 'revenue',
-                    yAxisID: 'y',
-                    order: 2
-                },
-                {
-                    label: 'Freelance',
-                    data: freelanceSlice,
-                    backgroundColor: 'rgba(245, 158, 11, 0.7)',
-                    borderColor: '#f59e0b',
-                    borderWidth: 1,
-                    stack: 'revenue',
-                    yAxisID: 'y',
-                    order: 2
-                },
-                // Lines for counts
-                {
-                    label: 'Followers (K)',
-                    data: followersSlice,
-                    type: 'line',
-                    borderColor: '#8b5cf6',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    yAxisID: 'y1',
-                    pointRadius: 3,
-                    pointBackgroundColor: '#8b5cf6',
-                    order: 1
-                },
-                {
-                    label: 'SaaS Subs',
-                    data: months.map((_, i) => (saasBasicSlice[i] || 0) + (saasAgencySlice[i] || 0)),
-                    type: 'line',
-                    borderColor: '#10b981',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    yAxisID: 'y1',
-                    pointRadius: 3,
-                    pointBackgroundColor: '#10b981',
-                    order: 1
-                }
-            ]
+            datasets
         },
         options: {
             responsive: true,
@@ -466,9 +502,13 @@ function loadProjectionChart(caseType = 'realistic', numMonths) {
                         label: function(context) {
                             const label = context.dataset.label || '';
                             const value = context.parsed.y;
+                            if (label.includes('Got a job')) {
+                                return `${label}: €${value.toLocaleString()}`;
+                            }
                             if (label.includes('MRR') || label === 'Freelance') {
                                 return `${label}: $${value.toLocaleString()}`;
-                            } else if (label.includes('Followers')) {
+                            }
+                            if (label.includes('Followers')) {
                                 return `${label}: ${value}K`;
                             }
                             return `${label}: ${value}`;
@@ -537,26 +577,33 @@ function loadProjectionChart(caseType = 'realistic', numMonths) {
     });
 }
 
-// Load projection plan from API (keeps data intact and structural)
-// Runway = remaining cash / monthly average expense (months)
+// Runway = asset ÷ monthly burn. Uses calculator burn (€/month → USD) when available; else falls back to avg expense from finance history.
 async function updateProjectionsRunway() {
     const runwayEl = document.getElementById('spRunway');
     if (!runwayEl) return;
     try {
         const cashEl = document.getElementById('spCash');
-        let cash = 0;
+        let asset = 0;
         if (cashEl) {
             const raw = (cashEl.textContent || '').replace(/\s/g, '').replace(/,/g, '');
             if (raw && raw !== '—') {
                 const hasK = /k/i.test(raw);
                 const num = parseFloat(raw.replace(/[$,Kk]/g, ''), 10);
-                if (!isNaN(num)) cash = hasK ? num * 1000 : num;
+                if (!isNaN(num)) asset = hasK ? num * 1000 : num;
             }
+        }
+        const burnInput = document.getElementById('projectionCalcBurn');
+        const burnEur = burnInput ? Math.max(0, parseFloat(burnInput.value) || 0) : 0;
+        if (burnEur > 0) {
+            const burnUsdPerMonth = burnEur * eurToUsd;
+            const monthsRunway = Math.floor(asset / burnUsdPerMonth);
+            runwayEl.textContent = monthsRunway + ' months';
+            return;
         }
         const res = await fetch('/api/finance/history?months=12');
         const history = await res.json();
         if (!Array.isArray(history) || history.length === 0) {
-            runwayEl.textContent = cash > 0 ? '—' : '—';
+            runwayEl.textContent = asset > 0 ? '—' : '—';
             return;
         }
         const byMonth = {};
@@ -571,10 +618,10 @@ async function updateProjectionsRunway() {
         const totalExpense = months.reduce((sum, m) => sum + byMonth[m], 0);
         const avgExpense = months.length > 0 ? totalExpense / months.length : 0;
         if (avgExpense <= 0) {
-            runwayEl.textContent = cash > 0 ? '∞' : '—';
+            runwayEl.textContent = asset > 0 ? '∞' : '—';
             return;
         }
-        const monthsRunway = Math.floor(cash / avgExpense);
+        const monthsRunway = Math.floor(asset / avgExpense);
         runwayEl.textContent = monthsRunway + ' months';
     } catch (e) {
         console.warn('Runway calculation:', e);
@@ -588,13 +635,14 @@ async function loadProjectionsFromAPI() {
         const data = await res.json();
         if (!res.ok || !data.plan) return false;
         const { plan, streams, monthValues } = data;
+        // Only overwrite starting position when API has values (don't wipe DOM with '—')
         if (plan.starting_position && typeof plan.starting_position === 'object') {
             const sp = plan.starting_position;
-            const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-            set('spCash', sp.cash != null ? '$' + (sp.cash >= 1000 ? (sp.cash / 1000) + 'K' : sp.cash) : '—');
-            set('spNetWorth', sp.net_worth != null ? '$' + (sp.net_worth >= 1000 ? (sp.net_worth / 1000) + 'K' : sp.net_worth) : '—');
-            set('spFollowers', sp.followers != null ? (sp.followers >= 1000 ? (sp.followers / 1000) + 'K' : sp.followers) : '—');
-            set('spHours', sp.hours_per_week || '—');
+            const setIf = (id, val) => { if (val != null && val !== '') { const el = document.getElementById(id); if (el) el.textContent = val; } };
+            if (sp.cash != null) setIf('spCash', sp.cash >= 1000 ? '$' + (sp.cash / 1000) + 'K' : '$' + sp.cash);
+            if (sp.net_worth != null) setIf('spNetWorth', sp.net_worth >= 1000 ? '$' + (sp.net_worth / 1000) + 'K' : '$' + sp.net_worth);
+            if (sp.followers != null) setIf('spFollowers', sp.followers >= 1000 ? (sp.followers / 1000) + 'K' : String(sp.followers));
+            if (sp.hours_per_week != null && sp.hours_per_week !== '') setIf('spHours', sp.hours_per_week);
         }
         if (streams && streams.length > 0 && monthValues && monthValues.length > 0) {
             const byStream = {};
@@ -622,6 +670,14 @@ async function loadProjectionsFromAPI() {
                     const arr = byStreamCase[freelanceStream.id + '_' + caseType + '_primary'];
                     if (arr) projectionData[caseType].freelance = arr.map((v, i) => v != null ? v : (projectionData[caseType].freelance[i] || 0));
                 }
+                // Keep 24-month view: extend 12-month API data to 24 (repeat last value)
+                ['followers', 'saasMrr', 'freelance'].forEach(key => {
+                    const a = projectionData[caseType][key];
+                    if (a && a.length === 12) {
+                        const last = a[11];
+                        projectionData[caseType][key] = a.concat(Array(12).fill(last));
+                    }
+                });
             });
         }
         return true;
@@ -688,14 +744,127 @@ async function saveProjectionsToAPI() {
     }
 }
 
-// Refresh all projection UI (cards, table, chart) for current case and timeframe
-function refreshProjectionUI() {
+// Net Asset Impact Calculator: projected position = start + passive yield + net from business − (monthly burn × period). Runway = asset ÷ burn. Passive yield % from Finance API.
+const eurToUsd = 1.05;
+
+async function updateProjectionCalculator() {
+    const caseType = document.getElementById('projectionCase')?.value || 'realistic';
+    const numMonths = getProjectionTimeframeMonths();
+    const taxRateInput = document.getElementById('projectionCalcTaxRate');
+    const taxRatePct = taxRateInput ? Math.max(0, Math.min(100, parseFloat(taxRateInput.value) || 0)) : 7;
+    const taxRate = taxRatePct / 100;
+    const businessExpInput = document.getElementById('projectionCalcBusinessExp');
+    const businessExpMonthly = businessExpInput ? Math.max(0, parseFloat(businessExpInput.value) || 0) : 0;
+    const burnInput = document.getElementById('projectionCalcBurn');
+    const burnEurPerMonth = burnInput ? Math.max(0, parseFloat(burnInput.value) || 0) : 2500;
+    const burnUsdPerMonth = burnEurPerMonth * eurToUsd;
+    const burnPeriodUsd = burnUsdPerMonth * Math.min(numMonths, 24);
+
+    let passiveYieldAmountPer12 = 0;
+    try {
+        const financeRes = await fetch('/api/finance');
+        if (financeRes.ok) {
+            const finance = await financeRes.json();
+            passiveYieldAmountPer12 = Math.max(0, Number(finance.constants?.passive_yield) || 0);
+        }
+    } catch (e) {
+        console.warn('Finance fetch for passive yield:', e);
+    }
+
+    const data = projectionData[caseType] || projectionData.realistic;
+    const n = Math.min(numMonths, 24);
+    const saasMrrArr = getProjectionSeries(data.saasMrr, n);
+    const freelanceArr = getProjectionSeries(data.freelance, n);
+    const monthlyRevenue = Array.from({ length: n }, (_, i) => (saasMrrArr[i] || 0) + (freelanceArr[i] || 0));
+    const totalGross = monthlyRevenue.reduce((a, b) => a + b, 0);
+    const businessExpPeriod = businessExpMonthly * n;
+    const taxableBase = Math.max(0, totalGross - businessExpPeriod);
+    const estimatedTax = taxableBase * taxRate;
+    const netFromBusiness = taxableBase - estimatedTax;
+
+    let startNetWorth = 0;
+    const spEl = document.getElementById('spNetWorth');
+    if (spEl && spEl.textContent && spEl.textContent !== '—') {
+        const text = spEl.textContent.trim();
+        const hasK = /k/i.test(text);
+        const raw = text.replace(/[$,Kk\s]/g, '').trim();
+        if (raw) {
+            const num = parseFloat(raw);
+            if (!isNaN(num)) startNetWorth = hasK ? num * 1000 : num;
+        }
+    }
+    const passiveYieldGain = passiveYieldAmountPer12 * (n / 12);
+    const projectedNetPosition = startNetWorth + passiveYieldGain + netFromBusiness - burnPeriodUsd;
+
+    const fmt = (v) => (v >= 1000 ? '$' + (v / 1000).toFixed(1) + 'K' : '$' + Math.round(v));
+    const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    const scenarioLabels = { realistic: 'Realistic', best: 'Best Case', worst: 'Worst Case' };
+
+    const predictedDate = new Date();
+    predictedDate.setMonth(predictedDate.getMonth() + numMonths);
+    const predictedDateStr = predictedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+    set('projectionCalcPeriod', numMonths + ' months');
+    set('projectionCalcPredictedDate', predictedDateStr);
+    set('projectionCalcScenario', scenarioLabels[caseType] || caseType);
+    set('projectionCalcStartNet', startNetWorth ? fmt(startNetWorth) : '—');
+    set('projectionCalcGross', fmt(totalGross));
+    set('projectionCalcBusinessExpPeriod', fmt(businessExpPeriod));
+    set('projectionCalcTaxable', fmt(taxableBase));
+    set('projectionCalcTax', fmt(estimatedTax));
+    set('projectionCalcNetAfterTax', fmt(netFromBusiness));
+    set('projectionCalcPassiveYieldPeriod', passiveYieldAmountPer12 > 0 ? fmt(passiveYieldGain) + ' (' + fmt(passiveYieldAmountPer12) + '/year from finance × ' + n + ' mo)' : fmt(0) + ' (from finance)');
+    set('projectionCalcBurnPeriod', fmt(burnPeriodUsd) + ' (' + (burnEurPerMonth >= 1000 ? (burnEurPerMonth / 1000).toFixed(1) + 'K' : burnEurPerMonth) + ' €/mo × ' + n + ' mo)');
+    set('projectionCalcFinalNet', fmt(projectedNetPosition));
+
+    const showGetAJob = document.getElementById('projectionCalcShowGetAJob')?.checked === true;
+    const getAJobSummary = document.getElementById('projectionCalcGetAJobSummary');
+    if (getAJobSummary) getAJobSummary.style.display = showGetAJob ? 'block' : 'none';
+    if (showGetAJob) {
+        const jobSearchMonths = 3;
+        const jobSalaryAfterTaxEur = 4000;
+        const jobMonths = Math.max(0, n - jobSearchMonths);
+        const getAJobPeriodNetEur = jobSalaryAfterTaxEur * jobMonths;
+        const getAJobProjectedUsd = startNetWorth + passiveYieldGain + getAJobPeriodNetEur * eurToUsd - burnPeriodUsd;
+        const fmtEur = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + 'K' : Math.round(v)) + ' €';
+        set('projectionCalcGetAJobPeriodNet', fmtEur(getAJobPeriodNetEur));
+        set('projectionCalcGetAJobFinalNet', fmt(getAJobProjectedUsd));
+        const diff = getAJobProjectedUsd - projectedNetPosition;
+        const diffRow = document.getElementById('projectionCalcCompareDiffRow');
+        if (diffRow) diffRow.style.display = 'flex';
+        if (Math.abs(diff) < 100) set('projectionCalcCompareDiff', 'About even');
+        else if (diff > 0) set('projectionCalcCompareDiff', 'Get a job: ' + fmt(diff) + ' more');
+        else set('projectionCalcCompareDiff', 'Business path: ' + fmt(-diff) + ' more');
+    } else {
+        const diffRow = document.getElementById('projectionCalcCompareDiffRow');
+        if (diffRow) diffRow.style.display = 'none';
+    }
+
+    const tbody = document.getElementById('projectionCalcMonthBody');
+    if (tbody) {
+        let cum = 0;
+        const rows = monthlyRevenue.map((rev, i) => {
+            cum += rev;
+            const taxableCum = Math.max(0, cum - businessExpMonthly * (i + 1));
+            const taxToDate = taxableCum * taxRate;
+            const netToDate = taxableCum - taxToDate;
+            return '<tr><td>' + (i + 1) + '</td><td>' + fmt(rev) + '</td><td>' + fmt(cum) + '</td><td>' + fmt(taxToDate) + '</td><td>' + fmt(netToDate) + '</td></tr>';
+        });
+        tbody.innerHTML = rows.join('');
+    }
+
+    updateProjectionsRunway();
+}
+
+// Refresh all projection UI (cards, table, chart, calculator) for current case and timeframe
+async function refreshProjectionUI() {
     const caseType = document.getElementById('projectionCase')?.value || 'realistic';
     const numMonths = getProjectionTimeframeMonths();
     updateProjectionCards(caseType, numMonths);
     updateProjectionTable(caseType, numMonths);
     updateProjectionChartTitle(numMonths);
     loadProjectionChart(caseType, numMonths);
+    await updateProjectionCalculator();
     requestAnimationFrame(() => {
         if (projectionChart) projectionChart.resize();
     });
@@ -728,6 +897,34 @@ function initProjectionTab() {
     if (timeframeSelect && !timeframeSelect._projectionsBound) {
         timeframeSelect._projectionsBound = true;
         timeframeSelect.addEventListener('change', () => refreshProjectionUI());
+    }
+    const gotAJobCheck = document.getElementById('projectionShowGotAJob');
+    if (gotAJobCheck && !gotAJobCheck._projectionsBound) {
+        gotAJobCheck._projectionsBound = true;
+        gotAJobCheck.addEventListener('change', () => refreshProjectionUI());
+    }
+    const taxRateInput = document.getElementById('projectionCalcTaxRate');
+    if (taxRateInput && !taxRateInput._projectionsBound) {
+        taxRateInput._projectionsBound = true;
+        taxRateInput.addEventListener('input', () => updateProjectionCalculator());
+        taxRateInput.addEventListener('change', () => updateProjectionCalculator());
+    }
+    const getAJobCheck = document.getElementById('projectionCalcShowGetAJob');
+    if (getAJobCheck && !getAJobCheck._projectionsBound) {
+        getAJobCheck._projectionsBound = true;
+        getAJobCheck.addEventListener('change', () => updateProjectionCalculator());
+    }
+    const burnEl = document.getElementById('projectionCalcBurn');
+    if (burnEl && !burnEl._projectionsBound) {
+        burnEl._projectionsBound = true;
+        burnEl.addEventListener('input', () => updateProjectionCalculator());
+        burnEl.addEventListener('change', () => updateProjectionCalculator());
+    }
+    const businessExpEl = document.getElementById('projectionCalcBusinessExp');
+    if (businessExpEl && !businessExpEl._projectionsBound) {
+        businessExpEl._projectionsBound = true;
+        businessExpEl.addEventListener('input', () => updateProjectionCalculator());
+        businessExpEl.addEventListener('change', () => updateProjectionCalculator());
     }
 }
 

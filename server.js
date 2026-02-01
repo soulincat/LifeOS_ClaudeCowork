@@ -31,6 +31,7 @@ app.use('/api/sync', require('./routes/sync'));
 app.use('/api/wishlist', require('./routes/wishlist'));
 app.use('/api/goals', require('./routes/goals'));
 app.use('/api/projections', require('./routes/projections'));
+app.use('/api/setup', require('./routes/setup'));
 
 // Agent: build context from last N conversations (suggestion 6 - agent memory)
 function getAgentContext(db, limit = 5) {

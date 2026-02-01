@@ -12,6 +12,7 @@
         if (tab === 'wishlist') loadWishlist();
         if (tab === 'goals') loadGoals();
         if (tab === 'scenarios' && typeof initProjectionTab === 'function') initProjectionTab();
+        if (tab === 'setup' && typeof loadSetup === 'function') loadSetup();
     }
 
     async function loadWishlist() {

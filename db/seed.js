@@ -51,13 +51,14 @@ function seedDatabase() {
     `);
     
     const socialMetrics = [
-        { platform: 'email', metric_type: 'subscribers', value: 1200 },
-        { platform: 'linkedin', metric_type: 'followers', value: 8500 },
-        { platform: 'twitter', metric_type: 'followers', value: 12300 },
-        { platform: 'instagram', metric_type: 'followers', value: 4100 },
-        { platform: 'threads', metric_type: 'followers', value: 2800 },
-        { platform: 'substack', metric_type: 'subscribers', value: 890 },
-        { platform: 'youtube', metric_type: 'subscribers', value: 3200 }
+        { platform: 'email', metric_type: 'subscribers', value: 2600 },
+        { platform: 'linkedin', metric_type: 'followers', value: 10000 },
+        { platform: 'twitter', metric_type: 'followers', value: 0 },
+        { platform: 'instagram', metric_type: 'followers', value: 0 },
+        { platform: 'threads', metric_type: 'followers', value: 0 },
+        { platform: 'substack', metric_type: 'subscribers', value: 0 },
+        { platform: 'youtube', metric_type: 'subscribers', value: 300 },
+        { platform: 'brunch', metric_type: 'followers', value: 2700 }
     ];
     
     socialMetrics.forEach(metric => {
@@ -106,27 +107,7 @@ function seedDatabase() {
         upcomingStmt.run(item.title, item.type, item.due_date, item.description);
     });
 
-    // Seed finance (current month)
-    const financeStmt = db.prepare(`
-        INSERT OR IGNORE INTO finance_entries (date, type, amount, account_type, source)
-        VALUES (?, ?, ?, ?, ?)
-    `);
-    
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    
-    const financeEntries = [
-        { date: `${currentMonth}-01`, type: 'revenue', amount: 18200, account_type: 'business', source: 'manual' },
-        { date: `${currentMonth}-01`, type: 'profit', amount: 13400, account_type: 'business', source: 'manual' },
-        { date: `${currentMonth}-15`, type: 'expense', amount: 4800, account_type: 'business', source: 'manual' },
-        { date: `${currentMonth}-20`, type: 'spending', amount: 3200, account_type: 'personal', source: 'manual' },
-        { date: `${currentMonth}-01`, type: 'investment', amount: 45500, account_type: 'personal', source: 'manual' },
-        { date: `${currentMonth}-01`, type: 'asset', amount: 120300, account_type: 'personal', source: 'manual' },
-        { date: `${currentMonth}-01`, type: 'total_net', amount: 165800, account_type: 'personal', source: 'manual' }
-    ];
-    
-    financeEntries.forEach(entry => {
-        financeStmt.run(entry.date, entry.type, entry.amount, entry.account_type, entry.source);
-    });
+    // No finance seeding — finance numbers come only from your input.
 
     console.log('✅ Database seeded successfully');
 }

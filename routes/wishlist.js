@@ -109,7 +109,8 @@ router.post('/', (req, res) => {
         res.status(201).json(row);
     } catch (error) {
         console.error('Error adding wishlist item:', error);
-        res.status(500).json({ error: 'Failed to add wishlist item' });
+        const message = error && error.message ? error.message : 'Failed to add wishlist item';
+        res.status(500).json({ error: message });
     }
 });
 

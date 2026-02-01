@@ -54,8 +54,9 @@ async function loadDashboardData() {
         const healthResponse = await fetch('/api/health');
         const health = await healthResponse.json();
         
-        // Update health display
-        const healthRows = document.querySelectorAll('.info-section .info-row');
+        // Update health display (only health section; do not touch finance rows)
+        const healthSection = document.getElementById('healthSection');
+        const healthRows = healthSection ? healthSection.querySelectorAll('.info-row') : [];
         healthRows.forEach(row => {
             const label = row.querySelector('.info-label')?.textContent;
             const valueEl = row.querySelector('.info-value');
@@ -147,25 +148,14 @@ async function loadDashboardData() {
                 newValue = finance.constants?.investment;
                 shouldAddAccent = true;
             } else if (label === 'Passive Yield') {
-                // Special handling for passive yield - show amount and percentage
-                const passiveYieldAmount = finance.constants?.passive_yield || 2735;
+                const passiveYieldAmount = finance.constants?.passive_yield;
                 const investment = finance.constants?.investment || 0;
-                
-                // Calculate percentage: (passive_yield / investment) * 100
-                let percentage = 0;
-                if (investment > 0 && passiveYieldAmount > 0) {
-                    percentage = (passiveYieldAmount / investment) * 100;
-                } else if (finance.constants?.passive_yield_percentage) {
-                    // Fallback to API-calculated percentage if available
-                    percentage = finance.constants.passive_yield_percentage;
-                }
-                
-                const formattedAmount = formatCurrency(passiveYieldAmount);
-                const formattedPercent = percentage.toFixed(1);
-                valueEl.textContent = `${formattedAmount} (${formattedPercent}%)`;
-                console.log(`Passive Yield: ${passiveYieldAmount} / ${investment} = ${percentage.toFixed(1)}%`);
-                // Don't add accent class for passive yield
-                return; // Skip normal value update
+                if (passiveYieldAmount == null && investment === 0) return; // leave "—"
+                const amount = Number(passiveYieldAmount) || 0;
+                let percentage = finance.constants?.passive_yield_percentage ?? 0;
+                if (investment > 0 && amount > 0) percentage = (amount / investment) * 100;
+                valueEl.textContent = `${formatCurrency(amount)} (${percentage.toFixed(1)}%)`;
+                return;
             } else if (label === 'Asset') {
                 newValue = finance.constants?.asset;
                 shouldAddAccent = true;
@@ -174,22 +164,12 @@ async function loadDashboardData() {
                 shouldAddAccent = true;
             }
             
-            // Always update the value (including 0)
-            if (newValue !== null && newValue !== undefined) {
+            // Only update when we have a value; if API returns nothing, keep existing display so it doesn't revert to $0
+            if (newValue !== null && newValue !== undefined && !isNaN(Number(newValue))) {
                 const formatted = formatCurrency(newValue);
-                const oldValue = valueEl.textContent;
                 valueEl.textContent = formatted;
-                if (oldValue !== formatted) {
-                    console.log(`✅ Updated ${label}: "${oldValue}" → "${formatted}"`);
-                }
-            } else {
-                // If no data, show $0
-                const oldValue = valueEl.textContent;
-                valueEl.textContent = '$0';
-                if (oldValue !== '$0') {
-                    console.log(`⚠️  No data for ${label}, showing $0 (was: "${oldValue}")`);
-                }
             }
+            // else: leave valueEl.textContent as is (don't overwrite with $0)
             
             // Update accent class
             if (shouldAddAccent) {
@@ -199,12 +179,28 @@ async function loadDashboardData() {
             }
         });
         
+        // Explicitly ensure Total Net is displayed (use API value or compute from investment + asset)
+        const totalNetEl = document.getElementById('totalNetValue');
+        if (totalNetEl) {
+            let totalNet = finance.constants?.total_net;
+            if (totalNet == null || isNaN(Number(totalNet))) {
+                const inv = Number(finance.constants?.investment) || 0;
+                const ast = Number(finance.constants?.asset) || 0;
+                totalNet = inv + ast;
+            } else {
+                totalNet = Number(totalNet);
+            }
+            totalNetEl.textContent = formatCurrency(totalNet);
+            totalNetEl.classList.add('accent');
+        }
+        
         console.log('✅ Finance display updated');
         console.log('Final finance values:', {
             revenue: finance.monthly?.revenue,
             profit: finance.monthly?.profit,
             expense: finance.monthly?.expense,
-            spending: finance.monthly?.spending
+            spending: finance.monthly?.spending,
+            total_net: finance.constants?.total_net
         });
         
         // Update finance month
@@ -229,39 +225,8 @@ async function loadDashboardData() {
             `).join('');
         }
         
-        // Load social metrics
-        try {
-            const socialResponse = await fetch('/api/social/metrics');
-            const socialMetrics = await socialResponse.json();
-            
-            // Platform mapping
-            const platformMap = {
-                'email': 0,
-                'linkedin': 1,
-                'twitter': 2,
-                'instagram': 3,
-                'threads': 4,
-                'substack': 5,
-                'youtube': 6
-            };
-            
-            // Update social platform cards
-            socialMetrics.forEach(metric => {
-                const index = platformMap[metric.platform.toLowerCase()];
-                if (index !== undefined) {
-                    const cards = document.querySelectorAll('.social-platform-card');
-                    if (cards[index]) {
-                        const metricEl = cards[index].querySelector('.social-platform-metric');
-                        if (metricEl) {
-                            metricEl.textContent = formatNumber(metric.value);
-                        }
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Error loading social metrics:', error);
-        }
-        
+        // Social numbers: kept from HTML (not overwritten by API)
+
         // Load projects
         const projectsResponse = await fetch('/api/projects');
         const projects = await projectsResponse.json();
@@ -417,11 +382,15 @@ function refreshGitHubGraph() {
     console.log('🔄 Refreshed GitHub contribution graph with timestamp:', timestamp);
 }
 
+// Social numbers are set in HTML and not overwritten by JS (so they stay correct).
+function updateSocialNumbers() { /* no-op: keep HTML values */ }
+
 // Load all dashboard data on page load
 // Wait a bit to ensure all elements are rendered
 setTimeout(() => {
     console.log('Initializing dashboard...');
     refreshGitHubGraph();
+    updateSocialNumbers();
     loadDashboardData();
 }, 100);
 

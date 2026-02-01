@@ -5,6 +5,7 @@
   "main": "index.html",
   "scripts": {
     "start": "node server.js",
+    "start:3001": "PORT=3001 node server.js",
     "dev": "node server.js",
     "seed": "node db/seed.js",
     "input-finance": "node scripts/input-finance.js",

@@ -43,42 +43,21 @@ router.get('/', (req, res) => {
             }
         });
         
-        // Get constant values (latest snapshot for current month, or most recent)
+        // Constants: use most recent value ever (any date) so last month's data still shows until you add new
         const constantStmt = db.prepare(`
             SELECT type, amount, date
             FROM finance_entries
             WHERE type IN ('investment', 'asset', 'total_net', 'passive_yield')
-            AND date >= ?
             ORDER BY date DESC
         `);
-        
-        const constantsRaw = constantStmt.all(startDate);
-        
-        // Get the most recent value for each constant type
+        const constantsRaw = constantStmt.all();
         const constants = {};
         constantsRaw.forEach(item => {
-            if (!constants[item.type] || new Date(item.date) > new Date(constants[item.type].date)) {
+            if (!constants[item.type]) {
                 constants[item.type] = { amount: item.amount, date: item.date };
             }
         });
-        
-        // If no passive_yield entry, use default 2735 USD
-        // Also check if there's a passive_yield entry outside the current month
-        if (!constants['passive_yield']) {
-            const passiveYieldStmt = db.prepare(`
-                SELECT type, amount, date
-                FROM finance_entries
-                WHERE type = 'passive_yield'
-                ORDER BY date DESC
-                LIMIT 1
-            `);
-            const passiveYieldEntry = passiveYieldStmt.get();
-            if (passiveYieldEntry) {
-                constants['passive_yield'] = { amount: passiveYieldEntry.amount, date: passiveYieldEntry.date };
-            } else {
-                constants['passive_yield'] = { amount: 2735, date: endDate };
-            }
-        }
+        // passive_yield only if user has entered it (no default)
         
         // Format response
         const finance = {
@@ -120,19 +99,17 @@ router.get('/', (req, res) => {
             }
         });
         
-        // Ensure passive_yield is set (use default if not in database)
-        if (!finance.constants.passive_yield) {
-            finance.constants.passive_yield = 2735;
-        }
-        
-        // Calculate passive yield percentage from investment
+        // Calculate passive yield percentage from investment (only if both exist)
         const investment = finance.constants.investment || 0;
-        const passiveYield = finance.constants.passive_yield || 2735;
+        const passiveYield = finance.constants.passive_yield || 0;
         if (investment > 0 && passiveYield > 0) {
             finance.constants.passive_yield_percentage = (passiveYield / investment) * 100;
         } else {
             finance.constants.passive_yield_percentage = 0;
         }
+        
+        // Total net = investment + asset (always computed)
+        finance.constants.total_net = investment + (finance.constants.asset || 0);
         
         res.json(finance);
     } catch (error) {
@@ -201,6 +178,30 @@ router.get('/history', (req, res) => {
     } catch (error) {
         console.error('Error fetching finance history:', error);
         res.status(500).json({ error: 'Failed to fetch finance history' });
+    }
+});
+
+/**
+ * GET /api/finance/entries
+ * List all finance_entries (raw) — to verify what's in the DB. App never deletes these.
+ */
+router.get('/entries', (req, res) => {
+    try {
+        const rows = db.prepare(`
+            SELECT id, date, type, amount, account_type, source, created_at
+            FROM finance_entries
+            ORDER BY date DESC, id DESC
+        `).all();
+        const path = require('path');
+        const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '..', 'lifeos.db');
+        res.json({
+            db_path: dbPath,
+            count: rows.length,
+            entries: rows
+        });
+    } catch (error) {
+        console.error('Error listing finance entries:', error);
+        res.status(500).json({ error: 'Failed to list finance entries' });
     }
 });
 
