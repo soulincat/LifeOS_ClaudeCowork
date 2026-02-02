@@ -9,6 +9,19 @@ if (!fs.existsSync(dbDir)) {
 }
 const db = new Database(dbPath);
 
+// Backup existing DB on startup (so you can restore if something wipes it)
+try {
+    if (fs.existsSync(dbPath)) {
+        const stat = fs.statSync(dbPath);
+        if (stat.size > 1000) {
+            fs.copyFileSync(dbPath, dbPath + '.backup');
+            const backupsDir = path.join(__dirname, 'backups');
+            if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+            fs.copyFileSync(dbPath, path.join(backupsDir, 'lifeos.db.latest.backup'));
+        }
+    }
+} catch (e) { /* ignore */ }
+
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
 
@@ -301,4 +314,5 @@ function createTables() {
     console.log('✅ Database tables created');
 }
 
+db.path = dbPath;
 module.exports = db;

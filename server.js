@@ -5,16 +5,23 @@ require('dotenv').config();
 // Initialize database
 require('./db/database');
 
-// Seed initial data if database is empty
 const db = require('./db/database');
+
+// Log which DB file we're using (so you can confirm it's your local file)
+console.log('Using database:', db.path);
+
+// Seed ONLY when DB is truly empty (never overwrite your todos or finance)
 const todoCount = db.prepare('SELECT COUNT(*) as count FROM todos').get();
-if (todoCount.count === 0) {
+const financeCount = db.prepare('SELECT COUNT(*) as count FROM finance_entries').get();
+if (todoCount.count === 0 && financeCount.count === 0) {
     console.log('Database is empty, seeding initial data...');
     require('./db/seed')();
+} else if (todoCount.count === 0 && financeCount.count > 0) {
+    console.log('Todos empty but finance data present — skipping seed (your data is safe).');
 }
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Middleware (allow large JSON for wishlist image data URLs)
 app.use(express.json({ limit: '10mb' }));

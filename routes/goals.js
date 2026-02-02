@@ -27,6 +27,50 @@ router.get('/', (req, res) => {
     }
 });
 
+router.get('/contingency-plans', (req, res) => {
+    try {
+        let plans = db.prepare('SELECT * FROM goal_contingency_plans ORDER BY plan_key ASC').all();
+        const keys = ['a', 'b', 'c'];
+        keys.forEach(k => {
+            if (!plans.find(p => (p.plan_key || '').toLowerCase() === k)) {
+                db.prepare('INSERT OR IGNORE INTO goal_contingency_plans (plan_key, plan_text, event_trigger) VALUES (?, ?, ?)').run(k, '', '');
+            }
+        });
+        plans = db.prepare('SELECT * FROM goal_contingency_plans ORDER BY plan_key ASC').all();
+        res.json(plans);
+    } catch (error) {
+        console.error('Error fetching contingency plans:', error);
+        res.status(500).json({ error: 'Failed to fetch contingency plans' });
+    }
+});
+
+router.patch('/contingency-plans/:planKey', (req, res) => {
+    try {
+        const planKey = (req.params.planKey || '').toLowerCase();
+        if (!['a', 'b', 'c'].includes(planKey)) return res.status(400).json({ error: 'planKey must be a, b, or c' });
+        const { plan_text, event_trigger } = req.body;
+        const existing = db.prepare('SELECT id FROM goal_contingency_plans WHERE plan_key = ?').get(planKey);
+        if (!existing) {
+            db.prepare('INSERT INTO goal_contingency_plans (plan_key, plan_text, event_trigger) VALUES (?, ?, ?)').run(planKey, plan_text != null ? plan_text : '', event_trigger != null ? event_trigger : '');
+        } else {
+            const updates = [];
+            const values = [];
+            if (plan_text !== undefined) { updates.push('plan_text = ?'); values.push(plan_text); }
+            if (event_trigger !== undefined) { updates.push('event_trigger = ?'); values.push(event_trigger); }
+            if (updates.length > 0) {
+                updates.push('updated_at = CURRENT_TIMESTAMP');
+                values.push(existing.id);
+                db.prepare('UPDATE goal_contingency_plans SET ' + updates.join(', ') + ' WHERE id = ?').run(...values);
+            }
+        }
+        const row = db.prepare('SELECT * FROM goal_contingency_plans WHERE plan_key = ?').get(planKey);
+        res.json(row || {});
+    } catch (error) {
+        console.error('Error updating contingency plan:', error);
+        res.status(500).json({ error: 'Failed to update contingency plan' });
+    }
+});
+
 router.get('/nos-and-uncertainties', (req, res) => {
     try {
         const nos = db.prepare('SELECT * FROM goal_nos ORDER BY created_at DESC').all();

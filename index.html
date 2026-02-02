@@ -7,6 +7,20 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="light-theme">
+    <script>
+        (function() {
+            var port = '3001';
+            var correct = 'http://localhost:' + port;
+            if (location.protocol === 'file:') {
+                document.documentElement.innerHTML = '<html><head><meta charset="utf-8"><title>Life OS</title></head><body style="font-family:system-ui;padding:2rem;max-width:32rem;margin:0 auto;"><h1>Open the app from the server</h1><p>This page was opened as a file. Data (todos, finance, etc.) only loads when the app runs on the server.</p><p><a href="' + correct + '" style="font-size:1.25rem;">Open ' + correct + '</a></p><p>In the project folder run: <code>npm start</code> then click the link above.</p></body></html>';
+                return;
+            }
+            if (location.port === '3000') {
+                location.replace(correct);
+                return;
+            }
+        })();
+    </script>
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>
     
@@ -31,8 +45,13 @@
     </div>
     
     <div class="os-grid">
-        <!-- Left Sidebar: Today + Emails + GitHub -->
+        <!-- Left Sidebar: Top priority + Today + Emails + GitHub -->
         <div class="os-sidebar">
+            <!-- Top priority this month -->
+            <div class="info-section sidebar-top-priority">
+                <div class="info-header sidebar-top-priority-label">Top priority this month</div>
+                <div class="sidebar-top-priority-value" id="sidebarTopPriorityTitle">—</div>
+            </div>
             <!-- Todo List -->
             <div class="info-section">
                 <div class="info-header">
@@ -169,6 +188,15 @@
                     </div>
                 </section>
 
+                <section class="project-modal-section pm-section-dashboard-metrics">
+                    <h3 class="project-modal-section-title">Dashboard card (vs last month)</h3>
+                    <p class="project-modal-section-hint">These numbers drive the project cards on the main dashboard.</p>
+                    <div class="pm-constraints-grid">
+                        <label class="pm-constraint"><span><span id="pmDashboardMetricLabel">Metric</span> — last month</span><input type="number" id="pmMetricLastMonth" min="0" step="any" placeholder="—" class="pm-input"></label>
+                        <label class="pm-constraint"><span><span id="pmDashboardMetricLabelCopy">Metric</span> — this month</span><input type="number" id="pmMetricThisMonth" min="0" step="any" placeholder="—" class="pm-input"></label>
+                    </div>
+                </section>
+
                 <section class="project-modal-section pm-section-analysis">
                     <div class="pm-analysis-header">
                         <h3 class="project-modal-section-title">Business Plan Analysis</h3>
@@ -222,6 +250,7 @@
 
         <!-- Main Content: Projects + Social -->
         <div class="os-main">
+            <div class="os-main-scroll">
             <!-- Panel: Dashboard -->
             <div id="panel-dashboard" class="main-panel main-panel-dashboard">
             <!-- Social section: fills space between project cards and tab bar -->
@@ -267,87 +296,83 @@
                 </div>
             </div>
 
-            <!-- Project Cards (projection style: last month → this month, growth) - fixed at top -->
-            <div class="projects-grid" id="dashboardProjectsGrid">
-                <div class="project-card projection-card" data-project-type="saas" title="Click for revenue projections">
-                    <div class="projection-card-type">SAAS</div>
-                    <div class="projection-card-name">Soulin Social</div>
-                    <div class="projection-card-metrics">
-                        <div class="projection-metric">
-                            <span class="projection-metric-now">—</span>
-                            <span class="projection-metric-arrow">→</span>
-                            <span class="projection-metric-target">—</span>
-                        </div>
-                        <div class="projection-metric-label">Users • vs last month</div>
-                    </div>
-                    <div class="projection-mini-chart dashboard-mini-chart">
-                        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-                    </div>
-                    <div class="projection-card-footer">
-                        <span class="projection-effort projection-card-updated">Updated: —</span>
-                        <span class="projection-growth dashboard-growth">—</span>
-                    </div>
-                </div>
-                <div class="project-card projection-card" data-project-type="saas" title="Click for revenue projections">
-                    <div class="projection-card-type">SAAS</div>
-                    <div class="projection-card-name">KINS</div>
-                    <div class="projection-card-metrics">
-                        <div class="projection-metric">
-                            <span class="projection-metric-now">—</span>
-                            <span class="projection-metric-arrow">→</span>
-                            <span class="projection-metric-target">—</span>
-                        </div>
-                        <div class="projection-metric-label">Subscribers • vs last month</div>
-                    </div>
-                    <div class="projection-mini-chart dashboard-mini-chart">
-                        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-                    </div>
-                    <div class="projection-card-footer">
-                        <span class="projection-effort projection-card-updated">Updated: —</span>
-                        <span class="projection-growth dashboard-growth">—</span>
-                    </div>
-                </div>
-                <div class="project-card projection-card" data-project-type="channel" title="Click for revenue projections">
+            <!-- Project Cards: same structure as Projections tab, data = real monthly (last month → this month) -->
+            <div class="projection-cards-grid projects-grid-dashboard" id="dashboardProjectsGrid">
+                <div class="projection-card project-card" data-project-type="channel" title="Click for revenue projections">
                     <div class="projection-card-type">CHANNEL</div>
                     <div class="projection-card-name">Cathy K</div>
                     <div class="projection-card-metrics">
-                        <div class="projection-metric">
-                            <span class="projection-metric-now">—</span>
-                            <span class="projection-metric-arrow">→</span>
-                            <span class="projection-metric-target">—</span>
+                        <div class="projection-metric projection-metric-dashboard">
+                            <span class="projection-metric-current">—</span>
+                            <span class="projection-metric-last">—</span>
                         </div>
-                        <div class="projection-metric-label">API Calls • vs last month</div>
+                        <div class="projection-metric-label">Subscribers</div>
                     </div>
-                    <div class="projection-mini-chart dashboard-mini-chart">
+                    <div class="projection-mini-chart">
                         <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
                     </div>
                     <div class="projection-card-footer">
                         <span class="projection-effort projection-card-updated">Updated: —</span>
-                        <span class="projection-growth dashboard-growth">—</span>
+                        <span class="projection-growth">—</span>
                     </div>
                 </div>
-                <div class="project-card projection-card" data-project-type="freelance" title="Click for revenue projections">
-                    <div class="projection-card-type">FREELANCE</div>
-                    <div class="projection-card-name">Soulful Academy</div>
+                <div class="projection-card project-card" data-project-type="business" title="Click for revenue projections">
+                    <div class="projection-card-type">BUSINESS</div>
+                    <div class="projection-card-name">KINS</div>
                     <div class="projection-card-metrics">
-                        <div class="projection-metric">
-                            <span class="projection-metric-now">—</span>
-                            <span class="projection-metric-arrow">→</span>
-                            <span class="projection-metric-target">—</span>
+                        <div class="projection-metric projection-metric-dashboard">
+                            <span class="projection-metric-current">—</span>
+                            <span class="projection-metric-last">—</span>
                         </div>
-                        <div class="projection-metric-label">Reach • vs last month</div>
+                        <div class="projection-metric-label">Sales</div>
                     </div>
-                    <div class="projection-mini-chart dashboard-mini-chart">
+                    <div class="projection-mini-chart">
                         <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
                     </div>
                     <div class="projection-card-footer">
                         <span class="projection-effort projection-card-updated">Updated: —</span>
-                        <span class="projection-growth dashboard-growth">—</span>
+                        <span class="projection-growth">—</span>
+                    </div>
+                </div>
+                <div class="projection-card project-card" data-project-type="saas" title="Click for revenue projections">
+                    <div class="projection-card-type">SAAS</div>
+                    <div class="projection-card-name">Soulin Social</div>
+                    <div class="projection-card-metrics">
+                        <div class="projection-metric projection-metric-dashboard">
+                            <span class="projection-metric-current">—</span>
+                            <span class="projection-metric-last">—</span>
+                        </div>
+                        <div class="projection-metric-label">Paid member</div>
+                    </div>
+                    <div class="projection-mini-chart">
+                        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div class="projection-card-footer">
+                        <span class="projection-effort projection-card-updated">Updated: —</span>
+                        <span class="projection-growth">—</span>
+                    </div>
+                </div>
+                <div class="projection-card project-card" data-project-type="freelance" title="Click for revenue projections">
+                    <div class="projection-card-type">FREELANCE</div>
+                    <div class="projection-card-name">Soulin Agency</div>
+                    <div class="projection-card-metrics">
+                        <div class="projection-metric projection-metric-dashboard">
+                            <span class="projection-metric-current">—</span>
+                            <span class="projection-metric-last">—</span>
+                        </div>
+                        <div class="projection-metric-label">Revenue</div>
+                    </div>
+                    <div class="projection-mini-chart">
+                        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div class="projection-card-footer">
+                        <span class="projection-effort projection-card-updated">Updated: —</span>
+                        <span class="projection-growth">—</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Social Media Platform Cards -->
+            <!-- Social Media Platform Cards (sticky to bottom above tabs) -->
             <div class="social-platforms-grid">
                 <div class="social-platform-card">
                     <svg class="social-platform-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
@@ -457,6 +482,35 @@
                         <div class="info-section">
                             <div class="info-header">No</div>
                             <div id="goalsNosList" class="goals-inline-list"></div>
+                        </div>
+                        <div class="info-section">
+                            <div class="info-header">Contingency plans</div>
+                            <div id="goalsContingencyPlans" class="goals-contingency-plans">
+                                <div class="goals-contingency-row" data-plan-key="a">
+                                    <span class="goals-contingency-label">Plan A</span>
+                                    <span class="goals-contingency-display" data-field="plan_text">—</span>
+                                    <span class="goals-contingency-if-wrap">
+                                        <span class="goals-contingency-trigger-label">IF</span>
+                                        <span class="goals-contingency-display" data-field="event_trigger">—</span>
+                                    </span>
+                                </div>
+                                <div class="goals-contingency-row" data-plan-key="b">
+                                    <span class="goals-contingency-label">Plan B</span>
+                                    <span class="goals-contingency-display" data-field="plan_text">—</span>
+                                    <span class="goals-contingency-if-wrap">
+                                        <span class="goals-contingency-trigger-label">IF</span>
+                                        <span class="goals-contingency-display" data-field="event_trigger">—</span>
+                                    </span>
+                                </div>
+                                <div class="goals-contingency-row" data-plan-key="c">
+                                    <span class="goals-contingency-label">Plan C</span>
+                                    <span class="goals-contingency-display" data-field="plan_text">—</span>
+                                    <span class="goals-contingency-if-wrap">
+                                        <span class="goals-contingency-trigger-label">IF</span>
+                                        <span class="goals-contingency-display" data-field="event_trigger">—</span>
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -854,7 +908,8 @@
                 </div>
             </div>
 
-            <!-- Tab bar (inside middle section) -->
+            </div>
+            <!-- Tab bar: fixed at bottom, never scrolls -->
             <div class="tab-bar" id="tabBar">
                 <button type="button" class="tab-bar-tab active" data-tab="dashboard">Dashboard</button>
                 <button type="button" class="tab-bar-tab" data-tab="goals">Goals</button>

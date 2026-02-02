@@ -7,8 +7,11 @@
         document.querySelectorAll('.tab-bar-tab').forEach(el => { el.classList.remove('active'); });
         const panel = document.getElementById('panel-' + tab);
         const tabBtn = document.querySelector('.tab-bar-tab[data-tab="' + tab + '"]');
-        if (panel) panel.style.display = 'block';
+        if (panel) panel.style.display = tab === 'dashboard' ? 'flex' : 'block';
         if (tabBtn) tabBtn.classList.add('active');
+        const scrollEl = document.querySelector('.os-main-scroll') || document.getElementById('osMainScroll');
+        if (scrollEl) scrollEl.classList.toggle('no-scroll', tab === 'dashboard');
+        if (tab === 'dashboard' && typeof loadDashboardData === 'function') loadDashboardData();
         if (tab === 'wishlist') loadWishlist();
         if (tab === 'goals') loadGoals();
         if (tab === 'scenarios' && typeof initProjectionTab === 'function') initProjectionTab();
@@ -268,12 +271,14 @@
         const parentSelect = document.getElementById('goalParentInput');
         if (!hierarchyEl) return;
         try {
-            const [goalsRes, nosUncertaintiesRes] = await Promise.all([
+            const [goalsRes, nosUncertaintiesRes, contingencyRes] = await Promise.all([
                 fetch('/api/goals?withDetail=1'),
-                fetch('/api/goals/nos-and-uncertainties')
+                fetch('/api/goals/nos-and-uncertainties'),
+                fetch('/api/goals/contingency-plans')
             ]);
             const goals = await goalsRes.json();
             const { nos, uncertainties } = await nosUncertaintiesRes.json();
+            const contingencyPlans = contingencyRes.ok ? await contingencyRes.json() : [];
             const periods = currentPeriodLabels();
 
             if (parentSelect && goals.length) {
@@ -657,6 +662,86 @@
 
             renderInlineList(maybeListEl, uncertainties || [], 'maybe', 'title', null, '/api/goals/uncertainties', '/api/goals/uncertainties/:id', '/api/goals/uncertainties/:id');
             renderInlineList(nosListEl, nos || [], 'no', 'title', 'why', '/api/goals/nos', '/api/goals/nos/:id', '/api/goals/nos/:id');
+
+            // Contingency plans A, B, C: render and inline edit
+            const contingencyEl = document.getElementById('goalsContingencyPlans');
+            if (contingencyEl && Array.isArray(contingencyPlans)) {
+                ['a', 'b', 'c'].forEach(planKey => {
+                    const row = contingencyEl.querySelector('.goals-contingency-row[data-plan-key="' + planKey + '"]');
+                    if (!row) return;
+                    const plan = contingencyPlans.find(p => (p.plan_key || '').toLowerCase() === planKey) || {};
+                    const planText = (plan.plan_text != null ? plan.plan_text : plan.planText || '').toString().trim() || '—';
+                    const eventTrigger = (plan.event_trigger != null ? plan.event_trigger : plan.eventTrigger || '').toString().trim() || '—';
+                    const planTextEl = row.querySelector('.goals-contingency-display[data-field="plan_text"]');
+                    const triggerEl = row.querySelector('.goals-contingency-display[data-field="event_trigger"]');
+                    if (planTextEl) {
+                        planTextEl.textContent = planText;
+                        planTextEl.style.display = '';
+                    }
+                    if (triggerEl) {
+                        triggerEl.textContent = eventTrigger;
+                        triggerEl.style.display = '';
+                    }
+                    row.classList.remove('editing');
+                    row.querySelectorAll('.goals-contingency-input').forEach(inp => inp.remove());
+                    const label = row.querySelector('.goals-contingency-label');
+                    const triggerLabel = row.querySelector('.goals-contingency-trigger-label');
+                    if (!row._contingencyBound) {
+                        row._contingencyBound = true;
+                        row.setAttribute('tabindex', '0');
+                        row.style.cursor = 'pointer';
+                        row.addEventListener('click', function(e) {
+                            if (this.classList.contains('editing')) return;
+                            const planKey = this.dataset.planKey;
+                            const planTextD = this.querySelector('.goals-contingency-display[data-field="plan_text"]');
+                            const triggerD = this.querySelector('.goals-contingency-display[data-field="event_trigger"]');
+                            const planText = (planTextD && planTextD.textContent !== '—') ? planTextD.textContent : '';
+                            const trigger = (triggerD && triggerD.textContent !== '—') ? triggerD.textContent : '';
+                            this.classList.add('editing');
+                            planTextD.style.display = 'none';
+                            triggerD.style.display = 'none';
+                            const inp1 = document.createElement('input');
+                            inp1.className = 'goals-contingency-input';
+                            inp1.placeholder = 'Plan ' + planKey.toUpperCase();
+                            inp1.value = planText;
+                            const inp2 = document.createElement('input');
+                            inp2.className = 'goals-contingency-input';
+                            inp2.placeholder = 'IF …';
+                            inp2.value = trigger;
+                            planTextD.after(inp1);
+                            triggerLabel.after(inp2);
+                            inp1.focus();
+                            function save() {
+                                const p = (inp1.value || '').trim();
+                                const t = (inp2.value || '').trim();
+                                row.classList.remove('editing');
+                                inp1.remove();
+                                inp2.remove();
+                                planTextD.style.display = '';
+                                triggerD.style.display = '';
+                                planTextD.textContent = p || '—';
+                                triggerD.textContent = t || '—';
+                                fetch('/api/goals/contingency-plans/' + planKey, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ plan_text: p, event_trigger: t })
+                                }).then(() => { loadGoals(); if (typeof showToast === 'function') showToast('Saved', 'success'); }).catch(() => loadGoals());
+                            }
+                            function onBlur() {
+                                setTimeout(function() {
+                                    var active = document.activeElement;
+                                    if (active === inp1 || active === inp2 || row.contains(active)) return;
+                                    save();
+                                }, 0);
+                            }
+                            inp1.addEventListener('blur', onBlur);
+                            inp2.addEventListener('blur', onBlur);
+                            inp1.addEventListener('keydown', function(ev) { if (ev.key === 'Enter') { ev.preventDefault(); inp2.focus(); } if (ev.key === 'Escape') { row.classList.remove('editing'); loadGoals(); } });
+                            inp2.addEventListener('keydown', function(ev) { if (ev.key === 'Enter') { ev.preventDefault(); save(); } if (ev.key === 'Escape') { row.classList.remove('editing'); loadGoals(); } });
+                        });
+                    }
+                });
+            }
         } catch (e) {
             hierarchyEl.innerHTML = '<p class="empty-state">Could not load goals.</p>';
             if (nosListEl) nosListEl.innerHTML = '';

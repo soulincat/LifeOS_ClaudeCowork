@@ -7,3 +7,5 @@ build/
 *.db
 *.db-shm
 *.db-wal
+*.db.backup
+db/backups/

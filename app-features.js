@@ -21,6 +21,146 @@ function showToast(message, type = 'info', duration = 3000) {
     }, duration);
 }
 
+// ---- Self-contained data loader (does NOT depend on app.js) ----
+function updateTodoCountLocal() {
+    const list = document.querySelector('.todo-list');
+    if (!list) return;
+    const checkboxes = list.querySelectorAll('.todo-checkbox');
+    const checked = list.querySelectorAll('.todo-checkbox:checked').length;
+    const undone = checkboxes.length - checked;
+    const countEl = document.getElementById('todoCount');
+    if (countEl) countEl.textContent = undone + '/' + checkboxes.length;
+}
+
+async function loadAllData() {
+    const base = location.origin;
+    const formatCurrency = (amount) => {
+        if (amount == null || isNaN(Number(amount))) return '$0';
+        const n = Number(amount);
+        if (n >= 1000) return '$' + (n / 1000).toFixed(1) + 'k';
+        return '$' + (n >= 0 ? n.toFixed(0) : '-' + Math.abs(n).toFixed(0));
+    };
+
+    // Todos
+    try {
+        const r = await fetch(base + '/api/todos');
+        if (r.ok) {
+            const todos = await r.json();
+            const todoList = document.querySelector('.todo-list');
+            if (todoList) {
+                const undone = todos.filter(t => !t.completed);
+                const done = todos.filter(t => t.completed);
+                let html = '';
+                undone.forEach(t => {
+                    html += '<label class="todo-item"><input type="checkbox" class="todo-checkbox" data-id="' + t.id + '"><span class="todo-text">' + (t.text || '').replace(/</g, '&lt;') + '</span></label>';
+                });
+                if (done.length > 0) {
+                    html += '<div class="todo-separator"></div><div class="todo-done-header"><button class="todo-expand-btn" id="expandDoneBtn" title="Show completed tasks"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="todo-done-label">Done today (' + done.length + ')</span></div><div class="todo-done-list" id="todoDoneList" style="display:none;">';
+                    done.forEach(t => {
+                        html += '<label class="todo-item todo-item-done"><input type="checkbox" class="todo-checkbox" data-id="' + t.id + '" checked><span class="todo-text">' + (t.text || '').replace(/</g, '&lt;') + '</span></label>';
+                    });
+                    html += '</div>';
+                }
+                todoList.innerHTML = html;
+                updateTodoCountLocal();
+                const expandBtn = document.getElementById('expandDoneBtn');
+                if (expandBtn) expandBtn.addEventListener('click', function() {
+                    const dl = document.getElementById('todoDoneList');
+                    if (dl) dl.style.display = dl.style.display === 'none' ? 'block' : 'none';
+                });
+            }
+        }
+    } catch (e) { console.warn('Todos load failed', e); }
+
+    // Finance
+    try {
+        const r = await fetch(base + '/api/finance');
+        if (r.ok) {
+            const finance = await r.json();
+            const section = document.getElementById('financeSection');
+            const rows = section ? section.querySelectorAll('.info-row') : [];
+            rows.forEach(row => {
+                const labelEl = row.querySelector('.info-label');
+                const valueEl = row.querySelector('.info-value');
+                if (!labelEl || !valueEl) return;
+                const label = labelEl.textContent.trim();
+                let val = null;
+                if (label === 'Revenue') val = finance.monthly?.revenue;
+                else if (label === 'Profit') val = finance.monthly?.profit;
+                else if (label === 'Expense') val = finance.monthly?.expense;
+                else if (label === 'Spending') val = finance.monthly?.spending;
+                else if (label === 'Investment') val = finance.constants?.investment;
+                else if (label === 'Passive Yield') {
+                    const amt = Number(finance.constants?.passive_yield) || 0;
+                    const inv = Number(finance.constants?.investment) || 0;
+                    const pct = inv > 0 && amt > 0 ? (amt / inv * 100) : (finance.constants?.passive_yield_percentage ?? 0);
+                    valueEl.textContent = formatCurrency(amt) + ' (' + pct.toFixed(1) + '%)';
+                    return;
+                } else if (label === 'Asset') val = finance.constants?.asset;
+                else if (label === 'Total Net') val = finance.constants?.total_net;
+                if (val != null && !isNaN(Number(val))) valueEl.textContent = formatCurrency(val);
+            });
+            const totalEl = document.getElementById('totalNetValue');
+            if (totalEl) {
+                let tn = finance.constants?.total_net;
+                if (tn == null || isNaN(Number(tn))) tn = (Number(finance.constants?.investment) || 0) + (Number(finance.constants?.asset) || 0);
+                totalEl.textContent = formatCurrency(tn);
+            }
+            const monthEl = document.getElementById('financeMonth');
+            if (monthEl) monthEl.textContent = ['January','February','March','April','May','June','July','August','September','October','November','December'][new Date().getMonth()];
+        }
+    } catch (e) { console.warn('Finance load failed', e); }
+
+    // Health
+    try {
+        const r = await fetch(base + '/api/health');
+        if (r.ok) {
+            const health = await r.json();
+            const section = document.getElementById('healthSection');
+            const rows = section ? section.querySelectorAll('.info-row') : [];
+            rows.forEach(row => {
+                const label = row.querySelector('.info-label')?.textContent;
+                const valueEl = row.querySelector('.info-value');
+                if (!valueEl) return;
+                if (label === 'Recovery') valueEl.textContent = (health.recovery ?? '') + '%';
+                else if (label === 'Sleep') valueEl.textContent = (health.sleep_hours ?? 0) + 'h ' + (health.sleep_minutes ?? 0) + 'm';
+                else if (label === 'HRV') valueEl.textContent = (health.hrv ?? '') + 'ms';
+                else if (label === 'Cycle') valueEl.textContent = health.cycle_phase || '—';
+            });
+            const phaseEl = document.getElementById('healthMonthlyPhase');
+            if (phaseEl && health.monthly_phase) phaseEl.textContent = health.monthly_phase;
+        }
+    } catch (e) { console.warn('Health load failed', e); }
+
+    // GitHub contribution graph
+    const graphImg = document.getElementById('githubContributionGraph');
+    if (graphImg) graphImg.src = 'https://ghchart.rshah.org/203EAE/soulincat?t=' + Date.now();
+
+    // Top priority this month (sidebar)
+    try {
+        const goalsRes = await fetch(base + '/api/goals');
+        if (goalsRes.ok) {
+            const goals = await goalsRes.json();
+            const now = new Date();
+            const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            const monthly = (goals || []).filter(g => {
+                if (g.period_type !== 'monthly') return false;
+                const label = (g.period_label || '').trim();
+                if (label === currentMonth) return true;
+                if (label.includes(currentMonth)) return true;
+                if (label.includes(monthNames[now.getMonth()]) && label.includes(String(now.getFullYear()))) return true;
+                return false;
+            });
+            const nonArt = monthly.filter(g => (g.aspect || 'general') !== 'art');
+            const byPriority = nonArt.slice().sort((a, b) => (a.priority ?? 3) - (b.priority ?? 3));
+            const top = byPriority[0];
+            const el = document.getElementById('sidebarTopPriorityTitle');
+            if (el) el.textContent = top ? top.title : '—';
+        }
+    } catch (e) { console.warn('Sidebar top priority load failed', e); }
+}
+
 // Dark Mode Toggle
 function initDarkMode() {
     const themeToggle = document.getElementById('themeToggle');
@@ -63,32 +203,19 @@ function initDarkMode() {
     });
 }
 
-// Refresh Button
+// Refresh Button — uses loadAllData() so it never depends on app.js
 function initRefreshButton() {
     const refreshBtn = document.getElementById('refreshBtn');
-    if (!refreshBtn) {
-        console.warn('Refresh button not found');
-        return;
-    }
+    if (!refreshBtn) return;
     
     refreshBtn.addEventListener('click', async () => {
         refreshBtn.classList.add('loading');
         refreshBtn.disabled = true;
-        
         try {
-            console.log('🔄 Manual refresh triggered');
-            if (typeof refreshGitHubGraph === 'function') {
-                refreshGitHubGraph();
-            }
-            if (typeof loadDashboardData === 'function') {
-                await loadDashboardData();
-                showToast('Data refreshed successfully', 'success');
-            } else {
-                console.error('loadDashboardData function not found!');
-                showToast('Error: Dashboard function not loaded', 'error');
-            }
-        } catch (error) {
-            console.error('Refresh error:', error);
+            await loadAllData();
+            showToast('Data refreshed successfully', 'success');
+        } catch (e) {
+            console.error('Refresh error:', e);
             showToast('Failed to refresh data', 'error');
         } finally {
             setTimeout(() => {
@@ -394,22 +521,31 @@ function setLoading(element, isLoading) {
     }
 }
 
-// Initialize all features when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        initDarkMode();
-        initRefreshButton();
-        initAddTodo();
-        initInlineTodoEdit();
-        initAddUpcoming();
-        initAddFinance();
-    });
-} else {
-    // DOM already loaded
+// Single delegated listener for todo checkbox (so it works after loadAllData replaces HTML)
+document.body.addEventListener('change', async function(ev) {
+    if (!ev.target.matches('.todo-list .todo-checkbox') || !ev.target.dataset.id) return;
+    const cb = ev.target;
+    try {
+        const res = await fetch(location.origin + '/api/todos/' + cb.dataset.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ completed: cb.checked }) });
+        if (res.ok) loadAllData();
+    } catch (e) { console.warn(e); }
+});
+
+// Initialize all features when DOM is ready; load data so it works even if app.js fails
+function init() {
     initDarkMode();
     initRefreshButton();
     initAddTodo();
     initInlineTodoEdit();
     initAddUpcoming();
     initAddFinance();
+    // Load todos, finance, health, GitHub graph (self-contained, no app.js dependency)
+    setTimeout(function() { loadAllData(); }, 100);
 }
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+// Fallback: load data again when window fully loaded
+window.addEventListener('load', function() { loadAllData(); });

@@ -6,26 +6,27 @@ const db = require('./database');
 function seedDatabase() {
     console.log('Seeding database with initial data...');
 
-    // Seed todos
-    const todoStmt = db.prepare(`
-        INSERT OR IGNORE INTO todos (text, completed)
-        VALUES (?, ?)
-    `);
-    
-    const todos = [
-        { text: 'Push API updates', completed: true },
-        { text: 'Review client feedback', completed: true },
-        { text: 'Update portfolio', completed: true },
-        { text: 'Schedule dentist', completed: true },
-        { text: 'Write blog post', completed: false },
-        { text: 'Team standup prep', completed: false },
-        { text: 'Review PRs', completed: false },
-        { text: 'Update documentation', completed: false }
-    ];
-    
-    todos.forEach(todo => {
-        todoStmt.run(todo.text, todo.completed ? 1 : 0);
-    });
+    // Seed todos only when table is empty (never overwrite or duplicate your data)
+    const existingTodos = db.prepare('SELECT COUNT(*) as count FROM todos').get();
+    if (existingTodos.count === 0) {
+        const todoStmt = db.prepare(`
+            INSERT INTO todos (text, completed)
+            VALUES (?, ?)
+        `);
+        const todos = [
+            { text: 'Push API updates', completed: true },
+            { text: 'Review client feedback', completed: true },
+            { text: 'Update portfolio', completed: true },
+            { text: 'Schedule dentist', completed: true },
+            { text: 'Write blog post', completed: false },
+            { text: 'Team standup prep', completed: false },
+            { text: 'Review PRs', completed: false },
+            { text: 'Update documentation', completed: false }
+        ];
+        todos.forEach(todo => {
+            todoStmt.run(todo.text, todo.completed ? 1 : 0);
+        });
+    }
 
     // Seed projects
     const projectStmt = db.prepare(`
@@ -34,10 +35,10 @@ function seedDatabase() {
     `);
     
     const projects = [
-        { name: 'Soulin Social', github_repo: null, last_updated: '2025-01-24', metrics: JSON.stringify({ users: 2400, mrr: 8200 }) },
-        { name: 'KINS', github_repo: null, last_updated: '2025-01-25', metrics: JSON.stringify({ subscribers: 8900, mrr: 3500 }) },
-        { name: 'Cathy K', github_repo: null, last_updated: '2025-01-26', metrics: JSON.stringify({ api_calls: 1200, mrr: 2800 }) },
-        { name: 'Soulful Academy', github_repo: null, last_updated: '2025-01-22', metrics: JSON.stringify({ reach: 18300, revenue: 1900 }) }
+        { name: 'Soulin Social', github_repo: null, last_updated: '2025-01-24', metrics: JSON.stringify({ current: { paid_members: 2400, mrr: 8200 }, last_month: { paid_members: 2200, mrr: 7800 } }) },
+        { name: 'KINS', github_repo: null, last_updated: '2025-01-25', metrics: JSON.stringify({ current: { sales: 3500, subscribers: 8900 }, last_month: { sales: 3200, subscribers: 8200 } }) },
+        { name: 'Cathy K', github_repo: null, last_updated: '2025-01-26', metrics: JSON.stringify({ current: { followers: 14000, subscribers: 14000 }, last_month: { followers: 12000, subscribers: 12000 } }) },
+        { name: 'Soulin Agency', github_repo: null, last_updated: '2025-01-22', metrics: JSON.stringify({ current: { revenue: 1900 }, last_month: { revenue: 1650 } }) }
     ];
     
     projects.forEach(project => {

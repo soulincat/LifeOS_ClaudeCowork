@@ -138,6 +138,15 @@ CREATE TABLE IF NOT EXISTS goal_nos (
     FOREIGN KEY (goal_id) REFERENCES goals(id)
 );
 
+-- Contingency plans A, B, C with event triggers (under No in Goals tab)
+CREATE TABLE IF NOT EXISTS goal_contingency_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_key TEXT NOT NULL UNIQUE,
+    plan_text TEXT,
+    event_trigger TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Uncertainties: not sure about, thinking about, yet to be decided
 CREATE TABLE IF NOT EXISTS goal_uncertainties (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

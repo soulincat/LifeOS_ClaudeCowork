@@ -2,6 +2,23 @@
 
 Run the dashboard on a different machine (VPS, cloud, or home server).
 
+## Why did everything reset when I pushed to main?
+
+If you **push to main** and a host (Vercel, Netlify, Railway, Render, etc.) **auto-deploys** your app, each deploy usually gets a **new, empty filesystem**. So:
+
+- `lifeos.db` doesn’t exist (or is empty) on that deploy.
+- The server starts, sees 0 todos, runs the seed.
+- You see default todos and no finance data.
+
+**Commit/push itself doesn’t delete your data.** Your local `lifeos.db` is unchanged. The **deployed** instance is a new environment with no copy of your DB.
+
+**So that your data doesn’t reset on deploy:**
+
+- Use **persistent storage** for the DB in production (see Option 1 below: Docker with a volume), or
+- Use a **hosted database** (e.g. Turso, PlanetScale) and set `DATABASE_PATH` or a DB URL in the deploy config.
+
+**Local use:** Your data lives in `lifeos.db` in the project root. It’s in `.gitignore`, so git never commits it. Back it up yourself if you need it elsewhere.
+
 ## Option 1: Docker (recommended)
 
 On the server, clone the repo and run:

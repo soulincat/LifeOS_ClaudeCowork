@@ -44,13 +44,12 @@ function updateHealthAlert() {
     }
 }
 
-// Load dashboard data
+// Load dashboard data (each section independent so one failure doesn't block the rest)
 async function loadDashboardData() {
+    let socialFollowersTotal = 0; // used by dashboard project cards (e.g. Cathy K = this total)
+
+    // --- Health ---
     try {
-        console.log('🔄 Loading dashboard data...');
-        console.log('Finance section exists:', !!document.getElementById('financeSection'));
-        
-        // Load health metrics
         const healthResponse = await fetch('/api/health');
         const health = await healthResponse.json();
         
@@ -80,32 +79,26 @@ async function loadDashboardData() {
         }
         
         updateHealthAlert();
-        
-        // Load finance data
-        console.log('📊 Fetching finance data...');
+    } catch (e) { console.warn('Health load failed', e); }
+
+    // --- Finance ---
+    let finance = {};
+    try {
         const financeResponse = await fetch('/api/finance');
-        if (!financeResponse.ok) {
-            console.error('❌ Failed to fetch finance data:', financeResponse.status);
-            return;
+            if (financeResponse.ok) {
+                finance = await financeResponse.json();
+        } else {
+            console.warn('Finance API:', financeResponse.status);
         }
-        const finance = await financeResponse.json();
-        console.log('✅ Finance data received:', finance);
-        
+    } catch (e) {
+        console.warn('Finance fetch failed:', e);
+    }
+    try {
         // Update finance display
         const financeSection = document.getElementById('financeSection');
-        if (!financeSection) {
-            console.error('❌ Finance section not found!');
-            return;
-        }
+        const financeRows = financeSection ? financeSection.querySelectorAll('.info-row') : [];
         
-        const financeRows = financeSection.querySelectorAll('.info-row');
-        console.log(`📋 Found ${financeRows.length} finance rows`);
-        
-        if (financeRows.length === 0) {
-            console.error('❌ No finance rows found! Check HTML structure.');
-            return;
-        }
-        
+        if (financeSection && financeRows.length > 0) {
         // Format currency helper
         const formatCurrency = (amount) => {
             if (amount === null || amount === undefined) return '$0';
@@ -193,6 +186,7 @@ async function loadDashboardData() {
             totalNetEl.textContent = formatCurrency(totalNet);
             totalNetEl.classList.add('accent');
         }
+        }
         
         console.log('✅ Finance display updated');
         console.log('Final finance values:', {
@@ -210,8 +204,10 @@ async function loadDashboardData() {
                               'July', 'August', 'September', 'October', 'November', 'December'];
             financeMonthEl.textContent = monthNames[new Date().getMonth()];
         }
-        
-        // Load scheduled posts
+    } catch (e) { console.warn('Finance display failed', e); }
+
+    // --- Scheduled posts ---
+    try {
         const postsResponse = await fetch('/api/social/scheduled-posts?limit=3');
         const posts = await postsResponse.json();
         
@@ -224,80 +220,151 @@ async function loadDashboardData() {
                 </div>
             `).join('');
         }
-        
-        // Social numbers: kept from HTML (not overwritten by API)
+    } catch (e) { console.warn('Scheduled posts failed', e); }
 
-        // Load projects
-        const projectsResponse = await fetch('/api/projects');
-        const projects = await projectsResponse.json();
-        
-        // Update project cards (projection style: last month → this month, growth)
-        const cards = document.querySelectorAll('#dashboardProjectsGrid .project-card');
-        const typeMap = {
-            'Soulin Social': 'SAAS',
-            'KINS': 'SAAS',
-            'Cathy K': 'CHANNEL',
-            'Soulful Academy': 'FREELANCE'
-        };
-        
-        projects.forEach((project) => {
-            const card = Array.from(cards).find(c => {
-                const nameEl = c.querySelector('.projection-card-name');
-                return nameEl && nameEl.textContent.trim() === project.name;
+    // --- Social followers: one API → fill each platform card, total = sum ---
+    try {
+        const metricsRes = await fetch('/api/social/metrics');
+        const list = await metricsRes.json();
+        if (Array.isArray(list)) {
+            const fmt = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v));
+            let total = 0;
+            list.forEach((m) => {
+                const v = Number(m.value) || 0;
+                total += v;
+                const platform = (m.platform || '').toLowerCase();
+                const el = document.querySelector('#panel-dashboard .social-platform-metric[data-platform="' + platform + '"]');
+                if (el) el.textContent = fmt(v);
             });
-            if (!card) return;
+            socialFollowersTotal = total;
+            const totalEl = document.getElementById('socialFollowersValue');
+            if (totalEl) totalEl.textContent = fmt(total);
+        }
+    } catch (e) { console.warn('Social metrics failed', e); }
+    // Fallback so Cathy K card can still show total (e.g. 20.6K) if social API failed
+    if (socialFollowersTotal === 0) {
+        const totalEl = document.getElementById('socialFollowersValue');
+        if (totalEl && totalEl.textContent) {
+            const t = String(totalEl.textContent).replace(/\s/g, '').toLowerCase();
+            const n = parseFloat(t);
+            if (!isNaN(n)) socialFollowersTotal = t.includes('k') ? Math.round(n * 1000) : Math.round(n);
+        }
+        if (socialFollowersTotal === 0) socialFollowersTotal = 20600;
+    }
 
-            if (project.id != null) card.setAttribute('data-project-id', project.id);
-
-            const metrics = project.metrics || {};
-            const current = metrics.current != null ? metrics.current : metrics;
-            const lastMonth = metrics.last_month != null ? metrics.last_month : null;
-
-            const typeLabel = typeMap[project.name] || 'PROJECT';
-            const typeEl = card.querySelector('.projection-card-type');
-            if (typeEl) typeEl.textContent = typeLabel;
-            card.setAttribute('data-project-type', typeLabel.toLowerCase());
-
-            const primaryKey = pickPrimaryMetricKey(current, lastMonth);
-            const labelKey = primaryKey ? formatMetricLabel(primaryKey) : '—';
-            const lastVal = lastMonth && primaryKey && lastMonth[primaryKey] != null ? lastMonth[primaryKey] : null;
-            const thisVal = primaryKey && current[primaryKey] != null ? current[primaryKey] : null;
-
-            const nowEl = card.querySelector('.projection-metric-now');
-            const targetEl = card.querySelector('.projection-metric-target');
-            const labelEl = card.querySelector('.projection-metric-label');
-            if (nowEl) nowEl.textContent = lastVal != null ? formatMetricValue(primaryKey, lastVal) : '—';
-            if (targetEl) targetEl.textContent = thisVal != null ? formatMetricValue(primaryKey, thisVal) : '—';
-            if (labelEl) labelEl.textContent = `${labelKey} • vs last month`;
-
-            let growthPct = null;
-            if (lastVal != null && thisVal != null && typeof lastVal === 'number' && typeof thisVal === 'number' && lastVal !== 0) {
-                growthPct = Math.round(((thisVal - lastVal) / lastVal) * 100);
+    // --- Social overview: Posts, Impressions, Clicks ---
+    try {
+        const overviewRes = await fetch('/api/social/overview');
+        const overview = await overviewRes.json();
+        if (overview) {
+            const fmt = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v));
+            const socialMetrics = document.querySelectorAll('#panel-dashboard .social-metric');
+            if (socialMetrics.length >= 4) {
+                if (overview.posts != null) socialMetrics[1].querySelector('.social-metric-value').textContent = overview.posts.toString();
+                if (overview.impressions != null) socialMetrics[2].querySelector('.social-metric-value').textContent = fmt(overview.impressions);
+                if (overview.clicks != null) socialMetrics[3].querySelector('.social-metric-value').textContent = fmt(overview.clicks);
             }
-            const growthEl = card.querySelector('.dashboard-growth');
-            if (growthEl) {
-                growthEl.textContent = growthPct != null ? (growthPct >= 0 ? `+${growthPct}%` : `${growthPct}%`) : '—';
-                growthEl.classList.toggle('negative', growthPct != null && growthPct < 0);
+        }
+    } catch (e) { console.warn('Social overview failed', e); }
+
+    // --- Project cards (dashboard): same structure as Projections, data from /api/projects ---
+    try {
+            const projectsResponse = await fetch('/api/projects');
+            const data = await projectsResponse.json();
+            const projects = Array.isArray(data) ? data : [];
+
+            // Same card structure as Projections tab: now → target, label, mini-chart, footer (effort + growth)
+            const gridEl = document.getElementById('dashboardProjectsGrid');
+            if (!gridEl) {
+                console.warn('Dashboard projects grid not found');
+                return;
+            }
+            const typeMap = { 'Soulin Social': 'SAAS', 'KINS': 'BUSINESS', 'Cathy K': 'CHANNEL', 'Soulin Agency': 'FREELANCE', 'Soulful Academy': 'FREELANCE' };
+            const kpiByProject = { 'Cathy K': { key: 'subscribers', label: 'Subscribers' }, 'KINS': { key: 'sales', label: 'Sales' }, 'Soulin Social': { key: 'paid_members', label: 'Paid member' }, 'Soulin Agency': { key: 'revenue', label: 'Revenue' }, 'Soulful Academy': { key: 'revenue', label: 'Revenue' } };
+            const nameAlias = { 'Soulful Academy': 'Soulin Agency' };
+
+            if (projects.length === 0) {
+                console.warn('No projects returned from API');
             }
 
-            const chartSvg = card.querySelector('.dashboard-mini-chart svg polyline');
-            if (chartSvg) {
-                const y0 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 28 : 8) : 18;
-                const y1 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 8 : 28) : 18;
-                chartSvg.setAttribute('points', `0,${y0} 100,${y1}`);
-            }
-
-            if (project.last_updated) {
-                const updatedEl = card.querySelector('.projection-card-updated');
-                if (updatedEl) {
-                    const date = new Date(project.last_updated);
-                    updatedEl.textContent = `Updated: ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+            projects.forEach((project) => {
+                const cardName = nameAlias[project.name] || project.name;
+                // Use cardName for typeMap lookup (handles Soulful Academy → Soulin Agency)
+                const projectType = (typeMap[cardName] || typeMap[project.name] || 'project').toLowerCase();
+                const card = gridEl.querySelector('.projection-card[data-project-type="' + projectType + '"]');
+                if (!card) {
+                    console.warn('Card not found for project:', project.name, 'cardName:', cardName, 'type:', projectType, 'available types:', Array.from(gridEl.querySelectorAll('.projection-card')).map(c => c.getAttribute('data-project-type')));
+                    return;
                 }
-            }
-        });
-        
-        // Load upcoming items
-        try {
+
+                if (project.id != null) card.setAttribute('data-project-id', project.id);
+
+                let metrics = project.metrics || {};
+                if (typeof metrics === 'string') {
+                    try {
+                        metrics = JSON.parse(metrics);
+                    } catch (e) {
+                        console.warn('Failed to parse metrics for', project.name, e);
+                        metrics = {};
+                    }
+                }
+                const current = metrics.current != null ? metrics.current : metrics;
+                const lastMonth = metrics.last_month != null ? metrics.last_month : null;
+                const typeLabel = typeMap[cardName] || typeMap[project.name] || 'PROJECT';
+                const kpi = kpiByProject[cardName] || kpiByProject[project.name];
+                const primaryKey = kpi ? kpi.key : pickPrimaryMetricKey(current, lastMonth, typeLabel.toLowerCase());
+                const getVal = (obj) => {
+                    if (!obj || !primaryKey) return null;
+                    if (primaryKey === 'paid_members') return obj.paid_members != null ? obj.paid_members : obj.paid_member;
+                    return obj[primaryKey];
+                };
+                let lastVal = getVal(lastMonth);
+                let thisVal = getVal(current);
+                // Cathy K (channel): show total social followers as current on the card (same as top of dashboard)
+                if ((project.name === 'Cathy K' || cardName === 'Cathy K') && (primaryKey === 'subscribers' || primaryKey === 'followers') && socialFollowersTotal > 0) {
+                    thisVal = socialFollowersTotal;
+                }
+
+                const currentEl = card.querySelector('.projection-metric-current');
+                const lastEl = card.querySelector('.projection-metric-last');
+                const labelEl = card.querySelector('.projection-metric-label');
+                const growthEl = card.querySelector('.projection-growth');
+                const updatedEl = card.querySelector('.projection-card-updated');
+
+                if (currentEl) {
+                    currentEl.textContent = thisVal != null ? formatMetricValue(primaryKey, thisVal) : '—';
+                    currentEl.classList.toggle('has-value', thisVal != null);
+                }
+                if (lastEl) lastEl.textContent = lastVal != null ? formatMetricValue(primaryKey, lastVal) : '—';
+                if (labelEl) labelEl.textContent = kpi ? kpi.label : '—';
+
+                let growthPct = null;
+                if (lastVal != null && thisVal != null && typeof lastVal === 'number' && typeof thisVal === 'number') {
+                    growthPct = lastVal !== 0 ? Math.round(((thisVal - lastVal) / lastVal) * 100) : (thisVal !== 0 ? 100 : 0);
+                }
+                if (growthEl) {
+                    growthEl.textContent = growthPct != null ? (growthPct > 0 ? '+' + growthPct + '%' : growthPct + '%') : '—';
+                    growthEl.classList.toggle('negative', growthPct != null && growthPct < 0);
+                }
+
+                const mini = card.querySelector('.projection-mini-chart polyline');
+                if (mini) {
+                    const y0 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 28 : 8) : 18;
+                    const y1 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 8 : 28) : 18;
+                    mini.setAttribute('points', '0,' + y0 + ' 100,' + y1);
+                }
+
+                if (updatedEl && project.last_updated) {
+                    const date = new Date(project.last_updated);
+                    updatedEl.textContent = 'Updated: ' + date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }
+            });
+    } catch (err) {
+        console.warn('Dashboard project cards failed', err);
+    }
+
+    // --- Upcoming ---
+    try {
             const upcomingResponse = await fetch('/api/upcoming');
             const upcoming = await upcomingResponse.json();
             
@@ -325,14 +392,13 @@ async function loadDashboardData() {
                     `;
                 }).join('');
             }
-        } catch (error) {
-            console.error('Error loading upcoming items:', error);
-        }
-        
-    } catch (error) {
-        console.error('Error loading dashboard data:', error);
+    } catch (e) {
+        console.warn('Upcoming failed', e);
     }
 }
+
+// Expose for refresh button (before any code that might throw)
+window.loadDashboardData = loadDashboardData;
 
 function formatNumber(num) {
     if (num >= 1000) {
@@ -341,24 +407,52 @@ function formatNumber(num) {
     return num.toString();
 }
 
-function pickPrimaryMetricKey(current, lastMonth) {
+function pickPrimaryMetricKey(current, lastMonth, projectType) {
     const obj = current || lastMonth || {};
     const keys = Object.keys(obj).filter(k => k !== 'current' && k !== 'last_month' && obj[k] != null);
+    if (!keys.length) return null;
+    if (projectType === 'channel') {
+        if (keys.includes('subscribers')) return 'subscribers';
+        if (keys.includes('followers')) return 'followers';
+        if (keys.includes('api_calls')) return 'api_calls';
+    }
+    if (projectType === 'business') {
+        if (keys.includes('sales')) return 'sales';
+        if (keys.includes('subscribers')) return 'subscribers';
+        if (keys.includes('mrr')) return 'mrr';
+    }
+    if (projectType === 'saas') {
+        if (keys.includes('paid_members')) return 'paid_members';
+        if (keys.includes('paid_member')) return 'paid_member';
+        if (keys.includes('mrr')) return 'mrr';
+        if (keys.includes('users')) return 'users';
+    }
+    if (projectType === 'freelance') {
+        if (keys.includes('revenue')) return 'revenue';
+        if (keys.includes('reach')) return 'reach';
+    }
+    if (keys.includes('sales')) return 'sales';
+    if (keys.includes('paid_members')) return 'paid_members';
+    if (keys.includes('paid_member')) return 'paid_member';
     if (keys.includes('mrr')) return 'mrr';
+    if (keys.includes('subscribers')) return 'subscribers';
+    if (keys.includes('followers')) return 'followers';
     if (keys.includes('users')) return 'users';
     if (keys.includes('revenue')) return 'revenue';
     return keys[0] || null;
 }
 
-function formatMetricLabel(key) {
-    const labels = { mrr: 'MRR', users: 'Users', revenue: 'Revenue', subscribers: 'Subscribers', reach: 'Reach', api_calls: 'API Calls' };
+function formatMetricLabel(key, projectType) {
+    if (projectType === 'channel' && key === 'followers') return 'Subscribers';
+    const labels = { mrr: 'MRR', users: 'Users', revenue: 'Revenue', subscribers: 'Subscribers', reach: 'Reach', api_calls: 'API Calls', followers: 'Followers', sales: 'Sales', paid_members: 'Paid member', paid_member: 'Paid member' };
     return labels[key] || (key && key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')) || '—';
 }
 
 function formatMetricValue(key, value) {
     if (typeof value !== 'number') return String(value);
-    if (key === 'mrr' || key === 'revenue') return '$' + (value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value.toFixed(0));
-    if (key === 'followers' || key === 'reach') return (value >= 1000 ? (value / 1000).toFixed(1) : value) + 'K';
+    if (key === 'mrr' || key === 'revenue' || key === 'sales') return '$' + (value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value.toFixed(0));
+    if (key === 'followers' || key === 'reach' || key === 'api_calls' || key === 'subscribers') return (value >= 1000 ? (value / 1000).toFixed(1) : value) + 'K';
+    if (key === 'paid_members' || key === 'paid_member') return value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value.toString();
     if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
     return value.toString();
 }
@@ -609,6 +703,31 @@ async function openProjectModal(projectId) {
         const model = project.business_model || 'saas';
         document.querySelectorAll('input[name="pmModel"]').forEach(r => r.checked = r.value === model);
         
+        // Dashboard metrics (same fixed KPI per project as cards)
+        const kpiByProject = { 'Cathy K': { key: 'subscribers', label: 'Subscribers' }, 'KINS': { key: 'sales', label: 'Sales' }, 'Soulin Social': { key: 'paid_members', label: 'Paid member' }, 'Soulin Agency': { key: 'revenue', label: 'Revenue' } };
+        const nameAlias = { 'Soulful Academy': 'Soulin Agency' };
+        const cardName = nameAlias[project.name] || project.name;
+        const kpi = kpiByProject[cardName] || kpiByProject[project.name];
+        const metrics = project.metrics || {};
+        const current = metrics.current != null ? metrics.current : metrics;
+        const lastMonth = metrics.last_month != null ? metrics.last_month : null;
+        const primaryKey = kpi ? kpi.key : pickPrimaryMetricKey(current, lastMonth, (project.name || '').toLowerCase());
+        const getVal = (obj) => {
+            if (!obj || !primaryKey) return null;
+            if (primaryKey === 'paid_members') return obj.paid_members != null ? obj.paid_members : obj.paid_member;
+            return obj[primaryKey];
+        };
+        modal.dataset.primaryMetricKey = primaryKey || '';
+        const labelEl = document.getElementById('pmDashboardMetricLabel');
+        const labelCopyEl = document.getElementById('pmDashboardMetricLabelCopy');
+        const labelText = kpi ? kpi.label : (primaryKey ? formatMetricLabel(primaryKey, (project.name || '').toLowerCase()) : 'Metric');
+        if (labelEl) labelEl.textContent = labelText;
+        if (labelCopyEl) labelCopyEl.textContent = labelText;
+        const lastMonthInput = document.getElementById('pmMetricLastMonth');
+        const thisMonthInput = document.getElementById('pmMetricThisMonth');
+        if (lastMonthInput) lastMonthInput.value = getVal(lastMonth) != null ? getVal(lastMonth) : '';
+        if (thisMonthInput) thisMonthInput.value = getVal(current) != null ? getVal(current) : '';
+        
         // Show saved analysis if any
         const numbersSection = document.getElementById('pmNumbersSection');
         if (project.ai_analysis) {
@@ -766,6 +885,7 @@ document.getElementById('projectModalSave')?.addEventListener('click', async fun
     const projectId = currentProjectModalId;
     if (!projectId) return;
     const analysis = currentProjectModalData.analysis;
+    const project = currentProjectModalData.project;
     const body = {
         name: document.getElementById('projectModalName')?.value?.trim() || undefined,
         description: document.getElementById('pmDescription')?.value?.trim() || null,
@@ -777,6 +897,22 @@ document.getElementById('projectModalSave')?.addEventListener('click', async fun
         revenue_lucky: analysis?.revenue_best || null,
         ai_analysis: analysis ? JSON.stringify(analysis) : null
     };
+    // Include dashboard metrics so project cards update
+    const modal = document.getElementById('projectModal');
+    const primaryKey = modal?.dataset?.primaryMetricKey;
+    const lastMonthInput = document.getElementById('pmMetricLastMonth');
+    const thisMonthInput = document.getElementById('pmMetricThisMonth');
+    const lastMonthVal = lastMonthInput?.value !== '' && lastMonthInput?.value != null ? Number(lastMonthInput.value) : undefined;
+    const thisMonthVal = thisMonthInput?.value !== '' && thisMonthInput?.value != null ? Number(thisMonthInput.value) : undefined;
+    if (primaryKey && (lastMonthVal !== undefined || thisMonthVal !== undefined)) {
+        const existing = project?.metrics || {};
+        const existingCurrent = existing.current != null ? existing.current : existing;
+        const existingLastMonth = existing.last_month != null ? existing.last_month : {};
+        body.metrics = {
+            current: { ...existingCurrent, ...(thisMonthVal !== undefined && { [primaryKey]: thisMonthVal }) },
+            last_month: { ...existingLastMonth, ...(lastMonthVal !== undefined && { [primaryKey]: lastMonthVal }) }
+        };
+    }
     try {
         const res = await fetch('/api/projects/' + projectId, {
             method: 'PATCH',
@@ -857,6 +993,9 @@ async function loadTodos() {
     try {
         const url = showAllCompleted ? '/api/todos?showAll=true' : '/api/todos';
         const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error('API ' + response.status);
+        }
         const todos = await response.json();
         
         const todoList = document.querySelector('.todo-list');
@@ -951,6 +1090,10 @@ async function loadTodos() {
         });
     } catch (error) {
         console.error('Error loading todos:', error);
+        const todoList = document.querySelector('.todo-list');
+        if (todoList && typeof showToast === 'function') {
+            showToast('Couldn\'t load todos. Use http://localhost:3001 and start the server (npm start).', 'error');
+        }
     }
 }
 
@@ -965,11 +1108,26 @@ function updateTodoCount() {
     }
 }
 
-// Load todos on page load
-loadTodos();
+// Load todos when DOM is ready and on page load (so API data always replaces static HTML)
+function initTodos() {
+    const todoList = document.querySelector('.todo-list');
+    if (todoList) loadTodos();
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTodos);
+} else {
+    initTodos();
+}
 
 // Make loadTodos available globally for refresh
 window.loadTodos = loadTodos;
+
+// Fallback: load data again when window is fully loaded (in case first run failed)
+window.addEventListener('load', function() {
+    if (typeof window.loadTodos === 'function') window.loadTodos();
+    if (typeof window.loadDashboardData === 'function') window.loadDashboardData();
+    if (typeof window.refreshGitHubGraph === 'function') window.refreshGitHubGraph();
+});
 
 // TODO: Replace dummy posts with API fetch when ready
 // async function loadScheduledPosts() {

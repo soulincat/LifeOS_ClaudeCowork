@@ -3,6 +3,19 @@ let healthChart = null;
 let financeChart = null;
 let projectionChart = null;
 
+// Used only to scale the projection series; display always uses getDashboardFollowersTotal() so we never show 35.7K
+let liveFollowersForProjections = 0;
+
+// Projection "now" followers: we only DISPLAY what the dashboard shows (#socialFollowersValue). We never overwrite your numbers.
+function getDashboardFollowersTotal() {
+    const el = document.getElementById('socialFollowersValue');
+    if (!el || !el.textContent) return 0;
+    const t = String(el.textContent).replace(/\s/g, '').toLowerCase();
+    const num = parseFloat(t);
+    if (isNaN(num)) return 0;
+    return t.includes('k') ? Math.round(num * 1000) : Math.round(num);
+}
+
 // Projection data: 12 months base (original working data). For 24-month view we extend on the fly.
 const projectionData = {
     months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
@@ -269,9 +282,12 @@ function updateProjectionCards(caseType, numMonths) {
     const fmtDollar = (v) => (v >= 1000 ? '$' + (v / 1000).toFixed(1) + 'K' : '$' + v);
 
     const followersArr = getProjectionSeries(data.followers, n);
-    const channelCard = document.querySelector('.projection-cards-grid .projection-card[data-project-type="channel"]');
+    const grid = document.querySelector('#panel-scenarios .projection-cards-grid');
+    const channelCard = grid ? grid.querySelector('.projection-card[data-project-type="channel"]') : null;
     if (channelCard) {
-        const now = followersArr[0] != null ? followersArr[0] : 0;
+        // Always show what the dashboard shows (#socialFollowersValue). Never show 35.7K from saved/other source.
+        const dashboardTotal = getDashboardFollowersTotal();
+        const now = dashboardTotal > 0 ? dashboardTotal : (followersArr[0] != null ? followersArr[0] : 0);
         const target = followersArr[n - 1] != null ? followersArr[n - 1] : 0;
         const nowEl = channelCard.querySelector('.projection-metric-now');
         const targetEl = channelCard.querySelector('.projection-metric-target');
@@ -289,7 +305,7 @@ function updateProjectionCards(caseType, numMonths) {
     }
 
     const saasMrrArr = getProjectionSeries(data.saasMrr, n);
-    const saasCard = document.querySelector('.projection-cards-grid .projection-card[data-project-type="saas"]');
+    const saasCard = grid ? grid.querySelector('.projection-card[data-project-type="saas"]') : null;
     if (saasCard) {
         const now = saasMrrArr[0] != null ? saasMrrArr[0] : 0;
         const target = saasMrrArr[n - 1] != null ? saasMrrArr[n - 1] : 0;
@@ -308,7 +324,7 @@ function updateProjectionCards(caseType, numMonths) {
     }
 
     const freelanceArr = getProjectionSeries(data.freelance, n);
-    const freelanceCard = document.querySelector('.projection-cards-grid .projection-card[data-project-type="freelance"]');
+    const freelanceCard = grid ? grid.querySelector('.projection-card[data-project-type="freelance"]') : null;
     if (freelanceCard) {
         const now = freelanceArr[0] != null ? freelanceArr[0] : 0;
         const target = freelanceArr[n - 1] != null ? freelanceArr[n - 1] : 0;
@@ -326,7 +342,7 @@ function updateProjectionCards(caseType, numMonths) {
         }
     }
 
-    const totalCard = document.querySelector('.projection-cards-grid .projection-card[data-project-type="total"]');
+    const totalCard = grid ? grid.querySelector('.projection-card[data-project-type="total"]') : null;
     if (totalCard) {
         const now = (saasMrrArr[0] || 0) + (freelanceArr[0] || 0);
         const target = (saasMrrArr[n - 1] || 0) + (freelanceArr[n - 1] || 0);
@@ -629,19 +645,81 @@ async function updateProjectionsRunway() {
     }
 }
 
+// Starting Position: Cash = Finance Investment, Net worth = Finance total_net, Followers = Social total (same sum as dashboard)
+async function loadProjectionsStartingPositionFromFinanceAndSocial() {
+    const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    const parseNum = (v) => { if (v == null) return NaN; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? NaN : n; };
+    const fmtDollar = (v) => { const n = parseNum(v); return isNaN(n) ? '—' : (n >= 1000 ? '$' + (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'K' : '$' + Math.round(n)); };
+    // Same format as dashboard: "16.6k" (lowercase k)
+    const fmtFollowers = (v) => { const n = parseNum(v); return isNaN(n) ? '—' : (n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n)); };
+    try {
+        const [financeRes, socialMetricsRes] = await Promise.all([
+            fetch('/api/finance'),
+            fetch('/api/social/metrics')
+        ]);
+        if (financeRes.ok) {
+            const finance = await financeRes.json();
+            const constants = finance.constants || {};
+            const investment = parseNum(constants.investment);
+            const asset = parseNum(constants.asset);
+            let totalNet = parseNum(constants.total_net);
+            if (isNaN(totalNet)) totalNet = (isNaN(investment) ? 0 : investment) + (isNaN(asset) ? 0 : asset);
+            set('spCash', fmtDollar(investment));
+            set('spNetWorth', fmtDollar(totalNet));
+        }
+        // Followers: ONLY /api/social/metrics, one value per platform (no overview = no double-count)
+        let totalFollowers = 0;
+        if (socialMetricsRes.ok) {
+            const list = await socialMetricsRes.json();
+            if (Array.isArray(list)) {
+                const byPlatform = {};
+                list.forEach((m) => {
+                    const p = (m.platform || '').toLowerCase();
+                    const v = Number(m.value) || 0;
+                    if (byPlatform[p] == null || v > (byPlatform[p] || 0)) byPlatform[p] = v;
+                });
+                totalFollowers = Object.values(byPlatform).reduce((s, v) => s + (v || 0), 0);
+            }
+        }
+        if (totalFollowers === 0) {
+            const dashEl = document.getElementById('socialFollowersValue');
+            if (dashEl && dashEl.textContent) {
+                const t = String(dashEl.textContent).replace(/\s/g, '').toLowerCase();
+                const num = parseFloat(t);
+                if (!isNaN(num)) totalFollowers = t.includes('k') ? Math.round(num * 1000) : num;
+            }
+        }
+        liveFollowersForProjections = totalFollowers;
+        set('spFollowers', fmtFollowers(totalFollowers));
+
+        const liveNow = totalFollowers;
+        if (liveNow > 0) {
+            ['realistic', 'best', 'worst'].forEach((caseType) => {
+                const arr = projectionData[caseType] && projectionData[caseType].followers;
+                if (!arr || arr.length === 0) return;
+                const oldFirst = arr[0] != null ? Number(arr[0]) : liveNow;
+                const ratio = oldFirst > 0 ? liveNow / oldFirst : 1;
+                for (let i = 0; i < arr.length; i++) {
+                    const v = arr[i] != null ? Number(arr[i]) : 0;
+                    arr[i] = Math.round(ratio * v);
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('Load starting position from finance/social:', e);
+    }
+}
+
 async function loadProjectionsFromAPI() {
     try {
         const res = await fetch('/api/projections');
         const data = await res.json();
         if (!res.ok || !data.plan) return false;
         const { plan, streams, monthValues } = data;
-        // Only overwrite starting position when API has values (don't wipe DOM with '—')
+        // Only overwrite hours from plan; Cash / Net worth / Followers come from Finance & Social
         if (plan.starting_position && typeof plan.starting_position === 'object') {
             const sp = plan.starting_position;
             const setIf = (id, val) => { if (val != null && val !== '') { const el = document.getElementById(id); if (el) el.textContent = val; } };
-            if (sp.cash != null) setIf('spCash', sp.cash >= 1000 ? '$' + (sp.cash / 1000) + 'K' : '$' + sp.cash);
-            if (sp.net_worth != null) setIf('spNetWorth', sp.net_worth >= 1000 ? '$' + (sp.net_worth / 1000) + 'K' : '$' + sp.net_worth);
-            if (sp.followers != null) setIf('spFollowers', sp.followers >= 1000 ? (sp.followers / 1000) + 'K' : String(sp.followers));
             if (sp.hours_per_week != null && sp.hours_per_week !== '') setIf('spHours', sp.hours_per_week);
         }
         if (streams && streams.length > 0 && monthValues && monthValues.length > 0) {
@@ -653,13 +731,10 @@ async function loadProjectionsFromAPI() {
                 if (!byStreamCase[key]) byStreamCase[key] = [];
                 byStreamCase[key][m.month - 1] = Number(m.value);
             });
+            // Followers: never restore from API — always synced live from /api/social/metrics in loadProjectionsStartingPositionFromFinanceAndSocial
             const streamKeys = { channel: 'followers', saas: 'saasMrr', freelance: 'freelance', total: 'totalRevenue' };
             ['realistic', 'best', 'worst'].forEach(caseType => {
-                const stream = streams.find(s => s.stream_type === 'channel');
-                if (stream) {
-                    const arr = byStreamCase[stream.id + '_' + caseType + '_primary'];
-                    if (arr) projectionData[caseType].followers = arr.map((v, i) => v != null ? v : (projectionData[caseType].followers[i] || 0));
-                }
+                // Do NOT overwrite projectionData[caseType].followers from saved data; keep defaults/in-memory, sync runs next
                 const saasStream = streams.find(s => s.stream_type === 'saas');
                 if (saasStream) {
                     const arr = byStreamCase[saasStream.id + '_' + caseType + '_mrr'];
@@ -696,16 +771,15 @@ async function saveProjectionsToAPI() {
             starting_position: {
                 cash: 45000,
                 net_worth: 250000,
-                followers: 14000,
                 hours_per_week: '15-20'
             },
             synergy_notes: null
         };
-        const cashEl = document.getElementById('spCash'), netEl = document.getElementById('spNetWorth'), folEl = document.getElementById('spFollowers'), hrEl = document.getElementById('spHours');
-        if (cashEl) { const t = cashEl.textContent.replace(/[$,K]/g, '').trim(); if (t && t !== '—') plan.starting_position.cash = t.includes('.') ? parseFloat(t) * 1000 : parseInt(t, 10); }
-        if (netEl) { const t = netEl.textContent.replace(/[$,K]/g, '').trim(); if (t && t !== '—') plan.starting_position.net_worth = t.includes('.') ? parseFloat(t) * 1000 : parseInt(t, 10); }
-        if (folEl) { const t = folEl.textContent.replace(/[K]/g, '').trim(); if (t && t !== '—') plan.starting_position.followers = t.includes('.') ? parseFloat(t) * 1000 : parseInt(t, 10); }
+        const cashEl = document.getElementById('spCash'), netEl = document.getElementById('spNetWorth'), hrEl = document.getElementById('spHours');
+        if (cashEl && cashEl.textContent !== '—') { const t = cashEl.textContent.replace(/[$,K]/g, '').trim(); if (t) plan.starting_position.cash = t.includes('.') ? parseFloat(t) * 1000 : parseInt(t, 10); }
+        if (netEl && netEl.textContent !== '—') { const t = netEl.textContent.replace(/[$,K]/g, '').trim(); if (t) plan.starting_position.net_worth = t.includes('.') ? parseFloat(t) * 1000 : parseInt(t, 10); }
         if (hrEl && hrEl.textContent !== '—') plan.starting_position.hours_per_week = hrEl.textContent;
+        // Followers: never saved — always synced live from dashboard social total (/api/social/metrics)
 
         const streams = [
             { key: 'channel', stream_type: 'channel', display_name: 'Cathy K', sort_order: 0, unit: 'count' },
@@ -856,10 +930,21 @@ async function updateProjectionCalculator() {
     updateProjectionsRunway();
 }
 
+// Same format as dashboard: "16.6k"
+function fmtFollowersDisplay(v) {
+    if (v == null || isNaN(v)) return '—';
+    const n = Number(v);
+    return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(Math.round(n));
+}
+
 // Refresh all projection UI (cards, table, chart, calculator) for current case and timeframe
 async function refreshProjectionUI() {
     const caseType = document.getElementById('projectionCase')?.value || 'realistic';
     const numMonths = getProjectionTimeframeMonths();
+    // Starting Position Followers: always match dashboard (#socialFollowersValue) so we never show 35.7K
+    const dashboardFollowers = getDashboardFollowersTotal();
+    const spEl = document.getElementById('spFollowers');
+    if (spEl) spEl.textContent = dashboardFollowers > 0 ? fmtFollowersDisplay(dashboardFollowers) : (spEl.textContent || '—');
     updateProjectionCards(caseType, numMonths);
     updateProjectionTable(caseType, numMonths);
     updateProjectionChartTitle(numMonths);
@@ -869,6 +954,9 @@ async function refreshProjectionUI() {
         if (projectionChart) projectionChart.resize();
     });
 }
+
+// Prevent concurrent projection load (avoids race and random number changes)
+let projectionLoadInProgress = false;
 
 // Initialize projection chart when Projections tab is shown
 function initProjectionTab() {
@@ -885,9 +973,30 @@ function initProjectionTab() {
     }
 
     (async () => {
-        await loadProjectionsFromAPI();
-        await updateProjectionsRunway();
-        requestAnimationFrame(() => refreshProjectionUI());
+        if (projectionLoadInProgress) return;
+        projectionLoadInProgress = true;
+        try {
+            await loadProjectionsStartingPositionFromFinanceAndSocial();
+            await loadProjectionsFromAPI();
+            // Re-apply followers to projection series using dashboard value so chart/table match display (never 35.7K)
+            const targetNow = getDashboardFollowersTotal() || liveFollowersForProjections;
+            if (targetNow > 0) {
+                ['realistic', 'best', 'worst'].forEach((caseType) => {
+                    const arr = projectionData[caseType] && projectionData[caseType].followers;
+                    if (!arr || arr.length === 0) return;
+                    const oldFirst = arr[0] != null ? Number(arr[0]) : targetNow;
+                    const ratio = oldFirst > 0 ? targetNow / oldFirst : 1;
+                    for (let i = 0; i < arr.length; i++) {
+                        const v = arr[i] != null ? Number(arr[i]) : 0;
+                        arr[i] = Math.round(ratio * v);
+                    }
+                });
+            }
+            await updateProjectionsRunway();
+            requestAnimationFrame(() => refreshProjectionUI());
+        } finally {
+            projectionLoadInProgress = false;
+        }
     })();
 
     if (caseSelect && !caseSelect._projectionsBound) {

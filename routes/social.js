@@ -25,26 +25,29 @@ router.get('/metrics', (req, res) => {
             FROM social_metrics
             WHERE date = (SELECT MAX(date) FROM social_metrics)
         `).all();
+        const platformOrder = ['email', 'linkedin', 'twitter', 'instagram', 'threads', 'substack', 'youtube', 'brunch'];
+        let merged;
         if (rows && rows.length > 0) {
-            const byKey = {};
-            rows.forEach(r => { byKey[(r.platform || '').toLowerCase()] = { platform: r.platform, metric_type: r.metric_type, value: r.value }; });
-            const platformOrder = ['email', 'linkedin', 'twitter', 'instagram', 'threads', 'substack', 'youtube', 'brunch'];
-            const merged = platformOrder.map(p => byKey[p] || { platform: p, metric_type: p === 'email' || p === 'substack' ? 'subscribers' : 'followers', value: (DEFAULT_SOCIAL_METRICS.find(d => d.platform === p) || {}).value ?? 0 });
-            return res.json(merged);
-        }
-        let metrics = soulinsocial.getSocialMetrics();
-        if (!metrics || metrics.length === 0) {
-            metrics = DEFAULT_SOCIAL_METRICS.slice();
-        } else {
-            const byKey = {};
-            (Array.isArray(metrics) ? metrics : []).forEach(m => { byKey[(m.platform || '').toLowerCase()] = m; });
-            const platformOrder = ['email', 'linkedin', 'twitter', 'instagram', 'threads', 'substack', 'youtube', 'brunch'];
-            metrics = platformOrder.map(p => {
-                const m = byKey[p];
-                return m ? { platform: m.platform, metric_type: m.metric_type || (p === 'email' || p === 'substack' ? 'subscribers' : 'followers'), value: m.value } : { platform: p, metric_type: p === 'email' || p === 'substack' ? 'subscribers' : 'followers', value: (DEFAULT_SOCIAL_METRICS.find(d => d.platform === p) || {}).value ?? 0 };
+            // One row per platform only (no double-count even if DB has duplicates)
+            merged = platformOrder.map(p => {
+                const r = rows.find(row => (row.platform || '').toLowerCase() === p);
+                return r ? { platform: r.platform, metric_type: r.metric_type, value: r.value } : { platform: p, metric_type: p === 'email' || p === 'substack' ? 'subscribers' : 'followers', value: (DEFAULT_SOCIAL_METRICS.find(d => d.platform === p) || {}).value ?? 0 };
             });
+        } else {
+            let metrics = soulinsocial.getSocialMetrics();
+            if (!metrics || metrics.length === 0) {
+                metrics = DEFAULT_SOCIAL_METRICS.slice();
+            } else {
+                const byKey = {};
+                (Array.isArray(metrics) ? metrics : []).forEach(m => { byKey[(m.platform || '').toLowerCase()] = m; });
+                metrics = platformOrder.map(p => {
+                    const m = byKey[p];
+                    return m ? { platform: m.platform, metric_type: m.metric_type || (p === 'email' || p === 'substack' ? 'subscribers' : 'followers'), value: m.value } : { platform: p, metric_type: p === 'email' || p === 'substack' ? 'subscribers' : 'followers', value: (DEFAULT_SOCIAL_METRICS.find(d => d.platform === p) || {}).value ?? 0 };
+                });
+            }
+            merged = metrics;
         }
-        res.json(metrics);
+        return res.json(merged);
     } catch (error) {
         console.error('Error fetching social metrics:', error);
         res.status(500).json({ error: 'Failed to fetch social metrics' });
