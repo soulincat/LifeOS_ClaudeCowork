@@ -1,0 +1,14 @@
+{
+  "whoop": { "enabled": false },
+  "stripe": { "enabled": false },
+  "wise": { "enabled": false },
+  "github": { "enabled": false },
+  "telegram": { "enabled": false },
+  "gmail": { "enabled": false },
+  "outlook": { "enabled": false },
+  "apple_mail": { "enabled": false, "inboxes": [] },
+  "apple_calendar": { "enabled": false, "calendar_names": [] },
+  "apple_reminders": { "enabled": false },
+  "whatsapp": { "enabled": false },
+  "soulinsocial": { "enabled": false, "base_url": "http://localhost:3000" }
+}

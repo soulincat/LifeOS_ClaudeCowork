@@ -4,6 +4,6 @@
 const path = require('path');
 
 module.exports = {
-    get db() { return () => require(path.join(__dirname, '../db/database')); },
-    get paContext() { return require(path.join(__dirname, './pa-context')); },
+    get db() { return () => require(path.join(__dirname, '../../core/db/database')); },
+    get paContext() { return require(path.join(__dirname, '../pa/context')); },
 };

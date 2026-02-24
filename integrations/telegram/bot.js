@@ -20,9 +20,9 @@
 require('dotenv').config({ override: true });
 
 const path = require('path');
-const db = require(path.join(__dirname, '../db/database'));
-const { buildPAContext } = require(path.join(__dirname, './pa-context'));
-const telegram = require(path.join(__dirname, './telegram'));
+const db = require(path.join(__dirname, '../../core/db/database'));
+const { buildPAContext } = require(path.join(__dirname, '../pa/context'));
+const telegram = require(path.join(__dirname, './index'));
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ALLOWED_CHAT_ID = String(process.env.TELEGRAM_CHAT_ID || '');
@@ -201,19 +201,14 @@ async function cmd_ask(chatId, args) {
     await telegram.sendBriefing('PA', text);
 }
 
-// ─── Claude helper ────────────────────────────────────────────────────────────
+// ─── Claude helper (uses shared BYOK client) ─────────────────────────────────
 
 async function callClaude(prompt) {
-    const Anthropic = require('@anthropic-ai/sdk');
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const { callClaude: sharedCall } = require('../../core/claude-client');
     const context = (() => { try { return buildPAContext(); } catch (e) { return ''; } })();
-    const response = await anthropic.messages.create({
-        model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929',
-        max_tokens: 1024,
-        system: `You are an executive PA. Today is ${new Date().toISOString().slice(0, 10)}. Be concise.\n\nCONTEXT:\n${context}`,
-        messages: [{ role: 'user', content: prompt }],
-    });
-    return response.content[0].text;
+    const systemPrompt = `You are an executive PA. Today is ${new Date().toISOString().slice(0, 10)}. Be concise.\n\nCONTEXT:\n${context}`;
+    const result = await sharedCall(systemPrompt, prompt);
+    return result.text;
 }
 
 // ─── Long-polling loop ────────────────────────────────────────────────────────

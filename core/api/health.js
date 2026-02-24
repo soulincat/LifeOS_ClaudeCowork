@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
-const whoop = require('../integrations/whoop');
+const whoop = require('../../integrations/whoop');
 
 /**
  * Compute cycle phase for a date from health_cycle_config.

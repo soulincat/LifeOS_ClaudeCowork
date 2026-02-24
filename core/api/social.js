@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
-const soulinsocial = require('../integrations/soulinsocial');
+const soulinsocial = require('../../integrations/soulinsocial');
 
 /**
  * GET /api/social/metrics

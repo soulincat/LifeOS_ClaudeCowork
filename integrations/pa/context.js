@@ -4,7 +4,7 @@
  * Queries SQLite directly (no HTTP) for speed and reliability.
  */
 
-const db = require('../db/database');
+const db = require('../../core/db/database');
 
 /**
  * Build the full PA context string injected into the system prompt.
@@ -21,6 +21,28 @@ function buildPAContext() {
 
     // ── Date & time ──────────────────────────────────────────────────────────
     sections.push(`DATE: ${todayFull}, ${timeStr} (${dayOfWeek})`);
+
+    // ── User priorities (from onboarding) ────────────────────────────────────
+    try {
+        const priRow = db.prepare("SELECT payload FROM setup_sections WHERE section_key = 'user_priorities'").get();
+        if (priRow && priRow.payload) {
+            const pri = JSON.parse(priRow.payload);
+            const parts = [];
+            if (Array.isArray(pri.life_areas) && pri.life_areas.length) {
+                parts.push(`Life focus: ${pri.life_areas.join(', ')}`);
+            }
+            if (pri.pa_style) {
+                const styleMap = { direct: 'Direct & brief', warm: 'Friendly & warm', professional: 'Professional' };
+                parts.push(`Communication style: ${styleMap[pri.pa_style] || pri.pa_style}`);
+            }
+            if (Array.isArray(pri.urgency_keywords) && pri.urgency_keywords.length) {
+                parts.push(`Urgency keywords: ${pri.urgency_keywords.join(', ')}`);
+            }
+            if (parts.length) {
+                sections.push('USER_PRIORITIES:\n  ' + parts.join('\n  '));
+            }
+        }
+    } catch (e) { /* setup_sections may not exist yet */ }
 
     // ── Health / energy (Whoop) ──────────────────────────────────────────────
     try {
@@ -46,7 +68,7 @@ function buildPAContext() {
 
     // ── Focus task ───────────────────────────────────────────────────────────
     try {
-        const { scoreFocusCard } = require('../db/derived-state');
+        const { scoreFocusCard } = require('../../core/db/derived-state');
         let recovery = 70;
         try {
             const h = db.prepare('SELECT recovery FROM health_daily_data ORDER BY date DESC LIMIT 1').get();

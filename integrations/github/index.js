@@ -1,4 +1,4 @@
-const db = require('../db/database');
+const db = require('../../core/db/database');
 
 /**
  * GitHub API Integration
@@ -9,7 +9,13 @@ class GitHubIntegration {
     constructor() {
         this.apiToken = process.env.GITHUB_TOKEN;
         this.baseUrl = 'https://api.github.com';
-        this.username = 'soulincat';
+        // Read username from config (fallback to env)
+        try {
+            const config = require('../../core/config');
+            this.username = config.getUser().github_username || process.env.GITHUB_USERNAME || '';
+        } catch (e) {
+            this.username = process.env.GITHUB_USERNAME || '';
+        }
     }
 
     /**

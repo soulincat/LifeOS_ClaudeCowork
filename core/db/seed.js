@@ -28,21 +28,19 @@ function seedDatabase() {
         });
     }
 
-    // Seed projects
+    // Seed demo projects (generic — real projects are created via onboarding wizard)
     const projectStmt = db.prepare(`
-        INSERT OR IGNORE INTO projects (name, github_repo, last_updated, metrics)
-        VALUES (?, ?, ?, ?)
+        INSERT OR IGNORE INTO projects (name, github_repo, last_updated, metrics, business_model, display_kpi_key, display_kpi_label)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     const projects = [
-        { name: 'Soulin Social', github_repo: null, last_updated: '2025-01-24', metrics: JSON.stringify({ current: { paid_members: 2400, mrr: 8200 }, last_month: { paid_members: 2200, mrr: 7800 } }) },
-        { name: 'KINS', github_repo: null, last_updated: '2025-01-25', metrics: JSON.stringify({ current: { sales: 3500, subscribers: 8900 }, last_month: { sales: 3200, subscribers: 8200 } }) },
-        { name: 'Cathy K', github_repo: null, last_updated: '2025-01-26', metrics: JSON.stringify({ current: { followers: 14000, subscribers: 14000 }, last_month: { followers: 12000, subscribers: 12000 } }) },
-        { name: 'Soulin Agency', github_repo: null, last_updated: '2025-01-22', metrics: JSON.stringify({ current: { revenue: 1900 }, last_month: { revenue: 1650 } }) }
+        { name: 'My SaaS', github_repo: null, last_updated: '2025-01-24', metrics: JSON.stringify({ current: { paid_members: 50, mrr: 2500 }, last_month: { paid_members: 40, mrr: 2000 } }), business_model: 'saas', kpi_key: 'paid_members', kpi_label: 'Paid Members' },
+        { name: 'Side Project', github_repo: null, last_updated: '2025-01-25', metrics: JSON.stringify({ current: { revenue: 500 }, last_month: { revenue: 350 } }), business_model: 'freelance', kpi_key: 'revenue', kpi_label: 'Revenue' },
     ];
-    
+
     projects.forEach(project => {
-        projectStmt.run(project.name, project.github_repo, project.last_updated, project.metrics);
+        projectStmt.run(project.name, project.github_repo, project.last_updated, project.metrics, project.business_model, project.kpi_key, project.kpi_label);
     });
 
     // Seed social metrics (latest)

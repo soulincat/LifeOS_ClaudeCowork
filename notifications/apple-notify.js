@@ -16,7 +16,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 
 const { exec, execSync } = require('child_process');
 const path = require('path');
-const db = require('../db/database');
+const db = require('../core/db/database');
 
 const PORT = process.env.PORT || 3001;
 
@@ -137,14 +137,14 @@ function checkDueToday() {
 
 async function runAppleSync() {
     try {
-        const reminders = require('../integrations/apple-reminders');
+        const reminders = require('../integrations/apple/reminders');
         await reminders.syncTodos();
     } catch (e) {
         console.error('Apple Reminders sync failed:', e.message);
     }
 
     try {
-        const calendar = require('../integrations/apple-calendar');
+        const calendar = require('../integrations/apple/calendar');
         await calendar.syncUpcoming();
     } catch (e) {
         console.error('Apple Calendar sync failed:', e.message);

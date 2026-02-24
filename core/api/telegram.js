@@ -9,8 +9,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
-const { buildPAContext } = require('../integrations/pa-context');
-const telegram = require('../integrations/telegram');
+const { buildPAContext } = require('../../integrations/pa/context');
+const telegram = require('../../integrations/telegram');
 
 const PA_BRIEF_PROMPT = `Generate a concise daily briefing for Telegram. Cover:
 1. **Today's priorities** — top 3 action items from todos + upcoming
@@ -138,7 +138,7 @@ let bot = null;
 router.post('/bot/start', (req, res) => {
     if (!process.env.TELEGRAM_BOT_TOKEN) return res.status(400).json({ error: 'TELEGRAM_BOT_TOKEN not set' });
     if (bot) return res.json({ status: 'already running' });
-    bot = require('../integrations/telegram-bot');
+    bot = require('../../integrations/telegram/bot');
     bot.registerCommands().catch(console.error);
     bot.poll();
     res.json({ status: 'started' });
@@ -152,7 +152,7 @@ module.exports = router;
 
 // Auto-start bot if token is configured (runs when server loads this route file)
 if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-    const autoBot = require('../integrations/telegram-bot');
+    const autoBot = require('../../integrations/telegram/bot');
     autoBot.registerCommands().catch(console.error);
     autoBot.poll();
     console.log('✅ Telegram bot started (auto)');

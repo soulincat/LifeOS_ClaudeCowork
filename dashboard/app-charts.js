@@ -274,6 +274,26 @@ function getProjectionSeries(arr, n) {
     return arr.concat(Array.from({ length: n - len }, () => last));
 }
 
+// Fill projection card names from projects in DB (matches business_model to card type)
+async function fillProjectionCardNames() {
+    try {
+        const res = await fetch('/api/projects');
+        const projects = await res.json();
+        if (!Array.isArray(projects)) return;
+        const grid = document.querySelector('#panel-scenarios .projection-cards-grid');
+        if (!grid) return;
+        const typeMap = { channel: 'channel', saas: 'saas', freelance: 'freelance', business: 'business' };
+        projects.forEach(p => {
+            const bm = (p.business_model || '').toLowerCase();
+            const card = grid.querySelector('.projection-card[data-project-type="' + bm + '"]');
+            if (card) {
+                const nameEl = card.querySelector('.projection-card-name');
+                if (nameEl) nameEl.textContent = p.name;
+            }
+        });
+    } catch (e) { /* non-critical */ }
+}
+
 // Update projection cards DOM from projectionData for selected case and timeframe
 function updateProjectionCards(caseType, numMonths) {
     const data = projectionData[caseType] || projectionData.realistic;
@@ -976,6 +996,7 @@ function initProjectionTab() {
         if (projectionLoadInProgress) return;
         projectionLoadInProgress = true;
         try {
+            await fillProjectionCardNames();
             await loadProjectionsStartingPositionFromFinanceAndSocial();
             await loadProjectionsFromAPI();
             // Re-apply followers to projection series using dashboard value so chart/table match display (never 35.7K)

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
-const github = require('../integrations/github');
+const github = require('../../integrations/github');
 
 /**
  * GET /api/projects

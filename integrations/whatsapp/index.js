@@ -11,6 +11,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const Connector = require('../connector');
 
 const WHATSAPP_MCP_URL = process.env.WHATSAPP_MCP_URL || 'http://localhost:8080';
 const WA_DEVICE_DB_PATH = process.env.WHATSAPP_DEVICE_DB_PATH
@@ -91,4 +92,70 @@ async function sendNew(recipient, message) {
     console.log(`✅ WhatsApp message sent to ${jid}`);
 }
 
-module.exports = { sendReply, sendNew, resolveToLid };
+/**
+ * WhatsApp Connector — wraps the send functions with Connector interface
+ * and handles bridge auto-start in startBackground().
+ */
+class WhatsAppConnector extends Connector {
+    constructor(config) {
+        super('whatsapp', config);
+    }
+
+    async checkStatus() {
+        try {
+            const resp = await fetch(`${WHATSAPP_MCP_URL}/api/status`, {
+                signal: AbortSignal.timeout(3000),
+            });
+            if (resp.ok) return { connected: true };
+            return { connected: false, error: `Bridge returned ${resp.status}` };
+        } catch (e) {
+            return { connected: false, error: 'Bridge not reachable' };
+        }
+    }
+
+    async send(payload) {
+        const { recipient, message } = payload;
+        if (!recipient || !message) return { success: false, error: 'Missing recipient or message' };
+        try {
+            await sendNew(recipient, message);
+            return { success: true };
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
+    }
+
+    async startBackground() {
+        const { exec, spawn } = require('child_process');
+        const waBridgePath = process.env.WHATSAPP_BRIDGE_PATH
+            || path.join(require('os').homedir(), 'code/whatsapp-mcp/whatsapp-bridge/whatsapp-bridge');
+
+        exec('lsof -nP -iTCP:8080 -sTCP:LISTEN', (err, stdout) => {
+            if (!stdout || !stdout.includes('LISTEN')) {
+                if (fs.existsSync(waBridgePath)) {
+                    const bridge = spawn(waBridgePath, [], {
+                        detached: true,
+                        stdio: 'ignore',
+                        cwd: path.dirname(waBridgePath),
+                    });
+                    bridge.unref();
+                    console.log('✅ WhatsApp bridge started (PID will detach)');
+                } else {
+                    console.log('⚠️  WhatsApp bridge not found at', waBridgePath, '— PA send will be unavailable');
+                }
+            } else {
+                console.log('✅ WhatsApp bridge already running on :8080');
+            }
+        });
+    }
+
+    static getRequiredConfig() {
+        return { env: ['WHATSAPP_BRIDGE_PATH'], settings: [] };
+    }
+}
+
+// Export both the connector instance (for registry) and named functions (for direct use by routes)
+const connector = new WhatsAppConnector();
+module.exports = connector;
+module.exports.sendReply = sendReply;
+module.exports.sendNew = sendNew;
+module.exports.resolveToLid = resolveToLid;

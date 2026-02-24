@@ -1,4 +1,4 @@
-const db = require('../db/database');
+const db = require('../../core/db/database');
 
 /**
  * Stripe API Integration (Optional)

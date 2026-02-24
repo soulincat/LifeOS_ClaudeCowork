@@ -5,7 +5,7 @@
  * Optionally set REMINDER_URL to POST to (e.g. your app's notification endpoint).
  */
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
-const db = require('../db/database');
+const db = require('../core/db/database');
 
 const currentMonth = new Date().toISOString().slice(0, 7);
 

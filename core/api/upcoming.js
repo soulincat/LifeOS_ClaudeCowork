@@ -91,7 +91,7 @@ router.delete('/:id', (req, res) => {
 router.post('/sync-calendar', (req, res) => {
     try {
         const { calendarNames } = req.body || {};
-        const { syncCalendarEvents } = require('../integrations/apple-calendar-read');
+        const { syncCalendarEvents } = require('../../integrations/apple/calendar-read');
         const result = syncCalendarEvents({ calendarNames });
         res.json({ success: true, ...result });
     } catch (error) {

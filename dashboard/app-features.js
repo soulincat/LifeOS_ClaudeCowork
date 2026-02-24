@@ -137,9 +137,15 @@ async function loadAllData() {
         }
     } catch (e) { console.warn('Health load failed', e); }
 
-    // GitHub contribution graph
+    // GitHub contribution graph (reads username from config)
     const graphImg = document.getElementById('githubContributionGraph');
-    if (graphImg) graphImg.src = 'https://ghchart.rshah.org/203EAE/soulincat?t=' + Date.now();
+    if (graphImg) {
+        try {
+            const uc = await fetch(base + '/api/config/user').then(function(r) { return r.json(); });
+            if (uc.github_username) graphImg.src = 'https://ghchart.rshah.org/203EAE/' + uc.github_username + '?t=' + Date.now();
+            else graphImg.style.display = 'none';
+        } catch (e) { /* config not available */ }
+    }
 
     // Top priority this month (sidebar)
     try {

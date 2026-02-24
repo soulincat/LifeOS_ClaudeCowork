@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const syncManager = require('../integrations/sync');
-const monthEnd = require('../integrations/month-end');
+const syncManager = require('../../integrations/sync');
+const monthEnd = require('../../integrations/month-end');
 
 /**
  * POST /api/sync/daily

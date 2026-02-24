@@ -121,4 +121,34 @@ router.post('/', (req, res) => {
     }
 });
 
+/**
+ * POST /api/setup/test-pa
+ * Test a Claude API key by making a minimal call.
+ */
+router.post('/test-pa', async (req, res) => {
+    try {
+        const { api_key } = req.body;
+        if (!api_key) return res.status(400).json({ valid: false, error: 'No API key provided' });
+        const { testApiKey } = require('../claude-client');
+        const result = await testApiKey(api_key);
+        res.json(result);
+    } catch (e) {
+        res.status(500).json({ valid: false, error: e.message });
+    }
+});
+
+/**
+ * GET /api/setup/integrations-status
+ * Get status of all loaded connectors.
+ */
+router.get('/integrations-status', async (req, res) => {
+    try {
+        const registry = require('../../integrations/registry');
+        const status = await registry.statusAll();
+        res.json(status);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = router;

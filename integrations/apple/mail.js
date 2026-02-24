@@ -8,7 +8,7 @@
  */
 
 const { execSync } = require('child_process');
-const db = require('../db/database');
+const db = require('../../core/db/database');
 
 function getMailboxes() {
     try {

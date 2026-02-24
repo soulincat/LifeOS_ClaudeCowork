@@ -3,7 +3,7 @@
  * Saves final monthly totals at the end of each month
  */
 
-const db = require('../db/database');
+const db = require('../core/db/database');
 
 class MonthEndManager {
     /**

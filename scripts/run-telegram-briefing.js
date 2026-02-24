@@ -17,9 +17,9 @@
 require('dotenv').config({ override: true });
 
 const path = require('path');
-const db = require(path.join(__dirname, '../db/database'));
+const db = require(path.join(__dirname, '../core/db/database'));
 const telegram = require(path.join(__dirname, '../integrations/telegram'));
-const { buildPAContext } = require(path.join(__dirname, '../integrations/pa-context'));
+const { buildPAContext } = require(path.join(__dirname, '../integrations/pa/context'));
 
 const MODE = process.argv[2] || 'daily';
 const today = new Date().toISOString().slice(0, 10);

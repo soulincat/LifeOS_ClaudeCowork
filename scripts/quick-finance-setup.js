@@ -6,7 +6,7 @@
  */
 
 const readline = require('readline');
-const db = require('../db/database');
+const db = require('../core/db/database');
 
 const rl = readline.createInterface({
     input: process.stdin,

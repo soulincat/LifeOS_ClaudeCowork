@@ -1,14 +1,53 @@
-const db = require('../db/database');
+const db = require('../../core/db/database');
+const Connector = require('../connector');
 
 /**
  * Whoop API Integration (OAuth2 + v2 API)
  * Fetches health metrics: recovery, sleep, HRV, cycle (strain)
  * Docs: https://developer.whoop.com/api
  */
-class WhoopIntegration {
-    constructor() {
+class WhoopIntegration extends Connector {
+    constructor(config) {
+        super('whoop', config);
         this.legacyToken = process.env.WHOOP_API_TOKEN;
         this.baseUrl = 'https://api.prod.whoop.com/developer/v2';
+        this.syncSchedule = 'daily';
+    }
+
+    async checkStatus() {
+        const token = await this.getAccessToken();
+        if (token) return { connected: true };
+        return { connected: false, error: 'No token — connect via /api/health/whoop/connect' };
+    }
+
+    async sync(options = {}) {
+        const days = options.days || 3;
+        return this.syncLastDays(days);
+    }
+
+    async startBackground() {
+        const self = this;
+        const run = async () => {
+            try {
+                const result = await self.syncLastDays(3);
+                if (result && result.synced > 0) console.log(`✅ Whoop auto-sync: ${result.synced} day(s) updated`);
+            } catch (e) {
+                if (!e.message?.includes('no token') && !e.message?.includes('needsReconnect')) {
+                    console.log('⚠️  Whoop auto-sync skipped:', e.message);
+                }
+            }
+        };
+        run(); // immediate on boot
+        this._interval = setInterval(run, 2 * 60 * 60 * 1000); // every 2 hours
+    }
+
+    async disconnect() {
+        if (this._interval) clearInterval(this._interval);
+        super.disconnect();
+    }
+
+    static getRequiredConfig() {
+        return { env: ['WHOOP_CLIENT_ID', 'WHOOP_CLIENT_SECRET'], settings: [] };
     }
 
     hasStoredTokens() {

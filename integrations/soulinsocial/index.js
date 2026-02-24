@@ -1,4 +1,4 @@
-const db = require('../db/database');
+const db = require('../../core/db/database');
 
 const SOULIN_BASE = process.env.SOULIN_SOCIAL_URL || 'http://localhost:3000';
 

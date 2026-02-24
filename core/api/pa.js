@@ -6,8 +6,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
-const { buildPAContext } = require('../integrations/pa-context');
-const { executeCommandsFromResponse, parseCommands } = require('../integrations/pa-commands');
+const { buildPAContext } = require('../../integrations/pa/context');
+const { executeCommandsFromResponse, parseCommands } = require('../../integrations/pa/commands');
 
 const PA_SYSTEM_PROMPT = `You are an Executive PA and Project Manager. Direct, efficient, British English. No waffle.
 
@@ -43,13 +43,13 @@ COMMAND: add_pa_note
 {"key": "sarah_context", "value": "Working on contract renewal, deadline end of Feb"}
 
 COMMAND: add_project_task
-{"project_name": "KINS Hotel", "text": "Call Bali notary", "due_date": "2026-02-28", "type": "deliverable", "energy_required": "medium"}
+{"project_name": "My Project", "text": "Call supplier", "due_date": "2026-02-28", "type": "deliverable", "energy_required": "medium"}
 
 COMMAND: complete_project_task
-{"text": "call Bali notary"}
+{"text": "call supplier"}
 
 COMMAND: update_next_action
-{"project_name": "KINS Hotel", "next_action": "Send signed LOI to investor by Friday"}
+{"project_name": "My Project", "next_action": "Send signed agreement by Friday"}
 
 COMMAND: update_trigger
 {"title": "Korean open rate", "actual_value": 18}
@@ -73,49 +73,9 @@ CURRENT LIFE OS CONTEXT:
 `;
 
 /**
- * Call Claude — prefers Cowork (Pro account, no per-token cost),
- * falls back to direct API key if Cowork is not running.
+ * Call Claude — shared BYOK client (DB key → .env key → Cowork endpoint)
  */
-async function callClaude(systemPrompt, userMessage, conversationHistory = []) {
-    const coworkEndpoint = process.env.CLAUDE_COWORK_ENDPOINT || 'http://localhost:8700';
-
-    // 1. Try Cowork first (Claude Pro / your subscription)
-    try {
-        const res = await fetch(`${coworkEndpoint}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: userMessage, system: systemPrompt }),
-            signal: AbortSignal.timeout(15000)
-        });
-        if (res.ok) {
-            const data = await res.json();
-            const text = data.response || data.text || data.content || data.message || '';
-            if (text) return { text, source: 'cowork' };
-        }
-    } catch (e) { /* Cowork not running — fall through to API */ }
-
-    // 2. Fall back to direct Anthropic API key
-    if (!process.env.ANTHROPIC_API_KEY) {
-        return { text: 'PA unavailable: start the Claude Cowork server (port 8700) or add ANTHROPIC_API_KEY to .env.', source: 'none' };
-    }
-
-    const Anthropic = require('@anthropic-ai/sdk');
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    const messages = [
-        ...conversationHistory,
-        { role: 'user', content: userMessage }
-    ];
-
-    const response = await anthropic.messages.create({
-        model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929',
-        max_tokens: 2048,
-        system: systemPrompt,
-        messages
-    });
-
-    return { text: response.content[0].text, source: 'api', usage: response.usage };
-}
+const { callClaude } = require('../claude-client');
 
 /**
  * Build system prompt with live context injected.
@@ -123,7 +83,28 @@ async function callClaude(systemPrompt, userMessage, conversationHistory = []) {
 function buildSystemPrompt() {
     try {
         const context = buildPAContext();
-        return PA_SYSTEM_PROMPT + '\n' + context;
+        let prompt = PA_SYSTEM_PROMPT + '\n' + context;
+
+        // Override STYLE section based on user preference
+        try {
+            const row = db.prepare("SELECT payload FROM setup_sections WHERE section_key = 'user_priorities'").get();
+            if (row && row.payload) {
+                const pri = JSON.parse(row.payload);
+                if (pri.pa_style === 'warm') {
+                    prompt = prompt.replace(
+                        /STYLE:\n- Be direct and brief\. Act, don't announce\./,
+                        "STYLE:\n- Be conversational and encouraging. Use a friendly, supportive tone."
+                    );
+                } else if (pri.pa_style === 'professional') {
+                    prompt = prompt.replace(
+                        /STYLE:\n- Be direct and brief\. Act, don't announce\./,
+                        "STYLE:\n- Use a structured, formal tone. Be thorough but efficient."
+                    );
+                }
+            }
+        } catch (e) { /* default style */ }
+
+        return prompt;
     } catch (e) {
         return PA_SYSTEM_PROMPT + '\n(Context unavailable)';
     }
@@ -386,11 +367,11 @@ router.post('/send', async (req, res) => {
     }
     try {
         if (type === 'whatsapp') {
-            const waSend = require('../integrations/whatsapp-send');
+            const waSend = require('../../integrations/whatsapp');
             await waSend.sendNew(recipient, message);
             console.log(`✅ PA sent WhatsApp to ${recipient}`);
         } else if (type === 'email') {
-            const gmailSend = require('../integrations/gmail-send');
+            const gmailSend = require('../../integrations/gmail');
             await gmailSend.sendNew({ to: recipient, subject: subject || '(no subject)', body: message });
             console.log(`✅ PA sent email to ${recipient}`);
         } else {

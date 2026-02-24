@@ -6,8 +6,15 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# Copy app
-COPY . .
+# Copy app directories
+COPY core/ ./core/
+COPY integrations/ ./integrations/
+COPY dashboard/ ./dashboard/
+COPY onboarding/ ./onboarding/
+COPY mcp-server/ ./mcp-server/
+COPY notifications/ ./notifications/
+COPY scripts/ ./scripts/
+COPY config.example/ ./config.example/
 
 # Persist DB in /data when running in container
 ENV DATABASE_PATH=/data/lifeos.db
@@ -15,4 +22,4 @@ RUN mkdir -p /data
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["node", "core/server.js"]

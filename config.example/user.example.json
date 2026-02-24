@@ -1,0 +1,15 @@
+{
+  "name": "",
+  "github_username": "",
+  "timezone": "UTC",
+  "locale": "en",
+  "currency": "USD",
+  "dashboard_widgets": {
+    "health": true,
+    "finance": true,
+    "social": true,
+    "github_graph": true,
+    "cycle_tracker": false,
+    "wishlist": true
+  }
+}

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeOS — Setup</title>
+    <style>
+        :root { --bg: #0a0a0a; --surface: #141414; --border: #2a2a2a; --text: #e8e8e8; --text-dim: #888; --accent: #203EAE; --secondary: #10b981; --warn: #f59e0b; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .wizard { max-width: 540px; width: 100%; padding: 24px; }
+        .wizard h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
+        .wizard p.sub { color: var(--text-dim); margin-bottom: 32px; font-size: 15px; }
+        .step { display: none; }
+        .step.active { display: block; }
+        .step h2 { font-size: 20px; margin-bottom: 16px; }
+        .step p { color: var(--text-dim); margin-bottom: 20px; font-size: 14px; }
+        label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; margin-top: 16px; }
+        input[type="text"], input[type="password"], select, textarea { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; }
+        input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+        textarea { resize: vertical; min-height: 60px; }
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row span { font-size: 14px; }
+        .toggle { width: 42px; height: 24px; background: var(--border); border-radius: 12px; position: relative; cursor: pointer; transition: background 0.2s; }
+        .toggle.on { background: var(--accent); }
+        .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: white; border-radius: 50%; transition: left 0.2s; }
+        .toggle.on::after { left: 21px; }
+        .btn { display: inline-block; padding: 10px 24px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; margin-top: 24px; }
+        .btn:hover { opacity: 0.9; }
+        .btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+        .btn-row { display: flex; gap: 12px; margin-top: 24px; }
+        .progress { display: flex; gap: 8px; margin-bottom: 32px; }
+        .progress-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+        .progress-dot.active { background: var(--accent); }
+        .progress-dot.done { background: var(--secondary); }
+        .status { font-size: 13px; margin-top: 8px; }
+        .status.ok { color: var(--secondary); }
+        .status.err { color: var(--warn); }
+        /* Priorities step */
+        .chip-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .chip { padding: 8px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.2s; user-select: none; }
+        .chip.selected { background: var(--accent); border-color: var(--accent); color: white; }
+        .vip-row { display: flex; gap: 8px; margin-top: 8px; }
+        .vip-row input { flex: 1; }
+        .vip-row select { width: 140px; flex: none; }
+        .add-link { font-size: 13px; color: var(--accent); cursor: pointer; margin-top: 8px; display: inline-block; }
+        .add-link:hover { text-decoration: underline; }
+        .radio-group { margin-top: 8px; }
+        .radio-option { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .radio-option:last-child { border-bottom: none; }
+        .radio-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); position: relative; flex-shrink: 0; }
+        .radio-option.selected .radio-dot { border-color: var(--accent); }
+        .radio-option.selected .radio-dot::after { content: ''; position: absolute; top: 3px; left: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+        .radio-label { font-size: 14px; }
+        .radio-desc { font-size: 12px; color: var(--text-dim); }
+    </style>
+</head>
+<body>
+    <div class="wizard">
+        <h1>Welcome to LifeOS</h1>
+        <p class="sub">Let's set up your personal operating system.</p>
+
+        <div class="progress" id="progress">
+            <div class="progress-dot active"></div>
+            <div class="progress-dot"></div>
+            <div class="progress-dot"></div>
+            <div class="progress-dot"></div>
+            <div class="progress-dot"></div>
+            <div class="progress-dot"></div>
+        </div>
+
+        <!-- Step 1: Profile -->
+        <div class="step active" id="step1">
+            <h2>About you</h2>
+            <label>Name</label>
+            <input type="text" id="userName" placeholder="Your name">
+            <label>Timezone</label>
+            <select id="userTimezone">
+                <option value="UTC">UTC</option>
+                <option value="America/New_York">US Eastern</option>
+                <option value="America/Chicago">US Central</option>
+                <option value="America/Denver">US Mountain</option>
+                <option value="America/Los_Angeles">US Pacific</option>
+                <option value="Europe/London">London</option>
+                <option value="Europe/Berlin">Berlin</option>
+                <option value="Asia/Tokyo">Tokyo</option>
+                <option value="Asia/Seoul">Seoul</option>
+                <option value="Asia/Shanghai">Shanghai</option>
+                <option value="Australia/Sydney">Sydney</option>
+            </select>
+            <label>GitHub username (optional)</label>
+            <input type="text" id="userGithub" placeholder="username">
+            <button class="btn" onclick="nextStep(2)">Continue</button>
+        </div>
+
+        <!-- Step 2: Priorities -->
+        <div class="step" id="step2">
+            <h2>Your priorities</h2>
+            <p>What matters most to you? This shapes how LifeOS triages your messages, ranks tasks, and briefs you.</p>
+
+            <label>Life areas (select what applies)</label>
+            <div class="chip-grid" id="lifeAreaChips"></div>
+
+            <label>Important people</label>
+            <p style="margin-bottom:8px">Who should always get your attention? Messages from VIPs are flagged first.</p>
+            <div id="vipRows"></div>
+            <span class="add-link" onclick="addVipRow()">+ Add another</span>
+
+            <label>Urgency keywords</label>
+            <p style="margin-bottom:8px">Messages containing these words will be flagged as urgent (comma-separated).</p>
+            <textarea id="urgencyKeywords">deadline, payment, urgent, asap, contract, invoice, overdue, confirm, approve</textarea>
+
+            <label>How should your PA communicate?</label>
+            <div class="radio-group" id="paStyleGroup">
+                <div class="radio-option selected" data-value="direct" onclick="selectPaStyle(this)">
+                    <div class="radio-dot"></div>
+                    <div>
+                        <div class="radio-label">Direct & brief</div>
+                        <div class="radio-desc">Short bullets, no filler. Get to the point.</div>
+                    </div>
+                </div>
+                <div class="radio-option" data-value="warm" onclick="selectPaStyle(this)">
+                    <div class="radio-dot"></div>
+                    <div>
+                        <div class="radio-label">Friendly & warm</div>
+                        <div class="radio-desc">Conversational, encouraging, supportive.</div>
+                    </div>
+                </div>
+                <div class="radio-option" data-value="professional" onclick="selectPaStyle(this)">
+                    <div class="radio-dot"></div>
+                    <div>
+                        <div class="radio-label">Professional</div>
+                        <div class="radio-desc">Structured, formal, thorough but efficient.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="nextStep(1)">Back</button>
+                <button class="btn" onclick="nextStep(3)">Continue</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Integrations -->
+        <div class="step" id="step3">
+            <h2>Integrations</h2>
+            <p>Toggle the services you use. You can configure API keys later in Settings.</p>
+            <div id="integrationToggles"></div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="nextStep(2)">Back</button>
+                <button class="btn" onclick="nextStep(4)">Continue</button>
+            </div>
+        </div>
+
+        <!-- Step 4: First Project (optional) -->
+        <div class="step" id="step4">
+            <h2>Your first project (optional)</h2>
+            <p>Create a project to track, or skip this for now. You can always add projects later.</p>
+            <label>Project name</label>
+            <input type="text" id="projectName" placeholder="e.g. My SaaS, Client Work">
+            <label>Type</label>
+            <select id="projectType">
+                <option value="saas">SaaS</option>
+                <option value="freelance">Freelance</option>
+                <option value="business">Business</option>
+                <option value="channel">Channel / Content</option>
+            </select>
+            <label>Primary KPI</label>
+            <input type="text" id="projectKpi" placeholder="e.g. Revenue, Subscribers, MRR">
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="nextStep(3)">Back</button>
+                <button class="btn btn-secondary" onclick="nextStep(5)">Skip</button>
+                <button class="btn" onclick="nextStep(5)">Continue</button>
+            </div>
+        </div>
+
+        <!-- Step 5: PA Key -->
+        <div class="step" id="step5">
+            <h2>AI Assistant</h2>
+            <p>LifeOS includes an AI assistant (PA). Add your Claude API key to enable it, or skip for now.</p>
+            <label>Claude API Key</label>
+            <input type="password" id="paKey" placeholder="sk-ant-...">
+            <button class="btn btn-secondary" onclick="testPaKey()" style="margin-top:12px;margin-right:8px">Test</button>
+            <span class="status" id="paStatus"></span>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="nextStep(4)">Back</button>
+                <button class="btn" onclick="savePaKey(); nextStep(6)">Continue</button>
+            </div>
+        </div>
+
+        <!-- Step 6: Telegram Alerts (optional) -->
+        <div class="step" id="step6">
+            <h2>Telegram Alerts (optional)</h2>
+            <p>Get daily briefings, todo reminders, and urgent alerts sent to your Telegram. Create a bot via <b>@BotFather</b> on Telegram, then paste the token below. Send <b>/start</b> to your bot, then use <b>@userinfobot</b> to get your Chat ID.</p>
+            <label>Bot Token</label>
+            <input type="text" id="tgBotToken" placeholder="123456:ABC-DEF1234...">
+            <label>Chat ID</label>
+            <input type="text" id="tgChatId" placeholder="e.g. 123456789">
+            <button class="btn btn-secondary" onclick="testTelegram()" style="margin-top:12px;margin-right:8px">Send Test Message</button>
+            <span class="status" id="tgStatus"></span>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="nextStep(5)">Back</button>
+                <button class="btn" onclick="finishSetup()">Finish Setup</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── Life area chips ──────────────────────────────────────────────────────
+        const lifeAreas = [
+            'Work / Career', 'Health / Fitness', 'Family', 'Finance',
+            'Learning', 'Creative / Projects', 'Social', 'Relationships'
+        ];
+        const selectedAreas = new Set();
+        const chipContainer = document.getElementById('lifeAreaChips');
+        lifeAreas.forEach(area => {
+            const chip = document.createElement('div');
+            chip.className = 'chip';
+            chip.textContent = area;
+            chip.addEventListener('click', () => {
+                chip.classList.toggle('selected');
+                if (chip.classList.contains('selected')) selectedAreas.add(area);
+                else selectedAreas.delete(area);
+            });
+            chipContainer.appendChild(chip);
+        });
+
+        // ── VIP people rows ──────────────────────────────────────────────────────
+        let vipCount = 0;
+        const vipContainer = document.getElementById('vipRows');
+        function addVipRow() {
+            if (vipCount >= 5) return;
+            vipCount++;
+            const row = document.createElement('div');
+            row.className = 'vip-row';
+            row.innerHTML = `
+                <input type="text" class="vip-name" placeholder="Name">
+                <select class="vip-rel">
+                    <option value="partner">Partner</option>
+                    <option value="family">Family</option>
+                    <option value="bestie">Best friend</option>
+                    <option value="client">Client</option>
+                    <option value="key_partner">Business partner</option>
+                    <option value="mentor">Mentor</option>
+                    <option value="other">Other</option>
+                </select>
+            `;
+            vipContainer.appendChild(row);
+        }
+        // Start with 2 rows
+        addVipRow(); addVipRow();
+
+        // ── PA style radio ───────────────────────────────────────────────────────
+        let paStyleValue = 'direct';
+        function selectPaStyle(el) {
+            document.querySelectorAll('#paStyleGroup .radio-option').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+            paStyleValue = el.dataset.value;
+        }
+
+        // ── Integration toggles ──────────────────────────────────────────────────
+        const integrationList = [
+            { id: 'whoop', label: 'Whoop (Health)' },
+            { id: 'stripe', label: 'Stripe (Revenue)' },
+            { id: 'wise', label: 'Wise (Spending)' },
+            { id: 'github', label: 'GitHub (Commits)' },
+            { id: 'telegram', label: 'Telegram (Briefings)' },
+            { id: 'gmail', label: 'Gmail (Email)' },
+            { id: 'outlook', label: 'Outlook (Email)' },
+            { id: 'apple_mail', label: 'Apple Mail' },
+            { id: 'apple_calendar', label: 'Apple Calendar' },
+            { id: 'whatsapp', label: 'WhatsApp' },
+        ];
+        const enabledIntegrations = {};
+        const toggleContainer = document.getElementById('integrationToggles');
+        integrationList.forEach(i => {
+            enabledIntegrations[i.id] = false;
+            const row = document.createElement('div');
+            row.className = 'toggle-row';
+            row.innerHTML = '<span>' + i.label + '</span><div class="toggle" data-id="' + i.id + '"></div>';
+            const toggle = row.querySelector('.toggle');
+            toggle.addEventListener('click', function() {
+                this.classList.toggle('on');
+                enabledIntegrations[i.id] = this.classList.contains('on');
+            });
+            toggleContainer.appendChild(row);
+        });
+
+        // ── Step navigation ──────────────────────────────────────────────────────
+        let currentStep = 1;
+
+        function nextStep(step) {
+            // Save current step data on forward navigation
+            if (currentStep === 1 && step > 1) saveProfile();
+            if (currentStep === 2 && step > 2) savePriorities();
+            if (currentStep === 3 && step > 3) saveIntegrations();
+            if (currentStep === 4 && step > 4) saveProject();
+
+            currentStep = step;
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById('step' + step).classList.add('active');
+
+            // Update progress dots
+            document.querySelectorAll('.progress-dot').forEach((dot, i) => {
+                dot.className = 'progress-dot';
+                if (i + 1 === step) dot.classList.add('active');
+                else if (i + 1 < step) dot.classList.add('done');
+            });
+        }
+
+        // ── Save functions ───────────────────────────────────────────────────────
+
+        async function saveProfile() {
+            await fetch('/api/onboarding/user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: document.getElementById('userName').value,
+                    timezone: document.getElementById('userTimezone').value,
+                    github_username: document.getElementById('userGithub').value,
+                })
+            });
+        }
+
+        async function savePriorities() {
+            const vipPeople = [];
+            document.querySelectorAll('.vip-row').forEach(row => {
+                const name = row.querySelector('.vip-name').value.trim();
+                const relationship = row.querySelector('.vip-rel').value;
+                if (name) vipPeople.push({ name, relationship });
+            });
+
+            const keywordsRaw = document.getElementById('urgencyKeywords').value;
+            const urgencyKeywords = keywordsRaw.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+
+            await fetch('/api/onboarding/priorities', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    life_areas: Array.from(selectedAreas),
+                    vip_people: vipPeople,
+                    urgency_keywords: urgencyKeywords,
+                    pa_style: paStyleValue,
+                })
+            });
+        }
+
+        async function saveIntegrations() {
+            const data = {};
+            Object.keys(enabledIntegrations).forEach(k => {
+                data[k] = { enabled: enabledIntegrations[k] };
+            });
+            await fetch('/api/onboarding/integrations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        }
+
+        async function saveProject() {
+            const name = document.getElementById('projectName').value;
+            if (!name) return;
+            const kpiRaw = document.getElementById('projectKpi').value;
+            await fetch('/api/onboarding/project', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    business_model: document.getElementById('projectType').value,
+                    display_kpi_key: kpiRaw ? kpiRaw.toLowerCase().replace(/\s+/g, '_') : null,
+                    display_kpi_label: kpiRaw || null,
+                })
+            });
+        }
+
+        async function testPaKey() {
+            const key = document.getElementById('paKey').value;
+            const status = document.getElementById('paStatus');
+            if (!key) { status.textContent = 'Enter a key first'; status.className = 'status err'; return; }
+            status.textContent = 'Testing...'; status.className = 'status';
+            const res = await fetch('/api/setup/test-pa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ api_key: key })
+            });
+            const data = await res.json();
+            if (data.valid) { status.textContent = 'Key is valid'; status.className = 'status ok'; }
+            else { status.textContent = 'Invalid: ' + (data.error || 'unknown'); status.className = 'status err'; }
+        }
+
+        async function savePaKey() {
+            const key = document.getElementById('paKey').value;
+            if (key) {
+                await fetch('/api/onboarding/pa-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: key })
+                });
+            }
+        }
+
+        async function testTelegram() {
+            const token = document.getElementById('tgBotToken').value;
+            const chatId = document.getElementById('tgChatId').value;
+            const status = document.getElementById('tgStatus');
+            if (!token || !chatId) { status.textContent = 'Enter both token and chat ID'; status.className = 'status err'; return; }
+            status.textContent = 'Sending...'; status.className = 'status';
+            const res = await fetch('/api/onboarding/telegram-test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bot_token: token, chat_id: chatId })
+            });
+            const data = await res.json();
+            if (data.success) { status.textContent = 'Message sent! Check Telegram.'; status.className = 'status ok'; }
+            else { status.textContent = 'Failed: ' + (data.error || 'unknown'); status.className = 'status err'; }
+        }
+
+        async function saveTelegram() {
+            const token = document.getElementById('tgBotToken').value;
+            const chatId = document.getElementById('tgChatId').value;
+            if (token && chatId) {
+                await fetch('/api/onboarding/telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bot_token: token, chat_id: chatId })
+                });
+            }
+        }
+
+        async function finishSetup() {
+            await saveTelegram();
+            await fetch('/api/onboarding/complete', { method: 'POST' });
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

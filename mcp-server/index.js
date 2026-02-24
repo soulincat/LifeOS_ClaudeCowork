@@ -17,7 +17,11 @@
  * Or via .mcp.json in Claude Code/Desktop.
  */
 
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+// Load .env: prefer config/.env, fall back to root .env
+const fs = require('fs');
+const configEnvPath = require('path').join(__dirname, '..', 'config', '.env');
+const rootEnvPath = require('path').join(__dirname, '..', '.env');
+require('dotenv').config({ path: fs.existsSync(configEnvPath) ? configEnvPath : rootEnvPath, override: true });
 
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
