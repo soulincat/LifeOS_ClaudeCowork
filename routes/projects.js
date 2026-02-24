@@ -96,6 +96,65 @@ router.post('/', (req, res) => {
 });
 
 /**
+ * GET /api/projects/:id/detail
+ * Full project detail: project + all tasks + all milestones + dependency names.
+ * Single-call payload for the project detail panel.
+ */
+router.get('/:id/detail', (req, res) => {
+    try {
+        const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        // Parse JSON fields
+        const out = { ...project };
+        if (typeof out.metrics === 'string')   try { out.metrics   = JSON.parse(out.metrics);   } catch (_) {}
+        if (typeof out.phase_list === 'string') try { out.phase_list = JSON.parse(out.phase_list); } catch (_) {}
+
+        // All non-cancelled tasks, ordered by phase → blocker → priority → created
+        const tasks = db.prepare(`
+            SELECT * FROM project_tasks
+            WHERE project_id = ? AND status != 'cancelled'
+            ORDER BY
+                project_phase ASC NULLS LAST,
+                CASE WHEN status = 'done' THEN 1 ELSE 0 END ASC,
+                is_blocker DESC,
+                priority_within_project ASC,
+                created_at ASC
+        `).all(req.params.id);
+
+        // All milestones ordered by phase → target_date → name
+        const milestones = db.prepare(`
+            SELECT * FROM project_milestones
+            WHERE project_id = ?
+            ORDER BY phase ASC NULLS LAST, target_date ASC NULLS LAST, name ASC
+        `).all(req.params.id);
+
+        // Projects that block THIS project (upstream)
+        const upstream = db.prepare(`
+            SELECT p.id, p.name, p.health_status, d.dependency_description, d.is_hard_block, d.id as dep_id
+            FROM project_dependencies d
+            JOIN projects p ON p.id = d.upstream_project_id
+            WHERE d.downstream_project_id = ?
+            ORDER BY d.is_hard_block DESC, p.name ASC
+        `).all(req.params.id);
+
+        // Projects that THIS project blocks (downstream)
+        const downstream = db.prepare(`
+            SELECT p.id, p.name, p.health_status, d.dependency_description, d.is_hard_block, d.id as dep_id
+            FROM project_dependencies d
+            JOIN projects p ON p.id = d.downstream_project_id
+            WHERE d.upstream_project_id = ?
+            ORDER BY d.is_hard_block DESC, p.name ASC
+        `).all(req.params.id);
+
+        res.json({ project: out, tasks, milestones, dependencies: { upstream, downstream } });
+    } catch (error) {
+        console.error('Error fetching project detail:', error);
+        res.status(500).json({ error: 'Failed to fetch project detail' });
+    }
+});
+
+/**
  * GET /api/projects/:id
  * Get one project by id
  */

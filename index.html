@@ -1071,6 +1071,137 @@
                 </div>
             </div><!-- /panel-contacts -->
 
+            <!-- PROJECT DETAIL PANEL -->
+            <div id="panel-project-detail" class="main-panel" style="display: none;">
+                <!-- Header bar -->
+                <div class="pd-header">
+                    <button type="button" class="pd-back-btn" id="pdBackBtn">← Projects</button>
+                    <div class="pd-header-center">
+                        <span class="pd-project-name" id="pdProjectName">Project</span>
+                        <span class="pd-health-badge" id="pdHealthBadge"></span>
+                    </div>
+                    <div class="pd-header-right">
+                        <div class="pd-progress-ring-wrap">
+                            <svg class="pd-progress-ring" viewBox="0 0 36 36">
+                                <circle class="pd-ring-bg" cx="18" cy="18" r="15.9"/>
+                                <circle class="pd-ring-fill" id="pdRingFill" cx="18" cy="18" r="15.9"
+                                    stroke-dasharray="0 100" stroke-dashoffset="25"/>
+                            </svg>
+                            <span class="pd-progress-pct" id="pdProgressPct">0%</span>
+                        </div>
+                        <button type="button" class="btn-small" id="pdEditBtn">Edit plan</button>
+                    </div>
+                </div>
+
+                <!-- Next action callout -->
+                <div class="pd-next-action-wrap" id="pdNextActionWrap">
+                    <span class="pd-next-label">⚡ Next action</span>
+                    <span class="pd-next-text" id="pdNextText" title="Click to edit"></span>
+                    <input type="text" class="pd-next-input" id="pdNextInput" placeholder="What's the next concrete step?">
+                </div>
+
+                <!-- Phase stepper -->
+                <div class="pd-phases-wrap" id="pdPhasesWrap" style="display:none;">
+                    <div class="pd-phases-label">Phases</div>
+                    <div class="pd-phases-stepper" id="pdPhasesStepper"></div>
+                </div>
+
+                <!-- Two-column body: milestones | tasks -->
+                <div class="pd-body">
+
+                    <!-- LEFT: Milestones -->
+                    <div class="pd-section pd-milestones-section">
+                        <div class="pd-section-header">
+                            <span class="pd-section-title">Milestones</span>
+                            <span class="pd-section-sub" id="pdMilestoneProgress"></span>
+                            <button type="button" class="pd-add-btn" id="pdAddMilestoneBtn">+ Add</button>
+                        </div>
+
+                        <!-- Progress bar -->
+                        <div class="pd-milestone-bar-wrap">
+                            <div class="pd-milestone-bar"><div class="pd-milestone-bar-fill" id="pdMilestoneBarFill"></div></div>
+                        </div>
+
+                        <!-- Milestone list -->
+                        <div class="pd-milestone-list" id="pdMilestoneList">
+                            <div class="pd-empty">No milestones yet</div>
+                        </div>
+
+                        <!-- Add milestone form (hidden by default) -->
+                        <div class="pd-add-form" id="pdAddMilestoneForm" style="display:none;">
+                            <input type="text" class="pd-add-input" id="pdMilestoneName" placeholder="Milestone name *">
+                            <div class="pd-add-row">
+                                <input type="number" class="pd-add-input pd-add-short" id="pdMilestoneWeight" placeholder="Weight" min="1" max="100" value="10">
+                                <input type="date"   class="pd-add-input pd-add-short" id="pdMilestoneDate">
+                                <select class="pd-add-input pd-add-short" id="pdMilestonePhase"></select>
+                            </div>
+                            <div class="pd-add-actions">
+                                <button type="button" class="btn-small" id="pdMilestoneSave">Save</button>
+                                <button type="button" class="btn-small btn-ghost" id="pdMilestoneCancel">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: Tasks -->
+                    <div class="pd-section pd-tasks-section">
+                        <div class="pd-section-header">
+                            <span class="pd-section-title">Tasks</span>
+                            <div class="pd-task-filters" id="pdTaskFilters">
+                                <button class="pd-filter active" data-filter="open">Open</button>
+                                <button class="pd-filter" data-filter="blockers">🚫 Blockers</button>
+                                <button class="pd-filter" data-filter="all">All</button>
+                                <button class="pd-filter" data-filter="done">Done</button>
+                            </div>
+                            <button type="button" class="pd-add-btn" id="pdAddTaskBtn">+ Add</button>
+                        </div>
+
+                        <!-- Task list -->
+                        <div class="pd-task-list" id="pdTaskList">
+                            <div class="pd-empty">No tasks yet</div>
+                        </div>
+
+                        <!-- Add task form (hidden by default) -->
+                        <div class="pd-add-form" id="pdAddTaskForm" style="display:none;">
+                            <input type="text" class="pd-add-input" id="pdTaskText" placeholder="Task description *">
+                            <div class="pd-add-row">
+                                <select class="pd-add-input pd-add-short" id="pdTaskPhase">
+                                    <option value="">Current phase</option>
+                                </select>
+                                <select class="pd-add-input pd-add-short" id="pdTaskEnergy">
+                                    <option value="medium">⚡ Medium</option>
+                                    <option value="high">🔥 High</option>
+                                    <option value="low">🌱 Low</option>
+                                </select>
+                                <input type="date" class="pd-add-input pd-add-short" id="pdTaskDue">
+                                <label class="pd-add-checkbox-label">
+                                    <input type="checkbox" id="pdTaskIsBlocker"> Blocker
+                                </label>
+                            </div>
+                            <div class="pd-add-actions">
+                                <button type="button" class="btn-small" id="pdTaskSave">Save</button>
+                                <button type="button" class="btn-small btn-ghost" id="pdTaskCancel">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dependencies strip -->
+                <div class="pd-deps-section" id="pdDepsSection" style="display:none;">
+                    <div class="pd-deps-col">
+                        <div class="pd-deps-col-title">⛔ Blocked by</div>
+                        <div class="pd-deps-list" id="pdUpstreamList"></div>
+                    </div>
+                    <div class="pd-deps-col">
+                        <div class="pd-deps-col-title">🔒 This blocks</div>
+                        <div class="pd-deps-list" id="pdDownstreamList"></div>
+                    </div>
+                </div>
+
+                <!-- Stats strip: timeline, hours, budget, revenue -->
+                <div class="pd-stats-strip" id="pdStatsStrip"></div>
+
+            </div><!-- /panel-project-detail -->
+
             </div><!-- /os-main-scroll -->
             <!-- PA Chat Bar: sticky bottom, always visible across all tabs -->
             <div class="dash-pa-wrap" id="dashPaWrap">

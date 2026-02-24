@@ -21,6 +21,7 @@
         if (tab === 'setup' && typeof loadSetup === 'function') loadSetup();
         if (tab === 'inbox') initInboxTab();
         if (tab === 'contacts' && typeof window.__loadContacts === 'function') window.__loadContacts();
+        // project-detail panel: no auto-load (loaded explicitly via openProjectDetail)
     }
 
     async function loadWishlist() {
