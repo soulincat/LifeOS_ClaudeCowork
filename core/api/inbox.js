@@ -62,15 +62,22 @@ router.post('/', (req, res) => {
 
         const item = { source, sender_name, sender_id, preview, full_content, timestamp,
             is_unread: true, project_tag, action_required };
-        const urgency = computeUrgencyScore(item);
+        const scoring = computeUrgencyScore(item);
+
+        // Blocked contacts → skip insert entirely
+        if (scoring.blocked) {
+            return res.json({ skipped: true, reason: 'blocked_sender' });
+        }
 
         const result = db.prepare(`
             INSERT INTO inbox_items (source, sender_name, sender_id, preview, full_content, timestamp,
-                urgency_score, project_tag, action_required, raw_payload)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                urgency_score, project_tag, action_required, raw_payload,
+                priority_tier, contact_id, category)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(source, sender_name || null, sender_id || null, preview ? preview.slice(0, 150) : null,
-            full_content || null, timestamp, urgency, project_tag || null,
-            action_required ? 1 : 0, raw_payload ? JSON.stringify(raw_payload) : null);
+            full_content || null, timestamp, scoring.score, project_tag || scoring.project_id || null,
+            action_required ? 1 : 0, raw_payload ? JSON.stringify(raw_payload) : null,
+            scoring.tier, scoring.contact_id, scoring.category);
 
         res.json({ ...db.prepare('SELECT * FROM inbox_items WHERE id = ?').get(result.lastInsertRowid) });
     } catch (error) {

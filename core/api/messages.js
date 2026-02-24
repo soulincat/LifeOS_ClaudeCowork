@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
+const { computeUrgencyScore } = require('../db/derived-state');
 
 /**
  * GET /api/messages
@@ -84,6 +85,79 @@ router.get('/grouped', (req, res) => {
 });
 
 /**
+ * GET /api/messages/tiered
+ * Returns messages grouped by sender, pre-sectioned into { urgent, medium, ignored }.
+ * Each row = one sender with latest message, msg_count, and representative_id.
+ * Query params: source, project_id
+ */
+router.get('/tiered', (req, res) => {
+    try {
+        const { source, project_id } = req.query;
+        let baseWhere = "m.status IN ('pending','approved')";
+        const params = [];
+
+        if (source) { baseWhere += ' AND m.source = ?'; params.push(source); }
+        if (project_id) { baseWhere += ' AND m.project_id = ?'; params.push(Number(project_id)); }
+
+        // Helper: grouped query for a specific tier filter
+        function queryTier(tierWhere, limit) {
+            return db.prepare(`
+                SELECT
+                    m.source,
+                    m.sender_address,
+                    m.sender_name,
+                    MAX(m.urgency_score) AS urgency_score,
+                    MAX(m.priority_tier) AS priority_tier,
+                    MAX(m.received_at)   AS received_at,
+                    COUNT(*)             AS msg_count,
+                    MAX(m.project_id)    AS project_id,
+                    MAX(m.contact_id)    AS contact_id,
+                    MAX(m.category)      AS category,
+                    (SELECT m2.preview FROM messages m2
+                     WHERE m2.sender_address = m.sender_address AND m2.source = m.source
+                       AND m2.status IN ('pending','approved')
+                     ORDER BY m2.received_at DESC LIMIT 1) AS preview,
+                    (SELECT m2.subject FROM messages m2
+                     WHERE m2.sender_address = m.sender_address AND m2.source = m.source
+                       AND m2.status IN ('pending','approved')
+                     ORDER BY m2.received_at DESC LIMIT 1) AS subject,
+                    (SELECT m2.ai_summary FROM messages m2
+                     WHERE m2.sender_address = m.sender_address AND m2.source = m.source
+                       AND m2.status IN ('pending','approved')
+                     ORDER BY m2.received_at DESC LIMIT 1) AS ai_summary,
+                    (SELECT m2.ai_suggested_reply FROM messages m2
+                     WHERE m2.sender_address = m.sender_address AND m2.source = m.source
+                       AND m2.status IN ('pending','approved')
+                     ORDER BY m2.received_at DESC LIMIT 1) AS ai_suggested_reply,
+                    (SELECT m2.id FROM messages m2
+                     WHERE m2.sender_address = m.sender_address AND m2.source = m.source
+                       AND m2.status IN ('pending','approved')
+                     ORDER BY m2.received_at DESC LIMIT 1) AS id,
+                    p.name AS project_name,
+                    c.name AS contact_name,
+                    c.label AS contact_label
+                FROM messages m
+                LEFT JOIN projects p ON m.project_id = p.id
+                LEFT JOIN contacts c ON m.contact_id = c.id
+                WHERE ${baseWhere} AND ${tierWhere}
+                GROUP BY m.source, m.sender_address
+                ORDER BY MAX(m.urgency_score) DESC, MAX(m.received_at) DESC
+                LIMIT ${limit}
+            `).all(...params);
+        }
+
+        const urgent  = queryTier("m.priority_tier = 'urgent'", 50);
+        const medium  = queryTier("(m.priority_tier = 'medium' OR m.priority_tier IS NULL)", 50);
+        const ignored = queryTier("m.priority_tier = 'ignored'", 20);
+
+        res.json({ urgent, medium, ignored });
+    } catch (error) {
+        console.error('Error fetching tiered messages:', error);
+        res.status(500).json({ error: 'Failed to fetch tiered messages' });
+    }
+});
+
+/**
  * DELETE /api/messages/by-sender
  * Dismiss all messages from a sender_address + source combo.
  * Body: { source, sender_address }
@@ -161,15 +235,40 @@ router.post('/ingest', (req, res) => {
             return res.status(400).json({ error: 'source and received_at are required' });
         }
 
+        // Run scoring engine to auto-categorize
+        const scoring = computeUrgencyScore({
+            sender_id: sender_address,
+            sender_address,
+            preview,
+            full_content: preview,
+            subject,
+            source,
+            timestamp: received_at,
+            is_unread: true
+        });
+
+        // Blocked contacts → skip insert entirely
+        if (scoring.blocked) {
+            return res.json({ success: true, skipped: true, reason: 'blocked_sender' });
+        }
+
+        // Use higher of AI-provided urgency vs computed score (AI may have more context)
+        const finalScore = Math.max(urgency_score || 3, scoring.score > 0 ? Math.round(scoring.score / 20) : 3);
+
         const stmt = db.prepare(`
             INSERT INTO messages
                 (source, external_id, sender_name, sender_address, subject,
-                 preview, received_at, urgency_score, ai_summary, ai_suggested_reply)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 preview, received_at, urgency_score, ai_summary, ai_suggested_reply,
+                 project_id, contact_id, category, priority_tier)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(source, external_id) DO UPDATE SET
                 urgency_score = excluded.urgency_score,
                 ai_summary = excluded.ai_summary,
-                ai_suggested_reply = excluded.ai_suggested_reply
+                ai_suggested_reply = excluded.ai_suggested_reply,
+                project_id = COALESCE(excluded.project_id, messages.project_id),
+                contact_id = COALESCE(excluded.contact_id, messages.contact_id),
+                category = COALESCE(excluded.category, messages.category),
+                priority_tier = excluded.priority_tier
         `);
 
         const result = stmt.run(
@@ -180,13 +279,17 @@ router.post('/ingest', (req, res) => {
             subject || null,
             preview ? preview.slice(0, 200) : null,
             received_at,
-            urgency_score || 3,
+            finalScore,
             ai_summary || null,
-            ai_suggested_reply || null
+            ai_suggested_reply || null,
+            scoring.project_id,
+            scoring.contact_id,
+            scoring.category,
+            scoring.tier
         );
 
         const action = result.changes > 0 ? 'ingested' : 'duplicate skipped';
-        res.json({ success: true, id: result.lastInsertRowid, action });
+        res.json({ success: true, id: result.lastInsertRowid, action, priority_tier: scoring.tier });
     } catch (error) {
         console.error('Error ingesting message:', error);
         res.status(500).json({ error: 'Failed to ingest message' });
@@ -195,13 +298,13 @@ router.post('/ingest', (req, res) => {
 
 /**
  * PATCH /api/messages/:id
- * Update a message — edit suggested reply text, change status, etc.
- * Body: { ai_suggested_reply?, status? }
+ * Update a message — edit suggested reply text, change status, project, category, etc.
+ * Body: { ai_suggested_reply?, status?, project_id?, category?, priority_tier? }
  */
 router.patch('/:id', (req, res) => {
     try {
         const { id } = req.params;
-        const { ai_suggested_reply, status } = req.body;
+        const { ai_suggested_reply, status, project_id, category, priority_tier } = req.body;
 
         const msg = db.prepare('SELECT id FROM messages WHERE id = ?').get(id);
         if (!msg) return res.status(404).json({ error: 'Message not found' });
@@ -213,6 +316,18 @@ router.patch('/:id', (req, res) => {
         if (status !== undefined) {
             db.prepare('UPDATE messages SET status = ? WHERE id = ?')
               .run(status, id);
+        }
+        if (project_id !== undefined) {
+            db.prepare('UPDATE messages SET project_id = ? WHERE id = ?')
+              .run(project_id || null, id);
+        }
+        if (category !== undefined) {
+            db.prepare('UPDATE messages SET category = ? WHERE id = ?')
+              .run(category || null, id);
+        }
+        if (priority_tier !== undefined) {
+            db.prepare('UPDATE messages SET priority_tier = ? WHERE id = ?')
+              .run(priority_tier, id);
         }
 
         res.json({ success: true });
@@ -255,13 +370,13 @@ router.post('/:id/send', async (req, res) => {
         let sendError = null;
         try {
             if (msg.source === 'gmail') {
-                const gmailSend = require('../integrations/gmail-send');
+                const gmailSend = require('../../integrations/gmail');
                 await gmailSend.sendReply(msg, reply_text.trim());
             } else if (msg.source === 'outlook') {
-                const outlookSend = require('../integrations/outlook-send');
+                const outlookSend = require('../../integrations/outlook');
                 await outlookSend.sendReply(msg, reply_text.trim());
             } else if (msg.source === 'whatsapp') {
-                const waSend = require('../integrations/whatsapp-send');
+                const waSend = require('../../integrations/whatsapp');
                 await waSend.sendReply(msg, reply_text.trim());
             }
         } catch (err) {
@@ -320,7 +435,7 @@ router.delete('/:id', (req, res) => {
 router.post('/sync', async (req, res) => {
     const hours = parseInt(req.query.hours) || 24;
     try {
-        const { syncWhatsApp } = require('../integrations/whatsapp-sync');
+        const { syncWhatsApp } = require('../../integrations/whatsapp/sync');
         const result = syncWhatsApp({ hours });
         res.json({ success: true, ...result });
     } catch (error) {
@@ -337,7 +452,7 @@ router.post('/sync', async (req, res) => {
 router.post('/sync-mail', (req, res) => {
     try {
         const { mailboxes } = req.body || {};
-        const { syncMail } = require('../integrations/apple-mail-read');
+        const { syncMail } = require('../../integrations/apple/mail');
         const result = syncMail({ mailboxes });
         res.json({ success: true, ...result });
     } catch (error) {
@@ -352,7 +467,7 @@ router.post('/sync-mail', (req, res) => {
  */
 router.get('/mailboxes', (req, res) => {
     try {
-        const { listMailboxes } = require('../integrations/apple-mail-read');
+        const { listMailboxes } = require('../../integrations/apple/mail');
         res.json(listMailboxes());
     } catch (error) {
         res.status(500).json({ error: error.message });

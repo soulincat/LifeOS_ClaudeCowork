@@ -10,6 +10,27 @@
 
 const db = require('./database');
 
+// ── User-configurable urgency keywords (cached per process) ──────────────────
+
+const DEFAULT_URGENT_KEYWORDS = ['approve', 'deadline', 'confirm', 'urgent', 'asap', 'by monday', 'by tuesday', 'by wednesday', 'by thursday', 'by friday', 'by tomorrow', 'by today', 'by end of', 'invoice', 'payment', 'contract', 'overdue'];
+let _cachedUrgentKeywords = null;
+
+function getUserUrgencyKeywords() {
+    if (_cachedUrgentKeywords) return _cachedUrgentKeywords;
+    try {
+        const row = db.prepare("SELECT payload FROM setup_sections WHERE section_key = 'user_priorities'").get();
+        if (row && row.payload) {
+            const prefs = JSON.parse(row.payload);
+            if (Array.isArray(prefs.urgency_keywords) && prefs.urgency_keywords.length > 0) {
+                _cachedUrgentKeywords = prefs.urgency_keywords.map(k => k.toLowerCase().trim()).filter(Boolean);
+                return _cachedUrgentKeywords;
+            }
+        }
+    } catch (e) { /* setup_sections may not exist yet */ }
+    _cachedUrgentKeywords = DEFAULT_URGENT_KEYWORDS;
+    return _cachedUrgentKeywords;
+}
+
 // ── Health Status Derivation ──────────────────────────────────────────────────
 // Runs whenever a task, milestone, or dependency changes.
 // RED: any blocker task is open
@@ -148,27 +169,80 @@ function rederiveProject(projectId) {
     deriveHealthStatus(projectId);
 }
 
+// ── Contact Lookup ────────────────────────────────────────────────────────────
+// Find contact by any identifier (phone, email, whatsapp_jid)
+
+function lookupContact(senderAddress) {
+    if (!senderAddress) return null;
+    const addr = String(senderAddress).trim();
+    if (!addr) return null;
+    return db.prepare(
+        'SELECT * FROM contacts WHERE phone = ? OR email = ? OR whatsapp_jid = ? LIMIT 1'
+    ).get(addr, addr, addr);
+}
+
 // ── Urgency Scoring ───────────────────────────────────────────────────────────
-// Five components summed on inbox item insert
+// Returns { score, tier, contact_id, project_id, category, blocked }
+// Blocked contacts → { blocked: true } — caller should skip insert entirely
+
+const RELATIONSHIP_BOOSTS = {
+    lover: 30, bestie: 25, key_partner: 20,
+    client: 15, investor: 15, co_founder: 15,
+    vendor: 5, acquaintance: 0, other: 0
+};
+
+function deriveTier(score, isBlocked, isIgnored) {
+    if (isBlocked) return 'blocked';
+    if (isIgnored) return 'ignored';
+    if (score >= 50) return 'urgent';
+    if (score >= 5) return 'medium';
+    return 'ignored';
+}
 
 function computeUrgencyScore(item) {
     let score = 0;
+    const senderAddr = item.sender_id || item.sender_address;
 
-    // VIP sender check (+40)
-    if (item.sender_id) {
-        const vip = db.prepare('SELECT 1 FROM vip_senders WHERE sender_id = ?').get(item.sender_id);
-        if (vip) score += 40;
+    // 1. Contact reputation lookup
+    const contact = lookupContact(senderAddr);
+    if (contact) {
+        if (contact.label === 'blocked') {
+            return { score: 0, tier: 'blocked', contact_id: contact.id, project_id: contact.project_id || null, category: null, blocked: true };
+        }
+        if (contact.label === 'ignored') {
+            return { score: 0, tier: 'ignored', contact_id: contact.id, project_id: contact.project_id || null, category: null, blocked: false };
+        }
+        if (contact.label === 'vip') score += 40;
+        score += RELATIONSHIP_BOOSTS[contact.relationship] || 0;
+        score += contact.urgency_boost || 0;
     }
 
-    // Keyword detection (+30)
-    const text = ((item.preview || '') + ' ' + (item.full_content || '')).toLowerCase();
-    const urgentKeywords = ['approve', 'deadline', 'confirm', 'urgent', 'asap', 'by monday', 'by tuesday', 'by wednesday', 'by thursday', 'by friday', 'by tomorrow', 'by today', 'by end of'];
+    // 2. Keyword detection (+30) — uses user-configured keywords or defaults
+    const text = ((item.preview || '') + ' ' + (item.full_content || '') + ' ' + (item.subject || '')).toLowerCase();
+    const urgentKeywords = getUserUrgencyKeywords();
     if (urgentKeywords.some(kw => text.includes(kw))) score += 30;
 
-    // Source-based scoring
+    // 3. Per-project keyword matching
+    let matchedProject = null;
+    try {
+        const allKeywords = db.prepare(`
+            SELECT pk.*, p.name as project_name FROM project_keywords pk
+            JOIN projects p ON p.id = pk.project_id
+            WHERE p.status = 'active'
+        `).all();
+        for (const kw of allKeywords) {
+            if (text.includes(kw.keyword.toLowerCase())) {
+                score += kw.boost || 20;
+                if (!matchedProject) {
+                    matchedProject = { id: kw.project_id, name: kw.project_name, category: kw.category };
+                }
+            }
+        }
+    } catch (e) { /* project_keywords may not exist yet */ }
+
+    // 4. Source-based scoring
     if (item.source === 'whatsapp') score += 10;
     if (item.source === 'gcal') {
-        // Calendar event within 2 hours → +50
         if (item.timestamp) {
             const eventTime = new Date(item.timestamp);
             const now = new Date();
@@ -178,7 +252,7 @@ function computeUrgencyScore(item) {
     }
     if (item.source === 'stripe' || item.source === 'wise') score += 5;
 
-    // Unread and older than 6 hours → +15
+    // 5. Unread and older than 6 hours → +15
     if (item.is_unread && item.timestamp) {
         const msgTime = new Date(item.timestamp);
         const now = new Date();
@@ -186,11 +260,23 @@ function computeUrgencyScore(item) {
         if (hoursOld > 6) score += 15;
     }
 
-    // Newsletter/automated detection (-40)
+    // 6. Newsletter/automated detection (-40)
     const automatedKeywords = ['unsubscribe', 'no-reply', 'noreply', 'newsletter', 'digest', 'weekly roundup', 'marketing'];
     if (automatedKeywords.some(kw => text.includes(kw))) score -= 40;
 
-    return Math.max(0, Math.min(100, score));
+    // 7. Auto-assign project from contact if no keyword match
+    const projectId = matchedProject?.id || (contact?.project_id) || null;
+    const category = matchedProject?.category || null;
+
+    const clampedScore = Math.max(0, Math.min(100, score));
+    return {
+        score: clampedScore,
+        tier: deriveTier(clampedScore, false, false),
+        contact_id: contact?.id || null,
+        project_id: projectId,
+        category,
+        blocked: false
+    };
 }
 
 // ── Focus Card Scoring ────────────────────────────────────────────────────────
@@ -310,5 +396,6 @@ module.exports = {
     derivePhase,
     rederiveProject,
     computeUrgencyScore,
+    lookupContact,
     scoreFocusCard
 };

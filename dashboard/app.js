@@ -3,6 +3,40 @@ function escHtml(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ── Widget config: controls which optional sections render ──────────────────
+let _widgetConfig = null;
+async function getWidgetConfig() {
+    if (_widgetConfig) return _widgetConfig;
+    try {
+        const res = await fetch('/api/config/user');
+        const user = await res.json();
+        _widgetConfig = user.dashboard_widgets || {};
+    } catch (e) { _widgetConfig = {}; }
+    return _widgetConfig;
+}
+function isWidgetEnabled(name) {
+    if (!_widgetConfig) return true; // default show until config loads
+    return _widgetConfig[name] !== false; // default true unless explicitly disabled
+}
+
+// On load: fetch config and hide optional tabs/sections
+(async function applyWidgetConfig() {
+    await getWidgetConfig();
+    // Hide optional tabs
+    if (!isWidgetEnabled('projections')) {
+        const tab = document.querySelector('.tab-bar-tab[data-tab="scenarios"]');
+        if (tab) tab.style.display = 'none';
+    }
+    if (!isWidgetEnabled('social')) {
+        const tab = document.querySelector('.tab-bar-tab[data-tab="dashboard"]');
+        if (tab) tab.style.display = 'none';
+    }
+    if (!isWidgetEnabled('wishlist')) {
+        const tab = document.querySelector('.tab-bar-tab[data-tab="wishlist"]');
+        if (tab) tab.style.display = 'none';
+    }
+})();
+
 // Health display: set values and WHOOP-style colors (green / yellow / red)
 function updateHealthDisplay(health) {
     const recoveryEl = document.getElementById('healthRecoveryValue');
@@ -130,7 +164,14 @@ function updateHealthAlert() {
 
 // Load dashboard data (each section independent so one failure doesn't block the rest)
 async function loadDashboardData() {
-    let socialFollowersTotal = 0; // used by dashboard project cards (e.g. Cathy K = this total)
+    let socialFollowersTotal = 0;
+
+    // Hide entire dashboard social section if social widget is disabled
+    await getWidgetConfig();
+    if (!isWidgetEnabled('social')) {
+        const socialFill = document.querySelector('#panel-dashboard .dashboard-social-fill');
+        if (socialFill) socialFill.style.display = 'none';
+    }
 
     // WHOOP OAuth callback feedback
     const params = new URLSearchParams(window.location.search);
@@ -386,7 +427,7 @@ async function loadDashboardData() {
             if (totalEl) totalEl.textContent = fmt(total);
         }
     } catch (e) { console.warn('Social metrics failed', e); }
-    // Fallback so Cathy K card can still show total (e.g. 20.6K) if social API failed
+    // Fallback so channel-type project card can still show total if social API failed
     if (socialFollowersTotal === 0) {
         const totalEl = document.getElementById('socialFollowersValue');
         if (totalEl && totalEl.textContent) {
@@ -424,26 +465,13 @@ async function loadDashboardData() {
                 console.warn('Dashboard projects grid not found');
                 return;
             }
-            const typeMap = { 'Soulin Social': 'SAAS', 'KINS': 'BUSINESS', 'Cathy K': 'CHANNEL', 'Soulin Agency': 'FREELANCE', 'Soulful Academy': 'FREELANCE' };
-            const kpiByProject = { 'Cathy K': { key: 'subscribers', label: 'Subscribers' }, 'KINS': { key: 'sales', label: 'Sales' }, 'Soulin Social': { key: 'paid_members', label: 'Paid member' }, 'Soulin Agency': { key: 'revenue', label: 'Revenue' }, 'Soulful Academy': { key: 'revenue', label: 'Revenue' } };
-            const nameAlias = { 'Soulful Academy': 'Soulin Agency' };
-
             if (projects.length === 0) {
                 console.warn('No projects returned from API');
             }
 
+            // Generate project cards dynamically from DB data (no hardcoded project names)
+            gridEl.innerHTML = '';
             projects.forEach((project) => {
-                const cardName = nameAlias[project.name] || project.name;
-                // Use cardName for typeMap lookup (handles Soulful Academy → Soulin Agency)
-                const projectType = (typeMap[cardName] || typeMap[project.name] || 'project').toLowerCase();
-                const card = gridEl.querySelector('.projection-card[data-project-type="' + projectType + '"]');
-                if (!card) {
-                    console.warn('Card not found for project:', project.name, 'cardName:', cardName, 'type:', projectType, 'available types:', Array.from(gridEl.querySelectorAll('.projection-card')).map(c => c.getAttribute('data-project-type')));
-                    return;
-                }
-
-                if (project.id != null) card.setAttribute('data-project-id', project.id);
-
                 let metrics = project.metrics || {};
                 if (typeof metrics === 'string') {
                     try {
@@ -455,9 +483,10 @@ async function loadDashboardData() {
                 }
                 const current = metrics.current != null ? metrics.current : metrics;
                 const lastMonth = metrics.last_month != null ? metrics.last_month : null;
-                const typeLabel = typeMap[cardName] || typeMap[project.name] || 'PROJECT';
-                const kpi = kpiByProject[cardName] || kpiByProject[project.name];
-                const primaryKey = kpi ? kpi.key : pickPrimaryMetricKey(current, lastMonth, typeLabel.toLowerCase());
+                const typeLabel = (project.business_model || 'PROJECT').toUpperCase();
+                const kpiKey = project.display_kpi_key;
+                const kpiLabel = project.display_kpi_label;
+                const primaryKey = kpiKey || pickPrimaryMetricKey(current, lastMonth, typeLabel.toLowerCase());
                 const getVal = (obj) => {
                     if (!obj || !primaryKey) return null;
                     if (primaryKey === 'paid_members') return obj.paid_members != null ? obj.paid_members : obj.paid_member;
@@ -465,55 +494,42 @@ async function loadDashboardData() {
                 };
                 let lastVal = getVal(lastMonth);
                 let thisVal = getVal(current);
-                // Cathy K (channel): show total social followers as current on the card (same as top of dashboard)
-                if ((project.name === 'Cathy K' || cardName === 'Cathy K') && (primaryKey === 'subscribers' || primaryKey === 'followers') && socialFollowersTotal > 0) {
+                // For channel-type projects, show total social followers if available
+                if (typeLabel === 'CHANNEL' && (primaryKey === 'subscribers' || primaryKey === 'followers') && socialFollowersTotal > 0) {
                     thisVal = socialFollowersTotal;
-                }
-
-                const currentEl = card.querySelector('.projection-metric-current');
-                const lastEl = card.querySelector('.projection-metric-last');
-                const labelEl = card.querySelector('.projection-metric-label');
-                const growthEl = card.querySelector('.projection-growth');
-                const updatedEl = card.querySelector('.projection-card-updated');
-
-                if (currentEl) {
-                    currentEl.textContent = thisVal != null ? formatMetricValue(primaryKey, thisVal) : '—';
-                    currentEl.classList.toggle('has-value', thisVal != null);
-                }
-                if (lastEl) lastEl.textContent = lastVal != null ? formatMetricValue(primaryKey, lastVal) : '—';
-                if (labelEl) labelEl.textContent = kpi ? kpi.label : '—';
-                const status = (project.status || 'active').toLowerCase();
-                let statusBadge = card.querySelector('.project-card-status-badge');
-                if (!statusBadge && updatedEl) {
-                    statusBadge = document.createElement('span');
-                    statusBadge.className = 'project-card-status-badge project-card-status-' + status;
-                    updatedEl.parentNode.insertBefore(statusBadge, updatedEl);
-                }
-                if (statusBadge) {
-                    statusBadge.textContent = status !== 'active' ? status : '';
-                    statusBadge.className = 'project-card-status-badge project-card-status-' + status;
                 }
 
                 let growthPct = null;
                 if (lastVal != null && thisVal != null && typeof lastVal === 'number' && typeof thisVal === 'number') {
                     growthPct = lastVal !== 0 ? Math.round(((thisVal - lastVal) / lastVal) * 100) : (thisVal !== 0 ? 100 : 0);
                 }
-                if (growthEl) {
-                    growthEl.textContent = growthPct != null ? (growthPct > 0 ? '+' + growthPct + '%' : growthPct + '%') : '—';
-                    growthEl.classList.toggle('negative', growthPct != null && growthPct < 0);
-                }
+                const growthText = growthPct != null ? (growthPct > 0 ? '+' + growthPct + '%' : growthPct + '%') : '—';
+                const growthClass = growthPct != null && growthPct < 0 ? ' negative' : '';
+                const status = (project.status || 'active').toLowerCase();
+                const statusBadgeHtml = status !== 'active' ? '<span class="project-card-status-badge project-card-status-' + status + '">' + status + '</span>' : '';
+                const currentText = thisVal != null ? formatMetricValue(primaryKey, thisVal) : '—';
+                const lastText = lastVal != null ? formatMetricValue(primaryKey, lastVal) : '—';
+                const y0 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 28 : 8) : 18;
+                const y1 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 8 : 28) : 18;
+                const updatedText = project.last_updated ? 'Updated: ' + new Date(project.last_updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Updated: —';
 
-                const mini = card.querySelector('.projection-mini-chart polyline');
-                if (mini) {
-                    const y0 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 28 : 8) : 18;
-                    const y1 = lastVal != null && thisVal != null ? (lastVal <= thisVal ? 8 : 28) : 18;
-                    mini.setAttribute('points', '0,' + y0 + ' 100,' + y1);
-                }
-
-                if (updatedEl && project.last_updated) {
-                    const date = new Date(project.last_updated);
-                    updatedEl.textContent = 'Updated: ' + date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                }
+                const card = document.createElement('div');
+                card.className = 'projection-card project-card';
+                card.setAttribute('data-project-type', typeLabel.toLowerCase());
+                if (project.id != null) card.setAttribute('data-project-id', project.id);
+                card.title = 'Click for revenue projections';
+                card.innerHTML = '<div class="projection-card-type">' + escHtml(typeLabel) + '</div>'
+                    + '<div class="projection-card-name">' + escHtml(project.name) + '</div>'
+                    + '<div class="projection-card-metrics"><div class="projection-metric projection-metric-dashboard">'
+                    + '<span class="projection-metric-current' + (thisVal != null ? ' has-value' : '') + '">' + currentText + '</span>'
+                    + '<span class="projection-metric-last">' + lastText + '</span>'
+                    + '</div><div class="projection-metric-label">' + escHtml(kpiLabel || primaryKey || '—') + '</div></div>'
+                    + '<div class="projection-mini-chart"><svg viewBox="0 0 100 30" preserveAspectRatio="none">'
+                    + '<polyline points="0,' + y0 + ' 100,' + y1 + '" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>'
+                    + '<div class="projection-card-footer">' + statusBadgeHtml
+                    + '<span class="projection-effort projection-card-updated">' + updatedText + '</span>'
+                    + '<span class="projection-growth' + growthClass + '">' + growthText + '</span></div>';
+                gridEl.appendChild(card);
             });
     } catch (err) {
         console.warn('Dashboard project cards failed', err);
@@ -623,20 +639,23 @@ document.getElementById('whoopConnectLink')?.addEventListener('click', function(
     window.location.href = base + '/api/health/whoop/connect';
 });
 
-// Refresh GitHub contribution graph with daily cache-busting
-function refreshGitHubGraph() {
+// Refresh GitHub contribution graph with daily cache-busting (reads username from config)
+async function refreshGitHubGraph() {
     const graphImg = document.getElementById('githubContributionGraph');
-    if (!graphImg) {
-        console.warn('GitHub contribution graph image not found');
-        return;
+    if (!graphImg) return;
+
+    try {
+        const userConfig = await fetch('/api/config/user').then(r => r.json());
+        const username = userConfig.github_username;
+        if (!username) {
+            graphImg.style.display = 'none';
+            return;
+        }
+        graphImg.style.display = '';
+        graphImg.src = `https://ghchart.rshah.org/203EAE/${username}?t=${Date.now()}`;
+    } catch (e) {
+        console.warn('GitHub graph: config fetch failed', e);
     }
-    
-    // Add timestamp-based cache-busting parameter for immediate refresh
-    const baseUrl = 'https://ghchart.rshah.org/203EAE/soulincat';
-    const timestamp = Date.now();
-    graphImg.src = `${baseUrl}?t=${timestamp}`;
-    
-    console.log('🔄 Refreshed GitHub contribution graph with timestamp:', timestamp);
 }
 
 // Social numbers are set in HTML and not overwritten by JS (so they stay correct).
@@ -743,7 +762,12 @@ async function loadHomeData() {
     } catch (e) { renderHomeInbox([], 'all'); }
 
     // ── Project Cards (collapsed by default, expand on click) ──
-    try {
+    // Hide entire section if projects widget is disabled
+    const projectSec = document.getElementById('dashProjectSection');
+    if (projectSec && !isWidgetEnabled('projects')) {
+        projectSec.style.display = 'none';
+    }
+    if (!isWidgetEnabled('projects')) { /* skip project loading */ } else try {
         const projRes = await fetch(base + '/api/home/projects-expanded');
         const projects = (await projRes.json()) || [];
         const grid = document.getElementById('dashProjectCards');
@@ -846,6 +870,26 @@ async function loadHomeData() {
             });
         }
     } catch (e) { console.warn('Home: projects-expanded failed', e); }
+
+    // Generate project-specific PA quick chips from active projects
+    try {
+        const chipsContainer = document.getElementById('dashPaChips');
+        const revenueChip = chipsContainer?.querySelector('[data-prompt*="revenue summary"]');
+        // Remove any previously generated project chips
+        chipsContainer?.querySelectorAll('.dash-pa-chip[data-dynamic]').forEach(c => c.remove());
+        const projRes2 = await fetch(base + '/api/projects');
+        const allProjects = await projRes2.json();
+        const activeProjects = (Array.isArray(allProjects) ? allProjects : []).filter(p => p.status === 'active').slice(0, 3);
+        activeProjects.forEach(p => {
+            const chip = document.createElement('button');
+            chip.className = 'dash-pa-chip';
+            chip.setAttribute('data-dynamic', '1');
+            chip.setAttribute('data-prompt', 'How is ' + p.name + ' progressing? What\'s the next critical step?');
+            chip.textContent = p.name + ' status';
+            if (revenueChip) chipsContainer.insertBefore(chip, revenueChip);
+            else chipsContainer?.appendChild(chip);
+        });
+    } catch (e) { /* chips are non-critical */ }
 
     // Wire up event handlers once
     if (!homeInitialised) {
@@ -1247,15 +1291,13 @@ async function openProjectModal(projectId) {
         const model = project.business_model || 'saas';
         document.querySelectorAll('input[name="pmModel"]').forEach(r => r.checked = r.value === model);
         
-        // Dashboard metrics (same fixed KPI per project as cards)
-        const kpiByProject = { 'Cathy K': { key: 'subscribers', label: 'Subscribers' }, 'KINS': { key: 'sales', label: 'Sales' }, 'Soulin Social': { key: 'paid_members', label: 'Paid member' }, 'Soulin Agency': { key: 'revenue', label: 'Revenue' } };
-        const nameAlias = { 'Soulful Academy': 'Soulin Agency' };
-        const cardName = nameAlias[project.name] || project.name;
-        const kpi = kpiByProject[cardName] || kpiByProject[project.name];
+        // Dashboard metrics — read KPI from project data (display_kpi_key/label columns)
+        const kpiKey = project.display_kpi_key;
+        const kpiLabel = project.display_kpi_label;
         const metrics = project.metrics || {};
         const current = metrics.current != null ? metrics.current : metrics;
         const lastMonth = metrics.last_month != null ? metrics.last_month : null;
-        const primaryKey = kpi ? kpi.key : pickPrimaryMetricKey(current, lastMonth, (project.name || '').toLowerCase());
+        const primaryKey = kpiKey || pickPrimaryMetricKey(current, lastMonth, (project.business_model || project.name || '').toLowerCase());
         const getVal = (obj) => {
             if (!obj || !primaryKey) return null;
             if (primaryKey === 'paid_members') return obj.paid_members != null ? obj.paid_members : obj.paid_member;
@@ -1264,7 +1306,7 @@ async function openProjectModal(projectId) {
         modal.dataset.primaryMetricKey = primaryKey || '';
         const labelEl = document.getElementById('pmDashboardMetricLabel');
         const labelCopyEl = document.getElementById('pmDashboardMetricLabelCopy');
-        const labelText = kpi ? kpi.label : (primaryKey ? formatMetricLabel(primaryKey, (project.name || '').toLowerCase()) : 'Metric');
+        const labelText = kpiLabel || (primaryKey ? formatMetricLabel(primaryKey, (project.business_model || project.name || '').toLowerCase()) : 'Metric');
         if (labelEl) labelEl.textContent = labelText;
         if (labelCopyEl) labelCopyEl.textContent = labelText;
         const lastMonthInput = document.getElementById('pmMetricLastMonth');
@@ -1796,10 +1838,15 @@ function renderContacts(contacts) {
     }
     list.innerHTML = contacts.map(c => {
         const initials = (c.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-        const isVip    = c.label === 'vip';
+        const isVip     = c.label === 'vip';
+        const isBlocked = c.label === 'blocked';
+        const isIgnored = c.label === 'ignored';
+        const labelIcon = isVip ? '⭐' : isBlocked ? '🚫' : isIgnored ? '👻' : '';
+        const cardClass = `contact-card${isVip ? ' is-vip' : ''}${isBlocked ? ' is-blocked' : ''}${isIgnored ? ' is-ignored' : ''}`;
+        const relLabel = c.relationship ? c.relationship.replace(/_/g, ' ') : '';
         const tags = [
             c.type ? `<span class="contact-tag">${c.type}</span>` : '',
-            c.relationship ? `<span class="contact-tag">${escHtml(c.relationship)}</span>` : '',
+            relLabel ? `<span class="contact-tag">${escHtml(relLabel)}</span>` : '',
             c.project_name ? `<span class="contact-tag project">${escHtml(c.project_name)}</span>` : '',
         ].join('');
         const reach = [
@@ -1808,11 +1855,11 @@ function renderContacts(contacts) {
             c.whatsapp_jid ? `<span>💬 ${escHtml(c.whatsapp_jid)}</span>` : '',
         ].filter(Boolean).join('');
         return `
-        <div class="contact-card${isVip ? ' is-vip' : ''}" data-id="${c.id}">
+        <div class="${cardClass}" data-id="${c.id}">
             <div class="contact-avatar ${c.type || 'personal'}">${initials}</div>
             <div class="contact-body">
                 <div class="contact-name">
-                    ${isVip ? '<span class="contact-vip-star">⭐</span>' : ''}
+                    ${labelIcon ? `<span class="contact-label-icon">${labelIcon}</span>` : ''}
                     ${escHtml(c.name)}
                 </div>
                 ${tags ? `<div class="contact-tags">${tags}</div>` : ''}
@@ -1820,6 +1867,9 @@ function renderContacts(contacts) {
                 ${c.notes ? `<div class="contact-notes">${escHtml(c.notes)}</div>` : ''}
             </div>
             <div class="contact-actions">
+                ${!isVip && !isBlocked ? `<button class="contact-btn" data-action="promote" data-id="${c.id}" title="Mark VIP">⭐</button>` : ''}
+                ${!isBlocked ? `<button class="contact-btn" data-action="block" data-id="${c.id}" title="Block">🚫</button>` : ''}
+                ${isBlocked ? `<button class="contact-btn" data-action="demote" data-id="${c.id}" title="Unblock">Unblock</button>` : ''}
                 <button class="contact-btn" data-action="edit" data-id="${c.id}">Edit</button>
                 <button class="contact-btn danger" data-action="delete" data-id="${c.id}">×</button>
             </div>
@@ -1836,6 +1886,16 @@ function renderContacts(contacts) {
             } else if (btn.dataset.action === 'delete') {
                 if (!confirm(`Delete ${contactsData.find(x=>String(x.id)===String(id))?.name}?`)) return;
                 await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+                loadContacts();
+            } else if (btn.dataset.action === 'promote') {
+                await fetch(`/api/contacts/${id}/promote`, { method: 'POST' });
+                loadContacts();
+            } else if (btn.dataset.action === 'block') {
+                if (!confirm(`Block ${contactsData.find(x=>String(x.id)===String(id))?.name}? Their messages will be hidden.`)) return;
+                await fetch(`/api/contacts/${id}/block`, { method: 'POST' });
+                loadContacts();
+            } else if (btn.dataset.action === 'demote') {
+                await fetch(`/api/contacts/${id}/demote`, { method: 'POST' });
                 loadContacts();
             }
         });
@@ -2042,6 +2102,9 @@ function renderProjectDetail(data) {
     // ── Dependencies ──
     renderDependencies(dependencies);
 
+    // ── Keywords ──
+    renderProjectKeywords(project.id);
+
     // ── Stats strip ──
     renderStats(project);
 }
@@ -2162,6 +2225,28 @@ function renderDependencies(dependencies) {
 
     if (upList)   upList.innerHTML   = depHtml(upstream);
     if (downList) downList.innerHTML = depHtml(downstream);
+}
+
+async function renderProjectKeywords(projectId) {
+    const list = document.getElementById('pdKeywordList');
+    if (!list) return;
+    try {
+        const keywords = await fetch('/api/project-keywords/' + projectId).then(r => r.json());
+        if (!keywords.length) {
+            list.innerHTML = '<div class="pd-empty">No keywords — messages won\'t auto-assign to this project</div>';
+            return;
+        }
+        list.innerHTML = keywords.map(kw =>
+            `<div class="pd-keyword-chip">
+                <span class="pd-keyword-text">${escHtml(kw.keyword)}</span>
+                <span class="pd-keyword-cat">${escHtml(kw.category)}</span>
+                <span class="pd-keyword-boost">+${kw.boost}</span>
+                <button class="pd-keyword-del" data-kw-id="${kw.id}" title="Remove">✕</button>
+            </div>`
+        ).join('');
+    } catch (e) {
+        list.innerHTML = '<div class="pd-empty">Failed to load keywords</div>';
+    }
 }
 
 function renderStats(project) {
@@ -2358,6 +2443,41 @@ function setupProjectDetailHandlers() {
         document.getElementById('pdTaskText').value = '';
         document.getElementById('pdAddTaskForm').style.display = 'none';
         loadProjectDetail(pdCurrentProject.project.id);
+    });
+
+    // ── Add keyword form ──
+    document.getElementById('pdAddKeywordBtn')?.addEventListener('click', () => {
+        const form = document.getElementById('pdAddKeywordForm');
+        if (!form) return;
+        const isHidden = form.style.display === 'none' || !form.style.display;
+        form.style.display = isHidden ? 'flex' : 'none';
+        if (isHidden) document.getElementById('pdKeywordText')?.focus();
+    });
+    document.getElementById('pdKeywordCancel')?.addEventListener('click', () => {
+        document.getElementById('pdAddKeywordForm').style.display = 'none';
+    });
+    document.getElementById('pdKeywordSave')?.addEventListener('click', async () => {
+        if (!pdCurrentProject) return;
+        const keyword  = document.getElementById('pdKeywordText')?.value.trim();
+        const category = document.getElementById('pdKeywordCategory')?.value || 'general';
+        const boost    = parseInt(document.getElementById('pdKeywordBoost')?.value || '20', 10);
+        if (!keyword) return;
+        await fetch('/api/project-keywords/' + pdCurrentProject.project.id, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword, category, boost })
+        });
+        document.getElementById('pdKeywordText').value = '';
+        document.getElementById('pdAddKeywordForm').style.display = 'none';
+        renderProjectKeywords(pdCurrentProject.project.id);
+    });
+
+    // ── Delete keyword (delegated) ──
+    document.getElementById('pdKeywordList')?.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.pd-keyword-del');
+        if (!btn) return;
+        await fetch('/api/project-keywords/' + btn.dataset.kwId, { method: 'DELETE' });
+        renderProjectKeywords(pdCurrentProject.project.id);
     });
 }
 

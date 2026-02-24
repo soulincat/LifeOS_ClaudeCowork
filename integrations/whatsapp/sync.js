@@ -8,7 +8,8 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const os = require('os');
-const db = require('../db/database');
+const db = require('../../core/db/database');
+const { computeUrgencyScore, lookupContact } = require('../../core/db/derived-state');
 
 const WA_DB_PATH = path.join(
     os.homedir(),
@@ -164,6 +165,11 @@ function syncWhatsApp({ hours = 24 } = {}) {
                 ? (row.chat_name || chatNum)
                 : (row.chat_name && row.chat_name !== chatNum ? row.chat_name : chatNum);
 
+            // Contact lookup — check blocked/ignored status before insertion
+            const senderAddr = isGroup ? row.chat_jid : (row.sender || row.chat_jid);
+            const contact = lookupContact(senderAddr) || lookupContact(row.chat_jid);
+            if (contact && contact.label === 'blocked') { skipped++; continue; }
+
             const urgency = scoreUrgency(row.content, isGroup);
 
             // Skip pure ACKs (urgency 1) from groups
@@ -178,11 +184,34 @@ function syncWhatsApp({ hours = 24 } = {}) {
             const receivedAt = new Date(row.timestamp).toISOString();
             const subject = makeSubject(row.content, isGroup ? row.chat_name : null);
 
+            // Run unified scoring for tier + project assignment
+            let priorityTier = 'medium';
+            let contactId = contact ? contact.id : null;
+            let projectId = null;
+            let category = null;
+            try {
+                const scoring = computeUrgencyScore({
+                    sender_id: senderAddr,
+                    sender_address: senderAddr,
+                    preview: row.content,
+                    full_content: row.content,
+                    subject,
+                    source: 'whatsapp',
+                    timestamp: receivedAt,
+                    is_unread: true
+                });
+                priorityTier = scoring.tier || 'medium';
+                if (scoring.contact_id) contactId = scoring.contact_id;
+                if (scoring.project_id) projectId = scoring.project_id;
+                if (scoring.category) category = scoring.category;
+            } catch (e) { /* scoring engine unavailable — use defaults */ }
+
             db.prepare(`
                 INSERT INTO messages
                     (source, external_id, sender_name, sender_address, subject,
-                     preview, received_at, urgency_score, ai_summary, ai_suggested_reply)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     preview, received_at, urgency_score, ai_summary, ai_suggested_reply,
+                     priority_tier, contact_id, project_id, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source, external_id) DO NOTHING
             `).run(
                 'whatsapp',
@@ -194,7 +223,11 @@ function syncWhatsApp({ hours = 24 } = {}) {
                 receivedAt,
                 urgency,
                 null,
-                null
+                null,
+                priorityTier,
+                contactId,
+                projectId,
+                category
             );
 
             synced++;

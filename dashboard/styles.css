@@ -3118,6 +3118,80 @@ body {
 .inbox-reply-input:focus { outline: none; border-color: var(--accent); }
 .inbox-reply-actions { display: flex; justify-content: flex-end; }
 
+/* Tiered inbox sections */
+.inbox-section { margin-bottom: 4px; }
+.inbox-section-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; cursor: pointer; border-radius: 6px;
+    font-size: 13px; font-weight: 600; user-select: none;
+}
+.inbox-section-header:hover { background: var(--surface); }
+.inbox-section-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.inbox-section-dot.urgent { background: #ef4444; }
+.inbox-section-dot.medium { background: #eab308; }
+.inbox-section-dot.ignored { background: var(--text-dim); opacity: 0.4; }
+.inbox-section-title { font-size: 13px; }
+.inbox-section-count {
+    font-size: 11px; color: var(--text-dim);
+    background: var(--surface); border-radius: 10px;
+    padding: 1px 7px; margin-left: auto;
+}
+.inbox-section-toggle { font-size: 10px; color: var(--text-dim); }
+.inbox-section-body { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+
+/* Tier-specific card borders */
+.inbox-card.inbox-tier-urgent { border-left-color: #ef4444; }
+.inbox-card.inbox-tier-medium { border-left-color: #eab308; }
+.inbox-card.inbox-tier-ignored { border-left-color: var(--border); opacity: 0.7; }
+
+/* Category and project badges */
+.inbox-category-badge, .inbox-project-badge {
+    font-size: 10px; border-radius: 4px; padding: 1px 5px;
+    background: var(--bg); color: var(--text-dim); border: 1px solid var(--border);
+}
+.inbox-project-badge { background: var(--accent); color: #fff; border-color: var(--accent); opacity: 0.85; }
+
+/* Quick action buttons */
+.inbox-quick-actions { display: flex; gap: 2px; margin-left: auto; }
+.inbox-action-btn {
+    background: transparent; border: none; cursor: pointer;
+    font-size: 12px; padding: 2px 4px; border-radius: 3px; opacity: 0.4;
+}
+.inbox-action-btn:hover { opacity: 1; background: var(--surface); }
+
+/* Privacy toggle */
+.inbox-privacy-toggle { font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+
+/* Contact label icons on inbox cards */
+.inbox-contact-label { font-size: 12px; flex-shrink: 0; }
+.inbox-contact-label.vip { filter: saturate(1.5); }
+.inbox-contact-label.blocked { opacity: 0.6; }
+.inbox-contact-label.ignored { opacity: 0.5; }
+
+/* Project picker dropdown on inbox cards */
+.inbox-project-picker { border: 1px solid var(--accent); border-radius: 4px; background: var(--surface); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+
+/* Project keyword chips */
+.pd-keyword-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
+.pd-keyword-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 3px 10px; font-size: 12px;
+}
+.pd-keyword-text { font-weight: 500; color: var(--text); }
+.pd-keyword-cat { font-size: 10px; color: var(--text-dim); }
+.pd-keyword-boost { font-size: 10px; color: var(--accent); font-weight: 600; }
+.pd-keyword-del {
+    background: transparent; border: none; cursor: pointer; color: var(--text-dim);
+    font-size: 11px; padding: 0 2px; opacity: 0.4;
+}
+.pd-keyword-del:hover { opacity: 1; color: #ef4444; }
+
+/* Blocked / Ignored contact cards */
+.contact-card.is-blocked { opacity: 0.5; border-left: 3px solid #ef4444; }
+.contact-card.is-ignored { opacity: 0.6; border-left: 3px solid var(--text-dim); }
+.contact-label-icon { margin-right: 4px; }
+
 /* ── PA Sidebar Box (info-section pattern) ───────────────────────────────── */
 
 /* Override github-calendar to not fill remaining space so PA fits below */

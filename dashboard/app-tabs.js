@@ -1114,7 +1114,7 @@
         });
     }
 
-    // ── Inbox Tab ────────────────────────────────────────────────────────────
+    // ── Inbox Tab (Tiered: Urgent / Medium / Ignored) ───────────────────────
     let inboxActiveSource = '';
     let inboxInitialised = false;
 
@@ -1124,6 +1124,7 @@
         if (!inboxInitialised) {
             inboxInitialised = true;
             setupInboxHandlers();
+            loadInboxProjectFilter();
         }
     }
 
@@ -1135,23 +1136,45 @@
         return source === 'gmail' ? '✉' : source === 'outlook' ? '📧' : source === 'whatsapp' ? '💬' : '📩';
     }
 
-    function renderInboxItem(msg) {
+    function esc(s) { return typeof escHtml === 'function' ? escHtml(s) : (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+
+    function renderInboxCard(msg) {
         const card = document.createElement('div');
-        card.className = `inbox-card urgency-${msg.urgency_score}`;
+        const tier = msg.priority_tier || 'medium';
+        card.className = `inbox-card inbox-tier-${tier}`;
         card.dataset.id = msg.id;
+        card.dataset.sender = msg.sender_address || '';
+        card.dataset.source = msg.source || '';
+        const privacy = document.getElementById('inboxPrivacyMode')?.checked;
         const date = msg.received_at ? new Date(msg.received_at).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const categoryBadge = msg.category ? `<span class="inbox-category-badge">${esc(msg.category)}</span>` : '';
+        const projectBadge = msg.project_name ? `<span class="inbox-project-badge">${esc(msg.project_name)}</span>` : '';
+        const senderDisplay = privacy ? '***' : esc(msg.sender_name || msg.sender_address || 'Unknown');
+        const contentHidden = privacy;
+        const labelIcon = msg.contact_label === 'vip' ? '<span class="inbox-contact-label vip" title="VIP">⭐</span>'
+            : msg.contact_label === 'blocked' ? '<span class="inbox-contact-label blocked" title="Blocked">🚫</span>'
+            : msg.contact_label === 'ignored' ? '<span class="inbox-contact-label ignored" title="Ignored">👻</span>'
+            : '';
         card.innerHTML = `
             <div class="inbox-card-header">
                 <span class="inbox-source-icon" title="${msg.source}">${sourceIcon(msg.source)}</span>
-                <span class="inbox-sender">${msg.sender_name || msg.sender_address || 'Unknown'}</span>
+                ${labelIcon}<span class="inbox-sender">${senderDisplay}</span>
+                ${msg.msg_count > 1 ? `<span class="inbox-msg-count">${msg.msg_count}</span>` : ''}
+                ${categoryBadge}${projectBadge}
                 <span class="inbox-urgency inbox-urgency-${msg.urgency_score}">${urgencyLabel(msg.urgency_score)}</span>
                 <span class="inbox-date">${date}</span>
-                <button class="inbox-dismiss" title="Dismiss" data-id="${msg.id}">✕</button>
+                <div class="inbox-quick-actions">
+                    <button class="inbox-action-btn" data-action="block" data-address="${esc(msg.sender_address || '')}" title="Block sender">🚫</button>
+                    <button class="inbox-action-btn" data-action="ignore" data-address="${esc(msg.sender_address || '')}" data-name="${esc(msg.sender_name || '')}" title="Ignore sender">👻</button>
+                    <button class="inbox-action-btn" data-action="vip" data-address="${esc(msg.sender_address || '')}" data-name="${esc(msg.sender_name || '')}" title="Mark VIP">⭐</button>
+                    <button class="inbox-action-btn" data-action="assign-project" data-id="${msg.id}" title="Assign to project">📁</button>
+                    <button class="inbox-dismiss" title="Dismiss" data-id="${msg.id}">✕</button>
+                </div>
             </div>
-            ${msg.subject ? `<div class="inbox-subject">${msg.subject}</div>` : ''}
-            ${msg.ai_summary ? `<div class="inbox-summary">${msg.ai_summary}</div>` : msg.preview ? `<div class="inbox-summary">${msg.preview}</div>` : ''}
+            ${!contentHidden && msg.subject ? `<div class="inbox-subject">${esc(msg.subject)}</div>` : ''}
+            ${!contentHidden && (msg.ai_summary || msg.preview) ? `<div class="inbox-summary">${esc(msg.ai_summary || msg.preview)}</div>` : ''}
             <div class="inbox-reply-section">
-                <textarea class="inbox-reply-input" placeholder="Edit reply before sending…" rows="3">${msg.ai_suggested_reply || ''}</textarea>
+                <textarea class="inbox-reply-input" placeholder="Reply…" rows="2">${msg.ai_suggested_reply || ''}</textarea>
                 <div class="inbox-reply-actions">
                     <button class="btn-save btn-small inbox-send-btn" data-id="${msg.id}">Send</button>
                 </div>
@@ -1159,50 +1182,47 @@
         return card;
     }
 
-    function renderGroupedItem(g) {
-        const card = document.createElement('div');
-        card.className = `inbox-card urgency-${g.urgency_score}`;
-        card.dataset.sender = g.sender_address;
-        card.dataset.source = g.source;
-        card.dataset.id = g.representative_id;
-        const date = g.latest_received_at ? new Date(g.latest_received_at).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-        const countBadge = g.msg_count > 1 ? `<span class="inbox-msg-count">${g.msg_count}</span>` : '';
-        card.innerHTML = `
-            <div class="inbox-card-header">
-                <span class="inbox-source-icon" title="${g.source}">${sourceIcon(g.source)}</span>
-                <span class="inbox-sender">${g.sender_name || g.sender_address || 'Unknown'}</span>
-                ${countBadge}
-                <span class="inbox-urgency inbox-urgency-${g.urgency_score}">${urgencyLabel(g.urgency_score)}</span>
-                <span class="inbox-date">${date}</span>
-                <button class="inbox-dismiss-sender" title="Dismiss all" data-sender="${g.sender_address}" data-source="${g.source}">✕</button>
-            </div>
-            ${g.latest_preview ? `<div class="inbox-summary">${g.latest_preview}</div>` : ''}
-            <div class="inbox-reply-section">
-                <textarea class="inbox-reply-input" placeholder="Reply…" rows="2"></textarea>
-                <div class="inbox-reply-actions">
-                    <button class="btn-save btn-small inbox-send-btn" data-id="${g.representative_id}">Send</button>
-                </div>
-            </div>`;
-        return card;
+    function updateSectionCounts() {
+        ['Urgent', 'Medium', 'Ignored'].forEach(tier => {
+            const container = document.getElementById('inboxList' + tier);
+            const countEl = document.getElementById('inboxCount' + tier);
+            if (!container || !countEl) return;
+            const cards = container.querySelectorAll('.inbox-card');
+            countEl.textContent = cards.length;
+            if (!cards.length && !container.querySelector('.inbox-empty')) {
+                container.innerHTML = '<div class="inbox-empty" style="padding:8px 12px;font-size:12px;color:var(--text-dim);">None</div>';
+            }
+        });
+    }
+
+    function renderInboxSection(containerId, msgs, countId) {
+        const container = document.getElementById(containerId);
+        const countEl = document.getElementById(countId);
+        if (!container) return;
+        container.innerHTML = '';
+        if (countEl) countEl.textContent = msgs.length;
+        if (!msgs.length) {
+            container.innerHTML = '<div class="inbox-empty" style="padding:8px 12px;font-size:12px;color:var(--text-dim);">None</div>';
+            return;
+        }
+        msgs.forEach(msg => container.appendChild(renderInboxCard(msg)));
     }
 
     async function loadInbox() {
-        const list = document.getElementById('inboxList');
-        if (!list) return;
-        list.innerHTML = '<div class="inbox-loading">Loading…</div>';
         try {
-            // Use grouped endpoint for WA (or when no filter active — default view)
-            const useGrouped = !inboxActiveSource || inboxActiveSource === 'whatsapp';
-            const url = useGrouped
-                ? '/api/messages/grouped' + (inboxActiveSource ? `?source=${inboxActiveSource}` : '')
-                : '/api/messages?source=' + inboxActiveSource;
+            const source = inboxActiveSource;
+            const projectId = document.getElementById('inboxProjectFilter')?.value;
+            let url = '/api/messages/tiered?';
+            if (source) url += `source=${source}&`;
+            if (projectId) url += `project_id=${projectId}&`;
             const res = await fetch(url);
-            const msgs = await res.json();
-            list.innerHTML = '';
-            if (!msgs.length) { list.innerHTML = '<div class="inbox-empty">No messages to triage.</div>'; return; }
-            msgs.forEach(msg => list.appendChild(useGrouped ? renderGroupedItem(msg) : renderInboxItem(msg)));
+            const { urgent, medium, ignored } = await res.json();
+            renderInboxSection('inboxListUrgent', urgent, 'inboxCountUrgent');
+            renderInboxSection('inboxListMedium', medium, 'inboxCountMedium');
+            renderInboxSection('inboxListIgnored', ignored, 'inboxCountIgnored');
         } catch (e) {
-            list.innerHTML = '<div class="inbox-empty">Failed to load messages.</div>';
+            const el = document.getElementById('inboxListUrgent');
+            if (el) el.innerHTML = '<div class="inbox-empty">Failed to load messages.</div>';
         }
     }
 
@@ -1225,7 +1245,111 @@
         } catch (e) { /* */ }
     }
 
+    async function loadInboxProjectFilter() {
+        const sel = document.getElementById('inboxProjectFilter');
+        if (!sel) return;
+        try {
+            const projects = await fetch('/api/projects').then(r => r.json());
+            sel.innerHTML = '<option value="">All projects</option>';
+            (Array.isArray(projects) ? projects : []).filter(p => p.status === 'active').forEach(p => {
+                sel.innerHTML += `<option value="${p.id}">${esc(p.name)}</option>`;
+            });
+        } catch (e) { /* */ }
+    }
+
+    async function inboxBlockSender(address, name) {
+        if (!address) return;
+        try {
+            let contact = await fetch('/api/contacts/lookup', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sender_address: address })
+            }).then(r => r.json());
+            if (contact && contact.id) {
+                await fetch(`/api/contacts/${contact.id}/block`, { method: 'POST' });
+            } else {
+                await fetch('/api/contacts', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name || address, phone: address, label: 'blocked' })
+                });
+            }
+            loadInbox();
+            loadInboxCounts();
+        } catch (e) { /* */ }
+    }
+
+    async function inboxMarkVip(address, name) {
+        if (!address) return;
+        try {
+            let contact = await fetch('/api/contacts/lookup', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sender_address: address })
+            }).then(r => r.json());
+            if (contact && contact.id) {
+                await fetch(`/api/contacts/${contact.id}/promote`, { method: 'POST' });
+            } else {
+                await fetch('/api/contacts', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name || address, phone: address, label: 'vip' })
+                });
+            }
+            loadInbox();
+        } catch (e) { /* */ }
+    }
+
+    async function inboxIgnoreSender(address, name) {
+        if (!address) return;
+        try {
+            let contact = await fetch('/api/contacts/lookup', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sender_address: address })
+            }).then(r => r.json());
+            if (contact && contact.id) {
+                await fetch(`/api/contacts/${contact.id}/ignore`, { method: 'POST' });
+            } else {
+                await fetch('/api/contacts', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name || address, phone: address, label: 'ignored' })
+                });
+            }
+            loadInbox();
+            loadInboxCounts();
+        } catch (e) { /* */ }
+    }
+
+    async function inboxAssignProject(msgId, btn) {
+        // Show a small inline project picker
+        const existing = btn.closest('.inbox-card')?.querySelector('.inbox-project-picker');
+        if (existing) { existing.remove(); return; }
+        const picker = document.createElement('select');
+        picker.className = 'inbox-project-picker todo-input';
+        picker.style.cssText = 'font-size:11px;width:140px;position:absolute;right:0;top:20px;z-index:10;';
+        picker.innerHTML = '<option value="">— Choose project —</option>';
+        try {
+            const projects = await fetch('/api/projects').then(r => r.json());
+            (Array.isArray(projects) ? projects : []).filter(p => p.status === 'active').forEach(p => {
+                picker.innerHTML += `<option value="${p.id}">${esc(p.name)}</option>`;
+            });
+        } catch (e) { return; }
+        btn.parentElement.style.position = 'relative';
+        btn.parentElement.appendChild(picker);
+        picker.focus();
+        picker.addEventListener('change', async function() {
+            const projectId = this.value;
+            if (!projectId) { this.remove(); return; }
+            try {
+                await fetch(`/api/messages/${msgId}`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ project_id: Number(projectId) })
+                });
+                this.remove();
+                loadInbox();
+            } catch (e) { this.remove(); }
+        });
+        picker.addEventListener('blur', function() { setTimeout(() => this.remove(), 200); });
+    }
+
     function setupInboxHandlers() {
+        // Source tab filtering
         document.querySelectorAll('.inbox-source-tab').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.querySelectorAll('.inbox-source-tab').forEach(b => b.classList.remove('active'));
@@ -1234,37 +1358,87 @@
                 loadInbox();
             });
         });
+
+        // Project filter
+        document.getElementById('inboxProjectFilter')?.addEventListener('change', () => loadInbox());
+
+        // Privacy toggle
+        document.getElementById('inboxPrivacyMode')?.addEventListener('change', () => loadInbox());
+
+        // Sync button
         document.getElementById('inboxSyncBtn')?.addEventListener('click', async function() {
             this.textContent = 'Syncing…'; this.disabled = true;
             try { await fetch('/api/messages/sync', { method: 'POST' }); setTimeout(() => { loadInbox(); loadInboxCounts(); }, 2000); } catch (e) { /* */ }
             setTimeout(() => { this.textContent = 'Sync'; this.disabled = false; }, 3000);
         });
-        document.getElementById('inboxList')?.addEventListener('click', async function(e) {
+
+        // Section collapse/expand
+        document.querySelectorAll('.inbox-section-header').forEach(header => {
+            header.addEventListener('click', function() {
+                const body = this.nextElementSibling;
+                const toggle = this.querySelector('.inbox-section-toggle');
+                if (body.style.display === 'none') {
+                    body.style.display = '';
+                    toggle.innerHTML = '&#9660;';
+                    this.classList.remove('collapsed');
+                } else {
+                    body.style.display = 'none';
+                    toggle.innerHTML = '&#9654;';
+                    this.classList.add('collapsed');
+                }
+            });
+        });
+
+        // Delegated click handlers on inbox sections
+        document.getElementById('panel-inbox')?.addEventListener('click', async function(e) {
+            // Quick action: block sender
+            const blockBtn = e.target.closest('.inbox-action-btn[data-action="block"]');
+            if (blockBtn) {
+                inboxBlockSender(blockBtn.dataset.address, '');
+                return;
+            }
+            // Quick action: mark VIP
+            const vipBtn = e.target.closest('.inbox-action-btn[data-action="vip"]');
+            if (vipBtn) {
+                inboxMarkVip(vipBtn.dataset.address, vipBtn.dataset.name);
+                return;
+            }
+            // Quick action: ignore sender
+            const ignoreBtn = e.target.closest('.inbox-action-btn[data-action="ignore"]');
+            if (ignoreBtn) {
+                inboxIgnoreSender(ignoreBtn.dataset.address, ignoreBtn.dataset.name);
+                return;
+            }
+            // Quick action: assign to project
+            const assignBtn = e.target.closest('.inbox-action-btn[data-action="assign-project"]');
+            if (assignBtn) {
+                inboxAssignProject(assignBtn.dataset.id, assignBtn);
+                return;
+            }
+            // Dismiss sender (all messages from this sender)
             const dismissBtn = e.target.closest('.inbox-dismiss');
             if (dismissBtn) {
-                const id = dismissBtn.dataset.id;
                 const card = dismissBtn.closest('.inbox-card');
+                const address = card?.dataset.sender;
+                const source = card?.dataset.source;
                 try {
-                    await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+                    if (address && source) {
+                        await fetch('/api/messages/by-sender', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ source, sender_address: address })
+                        });
+                    } else {
+                        await fetch(`/api/messages/${dismissBtn.dataset.id}`, { method: 'DELETE' });
+                    }
                     card?.remove();
                     loadInboxCounts();
-                    if (!document.querySelector('.inbox-card')) document.getElementById('inboxList').innerHTML = '<div class="inbox-empty">No messages to triage.</div>';
+                    // Update section counts after removal
+                    updateSectionCounts();
                 } catch (e) { /* */ }
                 return;
             }
-            const dismissSenderBtn = e.target.closest('.inbox-dismiss-sender');
-            if (dismissSenderBtn) {
-                const sender = dismissSenderBtn.dataset.sender;
-                const source = dismissSenderBtn.dataset.source;
-                const card = dismissSenderBtn.closest('.inbox-card');
-                try {
-                    await fetch('/api/messages/by-sender', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source, sender_address: sender }) });
-                    card?.remove();
-                    loadInboxCounts();
-                    if (!document.querySelector('.inbox-card')) document.getElementById('inboxList').innerHTML = '<div class="inbox-empty">No messages to triage.</div>';
-                } catch (e) { /* */ }
-                return;
-            }
+            // Send reply
             const sendBtn = e.target.closest('.inbox-send-btn');
             if (sendBtn) {
                 const id = sendBtn.dataset.id;
@@ -1274,7 +1448,7 @@
                 sendBtn.textContent = 'Sending…'; sendBtn.disabled = true;
                 try {
                     const res = await fetch(`/api/messages/${id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reply_text: replyText }) });
-                    if (res.ok) { card.classList.add('inbox-card-sent'); setTimeout(() => { card.remove(); loadInboxCounts(); }, 800); }
+                    if (res.ok) { card.classList.add('inbox-card-sent'); setTimeout(() => { card.remove(); loadInboxCounts(); updateSectionCounts(); }, 800); }
                     else { sendBtn.textContent = 'Failed'; sendBtn.disabled = false; }
                 } catch (e) { sendBtn.textContent = 'Error'; sendBtn.disabled = false; }
             }

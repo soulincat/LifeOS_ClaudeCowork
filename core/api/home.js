@@ -226,31 +226,51 @@ router.get('/projects-expanded', (req, res) => {
     }
 });
 
-// ── VIP Senders ───────────────────────────────────────────────────────────────
+// ── VIP Senders (redirects to contacts for new system, keeps backward compat) ─
 
 /**
- * GET /api/home/vip-senders
+ * GET /api/home/vip-senders — now returns VIP contacts
  */
 router.get('/vip-senders', (req, res) => {
     try {
-        res.json(db.prepare('SELECT * FROM vip_senders ORDER BY name ASC').all());
+        const vipContacts = db.prepare(
+            "SELECT id, name, phone AS sender_id, relationship, created_at FROM contacts WHERE label = 'vip' ORDER BY name ASC"
+        ).all();
+        res.json(vipContacts);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch VIP senders' });
     }
 });
 
 /**
- * POST /api/home/vip-senders
+ * POST /api/home/vip-senders — upserts into contacts with label='vip' + backward compat
  */
 router.post('/vip-senders', (req, res) => {
     try {
         const { sender_id, name, relationship } = req.body;
         if (!sender_id || !name) return res.status(400).json({ error: 'sender_id and name required' });
-        const result = db.prepare(`
-            INSERT INTO vip_senders (sender_id, name, relationship) VALUES (?, ?, ?)
-            ON CONFLICT(sender_id) DO UPDATE SET name = excluded.name, relationship = excluded.relationship
-        `).run(sender_id, name, relationship || null);
-        res.json({ success: true, id: result.lastInsertRowid });
+
+        // Upsert into contacts
+        const existing = db.prepare(
+            'SELECT id FROM contacts WHERE phone = ? OR email = ? OR whatsapp_jid = ?'
+        ).get(sender_id, sender_id, sender_id);
+        if (existing) {
+            db.prepare("UPDATE contacts SET label = 'vip', relationship = COALESCE(?, relationship) WHERE id = ?")
+                .run(relationship, existing.id);
+        } else {
+            db.prepare("INSERT INTO contacts (name, phone, label, relationship) VALUES (?, ?, 'vip', ?)")
+                .run(name, sender_id, relationship || null);
+        }
+
+        // Backward compat: also write to vip_senders
+        try {
+            db.prepare(`
+                INSERT INTO vip_senders (sender_id, name, relationship) VALUES (?, ?, ?)
+                ON CONFLICT(sender_id) DO UPDATE SET name = excluded.name, relationship = excluded.relationship
+            `).run(sender_id, name, relationship || null);
+        } catch (e) { /* table may not exist in fresh installs */ }
+
+        res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to add VIP sender' });
     }
@@ -261,10 +281,38 @@ router.post('/vip-senders', (req, res) => {
  */
 router.delete('/vip-senders/:id', (req, res) => {
     try {
-        db.prepare('DELETE FROM vip_senders WHERE id = ?').run(req.params.id);
+        // id now refers to contacts.id
+        db.prepare("UPDATE contacts SET label = 'regular' WHERE id = ?").run(req.params.id);
+        // Also try cleaning vip_senders if entry exists
+        try {
+            const c = db.prepare('SELECT phone FROM contacts WHERE id = ?').get(req.params.id);
+            if (c) db.prepare('DELETE FROM vip_senders WHERE sender_id = ?').run(c.phone);
+        } catch (e) { /* */ }
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete VIP sender' });
+    }
+});
+
+// ── Cross-Project Urgent Feed ────────────────────────────────────────────────
+
+/**
+ * GET /api/home/urgent-feed — all urgent messages across projects
+ */
+router.get('/urgent-feed', (req, res) => {
+    try {
+        const msgs = db.prepare(`
+            SELECT m.*, p.name AS project_name, c.name AS contact_name, c.label AS contact_label
+            FROM messages m
+            LEFT JOIN projects p ON m.project_id = p.id
+            LEFT JOIN contacts c ON m.contact_id = c.id
+            WHERE m.priority_tier = 'urgent' AND m.status IN ('pending','approved')
+            ORDER BY m.urgency_score DESC, m.received_at DESC
+            LIMIT 20
+        `).all();
+        res.json(msgs);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch urgent feed' });
     }
 });
 

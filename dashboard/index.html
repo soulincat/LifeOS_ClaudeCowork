@@ -334,12 +334,14 @@
                     <div class="dash-inbox-feed" id="dashInboxFeed"></div>
                 </div>
 
-                <!-- Project Cards (new expanded style) -->
+                <!-- Project Cards (optional — hidden when dashboard_widgets.projects = false) -->
+                <div id="dashProjectSection">
                 <div class="dash-section-header">
                     <div class="dash-section-title">Projects <span class="dash-section-count" id="dashProjectCount"></span></div>
                 </div>
                 <div class="dash-project-cards" id="dashProjectCards">
                     <!-- Populated by JS from /api/projects -->
+                </div>
                 </div>
 
             </div><!-- /dashboard-content -->
@@ -376,37 +378,6 @@
                     <div id="scheduledPostsContainer">
                         <div class="social-post">Loading scheduled posts...</div>
                     </div>
-                </div>
-            </div>
-            <!-- Project Cards -->
-            <div class="projection-cards-grid projects-grid-dashboard" id="dashboardProjectsGrid">
-                <div class="projection-card project-card" data-project-type="channel" title="Click for revenue projections">
-                    <div class="projection-card-type">CHANNEL</div>
-                    <div class="projection-card-name">Cathy K</div>
-                    <div class="projection-card-metrics"><div class="projection-metric projection-metric-dashboard"><span class="projection-metric-current">—</span><span class="projection-metric-last">—</span></div><div class="projection-metric-label">Subscribers</div></div>
-                    <div class="projection-mini-chart"><svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>
-                    <div class="projection-card-footer"><span class="projection-effort projection-card-updated">Updated: —</span><span class="projection-growth">—</span></div>
-                </div>
-                <div class="projection-card project-card" data-project-type="business" title="Click for revenue projections">
-                    <div class="projection-card-type">BUSINESS</div>
-                    <div class="projection-card-name">KINS</div>
-                    <div class="projection-card-metrics"><div class="projection-metric projection-metric-dashboard"><span class="projection-metric-current">—</span><span class="projection-metric-last">—</span></div><div class="projection-metric-label">Sales</div></div>
-                    <div class="projection-mini-chart"><svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>
-                    <div class="projection-card-footer"><span class="projection-effort projection-card-updated">Updated: —</span><span class="projection-growth">—</span></div>
-                </div>
-                <div class="projection-card project-card" data-project-type="saas" title="Click for revenue projections">
-                    <div class="projection-card-type">SAAS</div>
-                    <div class="projection-card-name">Soulin Social</div>
-                    <div class="projection-card-metrics"><div class="projection-metric projection-metric-dashboard"><span class="projection-metric-current">—</span><span class="projection-metric-last">—</span></div><div class="projection-metric-label">Paid member</div></div>
-                    <div class="projection-mini-chart"><svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>
-                    <div class="projection-card-footer"><span class="projection-effort projection-card-updated">Updated: —</span><span class="projection-growth">—</span></div>
-                </div>
-                <div class="projection-card project-card" data-project-type="freelance" title="Click for revenue projections">
-                    <div class="projection-card-type">FREELANCE</div>
-                    <div class="projection-card-name">Soulin Agency</div>
-                    <div class="projection-card-metrics"><div class="projection-metric projection-metric-dashboard"><span class="projection-metric-current">—</span><span class="projection-metric-last">—</span></div><div class="projection-metric-label">Revenue</div></div>
-                    <div class="projection-mini-chart"><svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="0,28 100,8" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>
-                    <div class="projection-card-footer"><span class="projection-effort projection-card-updated">Updated: —</span><span class="projection-growth">—</span></div>
                 </div>
             </div>
             <!-- Social Media Platform Cards -->
@@ -550,17 +521,16 @@
                     </div>
                 </div>
 
-                <!-- Project Projection Cards (4 columns) -->
+                <!-- Project Projection Cards (4 columns) — names loaded from DB -->
                 <div class="projection-cards-grid">
-                    <!-- Channel Growth Project -->
                     <div class="projection-card" data-project-type="channel">
                         <div class="projection-card-type">CHANNEL</div>
-                        <div class="projection-card-name">Cathy K</div>
+                        <div class="projection-card-name">Channel</div>
                         <div class="projection-card-metrics">
                             <div class="projection-metric">
-                                <span class="projection-metric-now">14K</span>
+                                <span class="projection-metric-now">—</span>
                                 <span class="projection-metric-arrow">→</span>
-                                <span class="projection-metric-target">100K</span>
+                                <span class="projection-metric-target">—</span>
                             </div>
                             <div class="projection-metric-label">Followers</div>
                         </div>
@@ -570,22 +540,21 @@
                             </svg>
                         </div>
                         <div class="projection-card-footer">
-                            <span class="projection-effort">2 hrs/week</span>
-                            <span class="projection-growth">+614%</span>
+                            <span class="projection-effort">—</span>
+                            <span class="projection-growth">—</span>
                         </div>
                     </div>
 
-                    <!-- SaaS Project -->
                     <div class="projection-card" data-project-type="saas">
                         <div class="projection-card-type">SAAS</div>
-                        <div class="projection-card-name">Soulin Social</div>
+                        <div class="projection-card-name">SaaS</div>
                         <div class="projection-card-metrics">
                             <div class="projection-metric">
-                                <span class="projection-metric-now">$0</span>
+                                <span class="projection-metric-now">—</span>
                                 <span class="projection-metric-arrow">→</span>
-                                <span class="projection-metric-target">$15.7K</span>
+                                <span class="projection-metric-target">—</span>
                             </div>
-                            <div class="projection-metric-label">MRR (260 basic + 60 agency)</div>
+                            <div class="projection-metric-label">MRR</div>
                         </div>
                         <div class="projection-mini-chart" id="miniChartSaas">
                             <svg viewBox="0 0 100 30" preserveAspectRatio="none">
@@ -593,22 +562,21 @@
                             </svg>
                         </div>
                         <div class="projection-card-footer">
-                            <span class="projection-effort">10-15 hrs/week</span>
-                            <span class="projection-growth">$49/$199</span>
+                            <span class="projection-effort">—</span>
+                            <span class="projection-growth">—</span>
                         </div>
                     </div>
 
-                    <!-- Freelance Project -->
                     <div class="projection-card" data-project-type="freelance">
                         <div class="projection-card-type">FREELANCE</div>
-                        <div class="projection-card-name">Design Services</div>
+                        <div class="projection-card-name">Freelance</div>
                         <div class="projection-card-metrics">
                             <div class="projection-metric">
-                                <span class="projection-metric-now">$1K</span>
+                                <span class="projection-metric-now">—</span>
                                 <span class="projection-metric-arrow">→</span>
-                                <span class="projection-metric-target">$7.2K</span>
+                                <span class="projection-metric-target">—</span>
                             </div>
-                            <div class="projection-metric-label">Monthly (2 proj + 5 retainers)</div>
+                            <div class="projection-metric-label">Monthly</div>
                         </div>
                         <div class="projection-mini-chart" id="miniChartFreelance">
                             <svg viewBox="0 0 100 30" preserveAspectRatio="none">
@@ -616,22 +584,21 @@
                             </svg>
                         </div>
                         <div class="projection-card-footer">
-                            <span class="projection-effort">2 hrs/project</span>
-                            <span class="projection-growth">+625%</span>
+                            <span class="projection-effort">—</span>
+                            <span class="projection-growth">—</span>
                         </div>
                     </div>
 
-                    <!-- Total / Combined -->
                     <div class="projection-card projection-card-total" data-project-type="total">
                         <div class="projection-card-type">TOTAL</div>
                         <div class="projection-card-name">Combined Revenue</div>
                         <div class="projection-card-metrics">
                             <div class="projection-metric">
-                                <span class="projection-metric-now">$1.2K</span>
+                                <span class="projection-metric-now">—</span>
                                 <span class="projection-metric-arrow">→</span>
-                                <span class="projection-metric-target">$23K</span>
+                                <span class="projection-metric-target">—</span>
                             </div>
-                            <div class="projection-metric-label">Monthly by Month 12</div>
+                            <div class="projection-metric-label">Monthly</div>
                         </div>
                         <div class="projection-mini-chart" id="miniChartTotal">
                             <svg viewBox="0 0 100 30" preserveAspectRatio="none">
@@ -639,8 +606,8 @@
                             </svg>
                         </div>
                         <div class="projection-card-footer">
-                            <span class="projection-effort">~20 hrs/week total</span>
-                            <span class="projection-growth">+1816%</span>
+                            <span class="projection-effort">—</span>
+                            <span class="projection-growth">—</span>
                         </div>
                     </div>
                 </div>
@@ -978,11 +945,47 @@
                             <button type="button" class="inbox-source-tab" data-source="outlook">Outlook <span class="inbox-badge" id="inboxBadgeOutlook"></span></button>
                             <button type="button" class="inbox-source-tab" data-source="whatsapp">WhatsApp <span class="inbox-badge" id="inboxBadgeWhatsapp"></span></button>
                         </div>
+                        <select id="inboxProjectFilter" class="todo-input" style="width:130px;font-size:11px;">
+                            <option value="">All projects</option>
+                        </select>
+                        <label class="inbox-privacy-toggle" title="Privacy mode: hide sender &amp; content">
+                            <input type="checkbox" id="inboxPrivacyMode"> Privacy
+                        </label>
                         <button type="button" class="btn-small" id="inboxSyncBtn" title="Sync messages">Sync</button>
                     </div>
                 </div>
-                <div id="inboxList" class="inbox-list">
-                    <div class="inbox-empty">No messages to triage.</div>
+
+                <!-- Urgent + Important -->
+                <div class="inbox-section" id="inboxSectionUrgent">
+                    <div class="inbox-section-header" data-section="urgent">
+                        <span class="inbox-section-dot urgent"></span>
+                        <span class="inbox-section-title">Urgent + Important</span>
+                        <span class="inbox-section-count" id="inboxCountUrgent">0</span>
+                        <span class="inbox-section-toggle">&#9660;</span>
+                    </div>
+                    <div class="inbox-section-body" id="inboxListUrgent"></div>
+                </div>
+
+                <!-- Medium / Optional -->
+                <div class="inbox-section" id="inboxSectionMedium">
+                    <div class="inbox-section-header" data-section="medium">
+                        <span class="inbox-section-dot medium"></span>
+                        <span class="inbox-section-title">Medium / Optional</span>
+                        <span class="inbox-section-count" id="inboxCountMedium">0</span>
+                        <span class="inbox-section-toggle">&#9660;</span>
+                    </div>
+                    <div class="inbox-section-body" id="inboxListMedium"></div>
+                </div>
+
+                <!-- Ignored / Noise (collapsed by default) -->
+                <div class="inbox-section" id="inboxSectionIgnored">
+                    <div class="inbox-section-header collapsed" data-section="ignored">
+                        <span class="inbox-section-dot ignored"></span>
+                        <span class="inbox-section-title">Ignored / Noise</span>
+                        <span class="inbox-section-count" id="inboxCountIgnored">0</span>
+                        <span class="inbox-section-toggle">&#9654;</span>
+                    </div>
+                    <div class="inbox-section-body" id="inboxListIgnored" style="display:none;"></div>
                 </div>
             </div>
 
@@ -992,10 +995,12 @@
                     <h2 class="panel-title">Contacts</h2>
                     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                         <input type="text" id="contactSearch" class="todo-input" style="width:160px;font-size:12px;" placeholder="Search…">
-                        <select id="contactFilterLabel" class="todo-input" style="width:90px;font-size:12px;">
+                        <select id="contactFilterLabel" class="todo-input" style="width:100px;font-size:12px;">
                             <option value="">All</option>
                             <option value="vip">⭐ VIP</option>
                             <option value="regular">Regular</option>
+                            <option value="blocked">🚫 Blocked</option>
+                            <option value="ignored">👻 Ignored</option>
                         </select>
                         <select id="contactFilterType" class="todo-input" style="width:100px;font-size:12px;">
                             <option value="">All types</option>
@@ -1034,6 +1039,8 @@
                                 <select id="cfLabel" class="todo-input">
                                     <option value="regular">Regular</option>
                                     <option value="vip">⭐ VIP</option>
+                                    <option value="blocked">🚫 Blocked</option>
+                                    <option value="ignored">👻 Ignored</option>
                                 </select>
                             </div>
                             <div class="contact-form-row">
@@ -1051,7 +1058,18 @@
                             </div>
                             <div class="contact-form-row">
                                 <label>Relationship</label>
-                                <input type="text" id="cfRelationship" class="todo-input" placeholder="investor, co-founder, friend…">
+                                <select id="cfRelationship" class="todo-input">
+                                    <option value="">None</option>
+                                    <option value="lover">Lover</option>
+                                    <option value="bestie">Bestie</option>
+                                    <option value="key_partner">Key Partner</option>
+                                    <option value="client">Client</option>
+                                    <option value="investor">Investor</option>
+                                    <option value="co_founder">Co-founder</option>
+                                    <option value="vendor">Vendor</option>
+                                    <option value="acquaintance">Acquaintance</option>
+                                    <option value="other">Other</option>
+                                </select>
                             </div>
                             <div class="contact-form-row contact-form-full">
                                 <label>Notes (PA context)</label>
@@ -1197,6 +1215,36 @@
                     </div>
                 </div>
 
+                <!-- Keywords for inbox auto-categorization -->
+                <div class="pd-section pd-keywords-section">
+                    <div class="pd-section-header">
+                        <span class="pd-section-title">Inbox Keywords</span>
+                        <span class="pd-section-sub" style="font-size:11px;color:var(--text-dim);">Auto-categorize messages</span>
+                        <button type="button" class="pd-add-btn" id="pdAddKeywordBtn">+ Add</button>
+                    </div>
+                    <div class="pd-keyword-list" id="pdKeywordList">
+                        <div class="pd-empty">No keywords — messages won't auto-assign to this project</div>
+                    </div>
+                    <div class="pd-add-form" id="pdAddKeywordForm" style="display:none;">
+                        <div class="pd-add-row">
+                            <input type="text" class="pd-add-input" id="pdKeywordText" placeholder="Keyword (e.g. invoice, pitch)">
+                            <select class="pd-add-input pd-add-short" id="pdKeywordCategory">
+                                <option value="general">General</option>
+                                <option value="finance">Finance</option>
+                                <option value="ops">Ops</option>
+                                <option value="marketing">Marketing</option>
+                                <option value="opportunity">Opportunity</option>
+                                <option value="personal">Personal</option>
+                            </select>
+                            <input type="number" class="pd-add-input pd-add-short" id="pdKeywordBoost" placeholder="Boost" min="1" max="100" value="20" style="width:60px;">
+                        </div>
+                        <div class="pd-add-actions">
+                            <button type="button" class="btn-small" id="pdKeywordSave">Save</button>
+                            <button type="button" class="btn-small btn-ghost" id="pdKeywordCancel">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Stats strip: timeline, hours, budget, revenue -->
                 <div class="pd-stats-strip" id="pdStatsStrip"></div>
 
@@ -1211,8 +1259,7 @@
                         <button class="dash-pa-chip" data-prompt="What's my #1 priority right now and why?">Priority?</button>
                         <button class="dash-pa-chip" data-prompt="What are the active blockers across my projects and how should I resolve them?">Blockers</button>
                         <button class="dash-pa-chip" data-prompt="What should I work on this week given my recovery and project deadlines?">This week</button>
-                        <button class="dash-pa-chip" data-prompt="How is Soulin Social progressing? What's the next critical step?">Soulin status</button>
-                        <button class="dash-pa-chip" data-prompt="How is KINS Hotel progressing? What's blocking the investor pipeline?">KINS status</button>
+                        <!-- Project-specific chips generated dynamically by app.js -->
                         <button class="dash-pa-chip" data-prompt="Give me a revenue summary — what am I making, what are the projections?">Revenue</button>
                     </div>
                     <div class="dash-pa-response" id="dashPaResponse">

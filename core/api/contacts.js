@@ -105,6 +105,69 @@ router.delete('/:id', (req, res) => {
     }
 });
 
+// ── Contact Reputation Actions ────────────────────────────────────────────────
+
+/** POST /api/contacts/:id/promote — upgrade to VIP */
+router.post('/:id/promote', (req, res) => {
+    try {
+        db.prepare("UPDATE contacts SET label = 'vip' WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/** POST /api/contacts/:id/block — mark as blocked, auto-dismiss pending messages */
+router.post('/:id/block', (req, res) => {
+    try {
+        db.prepare("UPDATE contacts SET label = 'blocked' WHERE id = ?").run(req.params.id);
+        const contact = db.prepare('SELECT * FROM contacts WHERE id = ?').get(req.params.id);
+        if (contact) {
+            const ids = [contact.phone, contact.email, contact.whatsapp_jid].filter(Boolean);
+            for (const addr of ids) {
+                db.prepare("UPDATE messages SET status='dismissed', priority_tier='ignored' WHERE sender_address = ? AND status IN ('pending','approved')").run(addr);
+            }
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/** POST /api/contacts/:id/ignore — soft block (stored but hidden) */
+router.post('/:id/ignore', (req, res) => {
+    try {
+        db.prepare("UPDATE contacts SET label = 'ignored' WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/** POST /api/contacts/:id/demote — downgrade from VIP to regular */
+router.post('/:id/demote', (req, res) => {
+    try {
+        db.prepare("UPDATE contacts SET label = 'regular' WHERE id = ?").run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/** POST /api/contacts/lookup — find contact by sender address */
+router.post('/lookup', (req, res) => {
+    try {
+        const { sender_address } = req.body;
+        if (!sender_address) return res.status(400).json({ error: 'sender_address required' });
+        const contact = db.prepare(
+            'SELECT * FROM contacts WHERE phone = ? OR email = ? OR whatsapp_jid = ? LIMIT 1'
+        ).get(sender_address, sender_address, sender_address);
+        res.json(contact || null);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 /** POST /api/contacts/sync-whatsapp
  * Reads recent chats from WhatsApp bridge DB + LID map and upserts contacts.
  * Stores the LID-based JID in whatsapp_jid when available (more reliable for sending).

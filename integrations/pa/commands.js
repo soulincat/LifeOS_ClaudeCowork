@@ -6,7 +6,7 @@
  *   {"key": "value", ...}
  */
 
-const db = require('../db/database');
+const db = require('../../core/db/database');
 
 /**
  * Parse all COMMAND blocks from a Claude response string.
@@ -160,7 +160,7 @@ async function executeCommand(command, params) {
                     VALUES (?, ?, ?, ?, ?, ?, ?, 'pa_chat')
                 `).run(projectId, params.text, params.type || 'deliverable', params.is_blocker ? 1 : 0,
                     params.energy_required || 'medium', params.due_date || null, project ? project.current_phase : null);
-                try { require('../db/derived-state').rederiveProject(projectId); } catch (e) { /* */ }
+                try { require('../../core/db/derived-state').rederiveProject(projectId); } catch (e) { /* */ }
                 return `Task added to project ${projectId}: "${params.text}"`;
             }
 
@@ -174,7 +174,7 @@ async function executeCommand(command, params) {
                 }
                 if (!task) return 'Failed: task not found';
                 db.prepare("UPDATE project_tasks SET status = 'done', completed_at = CURRENT_TIMESTAMP WHERE id = ?").run(task.id);
-                try { require('../db/derived-state').rederiveProject(task.project_id); } catch (e) { /* */ }
+                try { require('../../core/db/derived-state').rederiveProject(task.project_id); } catch (e) { /* */ }
                 return `Task marked done: "${task.text}"`;
             }
 
@@ -213,15 +213,16 @@ async function executeCommand(command, params) {
             }
 
             case 'add_inbox_item': {
-                // params: source, sender_name?, preview, timestamp?
+                // params: source, sender_name?, sender_id?, preview, timestamp?
                 const ts = params.timestamp || new Date().toISOString();
-                const item = { source: params.source || 'manual', sender_name: params.sender_name, preview: params.preview, timestamp: ts, is_unread: true };
-                let urgency = 0;
-                try { urgency = require('../db/derived-state').computeUrgencyScore(item); } catch (e) { /* */ }
+                const item = { source: params.source || 'manual', sender_name: params.sender_name, sender_id: params.sender_id, preview: params.preview, timestamp: ts, is_unread: true };
+                let scoring = { score: 0, tier: 'medium', contact_id: null, project_id: null, category: null, blocked: false };
+                try { scoring = require('../../core/db/derived-state').computeUrgencyScore(item); } catch (e) { /* */ }
+                if (scoring.blocked) return `Skipped: sender is blocked`;
                 db.prepare(`
-                    INSERT INTO inbox_items (source, sender_name, preview, timestamp, urgency_score)
-                    VALUES (?, ?, ?, ?, ?)
-                `).run(item.source, item.sender_name || null, item.preview || null, ts, urgency);
+                    INSERT INTO inbox_items (source, sender_name, sender_id, preview, timestamp, urgency_score, priority_tier, contact_id, category)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `).run(item.source, item.sender_name || null, item.sender_id || null, item.preview || null, ts, scoring.score, scoring.tier, scoring.contact_id, scoring.category);
                 return `Inbox item added: "${params.preview?.slice(0, 50)}"`;
             }
 

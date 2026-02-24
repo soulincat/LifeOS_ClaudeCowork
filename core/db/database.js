@@ -104,6 +104,9 @@ if (fs.existsSync(schemaPath)) {
         addP('timeline_end', 'DATE');
         addP('blocks_project_ids', 'TEXT');
         addP('depends_on_project_ids', 'TEXT');
+        // Per-project KPI display (replaces hardcoded typeMap/kpiByProject)
+        addP('display_kpi_key', 'TEXT');
+        addP('display_kpi_label', 'TEXT');
     } catch (e) { /* */ }
 
     // Migrate: Create project_tasks, project_milestones, project_dependencies, decision_triggers, inbox_items, vip_senders
@@ -594,6 +597,17 @@ if (fs.existsSync(schemaPath)) {
         `);
     } catch (e) { /* */ }
 
+    // Migrate: setup_sections (key-value config store for onboarding, integrations, PA, etc.)
+    try {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS setup_sections (
+                section_key TEXT PRIMARY KEY,
+                payload TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+    } catch (e) { /* */ }
+
     // Migrate: communications inbox (messages + send queue)
     try {
         db.exec(`
@@ -628,6 +642,107 @@ if (fs.existsSync(schemaPath)) {
             CREATE INDEX IF NOT EXISTS idx_message_send_queue_status ON message_send_queue(send_status);
         `);
     } catch (e) { /* */ }
+
+    // ── Priority system migrations ────────────────────────────────────────────
+
+    // Migrate: extend contacts with urgency_boost + sender lookup indexes
+    try {
+        const cCols = db.prepare("PRAGMA table_info(contacts)").all().map(r => r.name);
+        if (!cCols.includes('urgency_boost')) db.exec('ALTER TABLE contacts ADD COLUMN urgency_boost INTEGER DEFAULT 0');
+        if (!cCols.includes('priority_tier')) db.exec("ALTER TABLE contacts ADD COLUMN priority_tier TEXT DEFAULT 'medium'");
+        db.exec('CREATE INDEX IF NOT EXISTS idx_contacts_phone ON contacts(phone)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_contacts_whatsapp_jid ON contacts(whatsapp_jid)');
+    } catch (e) { /* */ }
+
+    // Migrate: project_keywords for per-project urgency/category keywords
+    try {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS project_keywords (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                keyword TEXT NOT NULL,
+                category TEXT DEFAULT 'general',
+                boost INTEGER DEFAULT 20,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id),
+                UNIQUE(project_id, keyword)
+            );
+            CREATE INDEX IF NOT EXISTS idx_project_keywords_project ON project_keywords(project_id);
+        `);
+    } catch (e) { /* */ }
+
+    // Migrate: extend messages with priority tier, project, contact, category
+    try {
+        const mCols = db.prepare("PRAGMA table_info(messages)").all().map(r => r.name);
+        if (!mCols.includes('project_id')) db.exec('ALTER TABLE messages ADD COLUMN project_id INTEGER REFERENCES projects(id)');
+        if (!mCols.includes('contact_id')) db.exec('ALTER TABLE messages ADD COLUMN contact_id INTEGER REFERENCES contacts(id)');
+        if (!mCols.includes('category')) db.exec('ALTER TABLE messages ADD COLUMN category TEXT');
+        if (!mCols.includes('priority_tier')) db.exec("ALTER TABLE messages ADD COLUMN priority_tier TEXT DEFAULT 'medium'");
+        db.exec('CREATE INDEX IF NOT EXISTS idx_messages_priority_tier ON messages(priority_tier)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_messages_project_id ON messages(project_id)');
+    } catch (e) { /* */ }
+
+    // Migrate: extend inbox_items with priority tier, contact, category
+    try {
+        const iCols = db.prepare("PRAGMA table_info(inbox_items)").all().map(r => r.name);
+        if (!iCols.includes('priority_tier')) db.exec("ALTER TABLE inbox_items ADD COLUMN priority_tier TEXT DEFAULT 'medium'");
+        if (!iCols.includes('contact_id')) db.exec('ALTER TABLE inbox_items ADD COLUMN contact_id INTEGER REFERENCES contacts(id)');
+        if (!iCols.includes('category')) db.exec('ALTER TABLE inbox_items ADD COLUMN category TEXT');
+    } catch (e) { /* */ }
+
+    // Migrate: copy vip_senders into contacts (one-time)
+    try {
+        db.exec('CREATE TABLE IF NOT EXISTS _schema_migrations (version TEXT PRIMARY KEY)');
+        const migDone = db.prepare('SELECT 1 FROM _schema_migrations WHERE version = ?').get('vip_to_contacts');
+        if (!migDone) {
+            const vips = db.prepare('SELECT * FROM vip_senders').all();
+            for (const vip of vips) {
+                const existing = db.prepare(
+                    'SELECT id FROM contacts WHERE phone = ? OR email = ? OR whatsapp_jid = ?'
+                ).get(vip.sender_id, vip.sender_id, vip.sender_id);
+                if (existing) {
+                    db.prepare("UPDATE contacts SET label = 'vip', relationship = COALESCE(relationship, ?) WHERE id = ?")
+                        .run(vip.relationship, existing.id);
+                } else {
+                    db.prepare("INSERT INTO contacts (name, phone, label, relationship) VALUES (?, ?, 'vip', ?)")
+                        .run(vip.name, vip.sender_id, vip.relationship);
+                }
+            }
+            db.prepare('INSERT INTO _schema_migrations (version) VALUES (?)').run('vip_to_contacts');
+        }
+    } catch (e) { /* vip_senders may not exist yet or migration already done */ }
+
+    // Migrate: backfill priority_tier on existing messages (one-time, SQL-only to avoid circular dep)
+    try {
+        const backfillDone = db.prepare('SELECT 1 FROM _schema_migrations WHERE version = ?').get('backfill_message_tiers');
+        if (!backfillDone) {
+            // Link messages to contacts by sender_address
+            db.exec(`
+                UPDATE messages SET contact_id = (
+                    SELECT c.id FROM contacts c
+                    WHERE c.phone = messages.sender_address
+                       OR c.email = messages.sender_address
+                       OR c.whatsapp_jid = messages.sender_address
+                    LIMIT 1
+                ) WHERE contact_id IS NULL
+            `);
+            // Set tiers based on urgency_score + contact label
+            db.exec(`UPDATE messages SET priority_tier = 'urgent' WHERE urgency_score >= 4`);
+            db.exec(`UPDATE messages SET priority_tier = 'ignored' WHERE urgency_score <= 1`);
+            db.exec(`
+                UPDATE messages SET priority_tier = 'ignored'
+                WHERE contact_id IN (SELECT id FROM contacts WHERE label IN ('blocked','ignored'))
+            `);
+            db.exec(`
+                UPDATE messages SET priority_tier = 'urgent'
+                WHERE contact_id IN (SELECT id FROM contacts WHERE label = 'vip')
+                  AND urgency_score >= 3
+            `);
+            db.prepare('INSERT INTO _schema_migrations (version) VALUES (?)').run('backfill_message_tiers');
+            console.log('Backfilled priority tiers on existing messages');
+        }
+    } catch (e) { /* backfill optional */ }
 } else {
     createTables();
 }
@@ -910,6 +1025,15 @@ function createTables() {
             wealth_notes TEXT,
             overall_assessment TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    // Setup sections (key-value config store for onboarding, integrations, PA, etc.)
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS setup_sections (
+            section_key TEXT PRIMARY KEY,
+            payload TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `);
 
