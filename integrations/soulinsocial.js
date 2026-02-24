@@ -1,58 +1,62 @@
 const db = require('../db/database');
-const fs = require('fs');
-const path = require('path');
+
+const SOULIN_BASE = process.env.SOULIN_SOCIAL_URL || 'http://localhost:3000';
 
 /**
  * Soulinsocial Integration
- * Reads data from local soulinsocial project
- * Since API is not ready yet, reads from local files/DB
+ * Fetches data from Soulin Social's /api/summary/* endpoints via HTTP.
+ * Falls back to LifeOS cached data when Soulin Social is offline.
  */
 class SoulinsocialIntegration {
-    constructor() {
-        // Try to find soulinsocial project
-        this.soulinsocialPath = path.join(__dirname, '..', '..', 'soulin_social_bot');
-        this.soulinsocialDbPath = path.join(this.soulinsocialPath, 'data.db');
-    }
-
     /**
-     * Check if soulinsocial project exists
+     * Check if Soulin Social API is reachable
      */
-    projectExists() {
-        return fs.existsSync(this.soulinsocialPath);
+    async healthCheck() {
+        try {
+            const res = await fetch(`${SOULIN_BASE}/api/summary/health`, { signal: AbortSignal.timeout(3000) });
+            if (!res.ok) return false;
+            const data = await res.json();
+            return data.status === 'ok';
+        } catch {
+            return false;
+        }
     }
 
     /**
-     * Read scheduled posts from soulinsocial
-     * Tries to read from DB first, then falls back to files
+     * Get per-project summary (followers, posts, engagement) for all projects
+     */
+    async getProjectsSummary() {
+        try {
+            const res = await fetch(`${SOULIN_BASE}/api/summary/projects`, { signal: AbortSignal.timeout(5000) });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return data.projects || [];
+        } catch (error) {
+            console.log('Soulin Social API unavailable:', error.message);
+            return [];
+        }
+    }
+
+    /**
+     * Get social metrics.
+     * Returns array of {platform, metric_type, value, date} from LifeOS cache.
+     * Cache is updated by syncSocialMetrics() on schedule.
+     */
+    getSocialMetrics() {
+        const stmt = db.prepare(`
+            SELECT platform, metric_type, value, date
+            FROM social_metrics
+            WHERE date = (SELECT MAX(date) FROM social_metrics)
+        `);
+        return stmt.all();
+    }
+
+    /**
+     * Get scheduled posts from LifeOS cache.
+     * Returns array of {center_post, platforms, scheduled_date, status}.
+     * Cache is updated by syncSocialMetrics() on schedule.
      */
     getScheduledPosts(limit = 3) {
-        // Try to read from soulinsocial DB if it exists
-        if (fs.existsSync(this.soulinsocialDbPath)) {
-            try {
-                const SoulinsocialDb = require('better-sqlite3');
-                const soulinsocialDb = new SoulinsocialDb(this.soulinsocialDbPath);
-                
-                const stmt = soulinsocialDb.prepare(`
-                    SELECT center_post, platforms, scheduled_date, status
-                    FROM posts
-                    WHERE status = 'queued'
-                    ORDER BY scheduled_date ASC
-                    LIMIT ?
-                `);
-                
-                const posts = stmt.all(limit);
-                soulinsocialDb.close();
-                
-                // Sync to our database
-                this.syncScheduledPosts(posts);
-                
-                return posts;
-            } catch (error) {
-                console.log('Could not read from soulinsocial DB:', error.message);
-            }
-        }
-
-        // Fallback: Read from our own database (if previously synced)
         const stmt = db.prepare(`
             SELECT center_post, platforms, scheduled_date, status
             FROM scheduled_posts
@@ -60,72 +64,86 @@ class SoulinsocialIntegration {
             ORDER BY scheduled_date ASC
             LIMIT ?
         `);
-        
         return stmt.all(limit);
     }
 
     /**
-     * Sync scheduled posts to our database
+     * Sync social metrics + scheduled posts from Soulin Social API into LifeOS cache.
+     * Called by integrations/sync.js on schedule.
      */
-    syncScheduledPosts(posts) {
+    async syncSocialMetrics() {
+        try {
+            const res = await fetch(`${SOULIN_BASE}/api/summary/projects`, { signal: AbortSignal.timeout(5000) });
+            if (!res.ok) {
+                console.log('Soulin Social sync: API returned', res.status);
+                return;
+            }
+            const data = await res.json();
+            const projects = data.projects || [];
+
+            const today = new Date().toISOString().slice(0, 10);
+            const metricsStmt = db.prepare(`
+                INSERT INTO social_metrics (platform, metric_type, value, date)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(platform, metric_type, date) DO UPDATE SET value = excluded.value
+            `);
+
+            // Aggregate follower counts across all projects
+            const platformTotals = {};
+            for (const project of projects) {
+                const followers = project.followers || {};
+                for (const [platform, count] of Object.entries(followers)) {
+                    if (platform === 'total') continue;
+                    platformTotals[platform] = (platformTotals[platform] || 0) + count;
+                }
+            }
+
+            for (const [platform, count] of Object.entries(platformTotals)) {
+                const metricType = (platform === 'substack' || platform === 'email') ? 'subscribers' : 'followers';
+                metricsStmt.run(platform, metricType, count, today);
+            }
+
+            console.log(`Soulin Social sync: updated metrics for ${Object.keys(platformTotals).length} platforms`);
+
+            // Sync scheduled posts
+            await this._syncScheduledPosts(projects);
+
+        } catch (error) {
+            console.log('Soulin Social sync error:', error.message);
+        }
+    }
+
+    /**
+     * Fetch and cache scheduled posts from Soulin Social
+     */
+    async _syncScheduledPosts(projects) {
         const stmt = db.prepare(`
             INSERT INTO scheduled_posts (center_post, platforms, scheduled_date, status)
             VALUES (?, ?, ?, ?)
             ON CONFLICT DO NOTHING
         `);
 
-        posts.forEach(post => {
-            const platforms = typeof post.platforms === 'string' 
-                ? post.platforms 
-                : JSON.stringify(post.platforms);
-            stmt.run(
-                post.center_post || post.title || post.content,
-                platforms,
-                post.scheduled_date,
-                post.status || 'queued'
-            );
-        });
-    }
-
-    /**
-     * Get social metrics from soulinsocial
-     */
-    getSocialMetrics() {
-        // Try to read from soulinsocial DB
-        if (fs.existsSync(this.soulinsocialDbPath)) {
+        for (const project of (projects || [])) {
             try {
-                const SoulinsocialDb = require('better-sqlite3');
-                const soulinsocialDb = new SoulinsocialDb(this.soulinsocialDbPath);
-                
-                // This would depend on soulinsocial's schema
-                // Placeholder for now
-                soulinsocialDb.close();
+                const detailRes = await fetch(
+                    `${SOULIN_BASE}/api/summary/project/${project.client_id}`,
+                    { signal: AbortSignal.timeout(5000) }
+                );
+                if (!detailRes.ok) continue;
+                const detail = await detailRes.json();
+
+                for (const sched of (detail.upcoming_scheduled || [])) {
+                    stmt.run(
+                        sched.post_id || 'Scheduled post',
+                        JSON.stringify([sched.platform]),
+                        sched.scheduled_for,
+                        'queued'
+                    );
+                }
             } catch (error) {
-                console.log('Could not read social metrics from soulinsocial:', error.message);
+                console.log(`Soulin Social sync (${project.client_id}) error:`, error.message);
             }
         }
-
-        // Fallback: Get latest from our database
-        const stmt = db.prepare(`
-            SELECT platform, metric_type, value, date
-            FROM social_metrics
-            WHERE date = (SELECT MAX(date) FROM social_metrics)
-        `);
-        
-        return stmt.all();
-    }
-
-    /**
-     * Sync social metrics (daily)
-     */
-    syncSocialMetrics() {
-        if (!this.projectExists()) {
-            console.log('⚠️  Soulinsocial project not found at:', this.soulinsocialPath);
-            return;
-        }
-
-        // Placeholder - will be implemented when soulinsocial API is ready
-        console.log('Soulinsocial sync: Reading from local project');
     }
 }
 

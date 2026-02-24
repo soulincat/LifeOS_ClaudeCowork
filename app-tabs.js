@@ -1,5 +1,5 @@
 (function() {
-    let currentTab = 'dashboard';
+    let currentTab = 'home';
 
     function showPanel(tab) {
         currentTab = tab;
@@ -7,15 +7,20 @@
         document.querySelectorAll('.tab-bar-tab').forEach(el => { el.classList.remove('active'); });
         const panel = document.getElementById('panel-' + tab);
         const tabBtn = document.querySelector('.tab-bar-tab[data-tab="' + tab + '"]');
-        if (panel) panel.style.display = tab === 'dashboard' ? 'flex' : 'block';
+        const flexPanels = ['home', 'dashboard'];
+        if (panel) panel.style.display = flexPanels.includes(tab) ? 'flex' : 'block';
         if (tabBtn) tabBtn.classList.add('active');
-        const scrollEl = document.querySelector('.os-main-scroll') || document.getElementById('osMainScroll');
-        if (scrollEl) scrollEl.classList.toggle('no-scroll', tab === 'dashboard');
+        // Show PA chat bar on all tabs
+        const paWrap = document.getElementById('dashPaWrap');
+        if (paWrap) paWrap.style.display = 'block';
+        if (tab === 'home' && typeof loadHomeData === 'function') loadHomeData();
         if (tab === 'dashboard' && typeof loadDashboardData === 'function') loadDashboardData();
         if (tab === 'wishlist') loadWishlist();
         if (tab === 'goals') loadGoals();
         if (tab === 'scenarios' && typeof initProjectionTab === 'function') initProjectionTab();
         if (tab === 'setup' && typeof loadSetup === 'function') loadSetup();
+        if (tab === 'inbox') initInboxTab();
+        if (tab === 'contacts' && typeof window.__loadContacts === 'function') window.__loadContacts();
     }
 
     async function loadWishlist() {
@@ -943,4 +948,342 @@
     window.showPanel = showPanel;
     window.loadWishlist = loadWishlist;
     window.loadGoals = loadGoals;
+
+    // ── PA Modal (defined at module scope so always accessible) ─────────────
+    function showPAModal(title, text) {
+        const modal = document.getElementById('paBriefModal');
+        if (!modal) { console.warn('PA modal element not found'); return; }
+        const titleEl = document.getElementById('paBriefModalTitle');
+        const bodyEl = document.getElementById('paBriefModalBody');
+        if (!bodyEl) { console.warn('PA modal body not found'); return; }
+        if (titleEl) titleEl.textContent = title;
+        // Convert markdown-ish syntax to HTML
+        const html = text
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+            .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+            .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:10px 0">')
+            .replace(/\n/g, '<br>');
+        bodyEl.innerHTML = html;
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closePAModal() {
+        const modal = document.getElementById('paBriefModal');
+        if (modal) modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    // ── PA Tab ──────────────────────────────────────────────────────────────
+    let paInitialised = false;
+
+    function initPATab() {
+        loadPADrafts();
+        if (!paInitialised) {
+            paInitialised = true;
+            setupPAHandlers();
+        }
+    }
+
+    function addPAMessage(role, text, commandResults) {
+        const wrap = document.getElementById('paChatMessages');
+        if (!wrap) return;
+        const div = document.createElement('div');
+        div.className = 'pa-message pa-message-' + role;
+        let html = text
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+        // Strip raw COMMAND blocks from display
+        html = html.replace(/COMMAND:\s*\w+<br>(\{[\s\S]*?\})?(<br>)?/g, '');
+        div.innerHTML = `<div class="pa-message-bubble">${html}</div>`;
+        if (commandResults && commandResults.length) {
+            const note = document.createElement('div');
+            note.className = 'pa-command-results';
+            note.textContent = '✓ ' + commandResults.join(' • ');
+            div.appendChild(note);
+        }
+        wrap.appendChild(div);
+        wrap.scrollTop = wrap.scrollHeight;
+    }
+
+    async function sendPAMessage(message) {
+        if (!message.trim()) return;
+        addPAMessage('user', message);
+        const input = document.getElementById('paChatInput');
+        if (input) input.value = '';
+
+        const thinking = document.createElement('div');
+        thinking.className = 'pa-message pa-message-assistant pa-thinking';
+        thinking.innerHTML = '<div class="pa-message-bubble">Thinking…</div>';
+        const wrap = document.getElementById('paChatMessages');
+        if (wrap) { wrap.appendChild(thinking); wrap.scrollTop = wrap.scrollHeight; }
+
+        try {
+            const res = await fetch('/api/pa/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            });
+            const data = await res.json();
+            thinking.remove();
+            addPAMessage('assistant', data.response || data.error || 'No response', data.commandResults);
+            loadPADrafts();
+        } catch (e) {
+            thinking.remove();
+            addPAMessage('assistant', 'Error reaching PA. Is the server running?');
+        }
+    }
+
+    async function loadPADrafts() {
+        try {
+            const res = await fetch('/api/pa/drafts');
+            const drafts = await res.json();
+            const section = document.getElementById('paDraftsSection');
+            const list = document.getElementById('paDraftsList');
+            if (!section || !list) return;
+            if (!drafts.length) { section.style.display = 'none'; return; }
+            section.style.display = 'block';
+            list.innerHTML = drafts.filter(d => d.status === 'draft').map(d => `
+                <div class="pa-draft-card" data-id="${d.id}">
+                    <div class="pa-draft-header">
+                        <span class="pa-draft-to">${d.to_email || 'No recipient'}</span>
+                        <span class="pa-draft-subject">${d.subject || '(no subject)'}</span>
+                        <button class="inbox-dismiss pa-draft-discard" data-id="${d.id}" title="Discard">✕</button>
+                    </div>
+                    <div class="pa-draft-body">${(d.body || '').slice(0, 200)}${d.body && d.body.length > 200 ? '…' : ''}</div>
+                </div>
+            `).join('');
+        } catch (e) { /* */ }
+    }
+
+    function setupPAHandlers() {
+        document.getElementById('paChatSend')?.addEventListener('click', () => {
+            const input = document.getElementById('paChatInput');
+            sendPAMessage(input?.value || '');
+        });
+        document.getElementById('paChatInput')?.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const input = document.getElementById('paChatInput');
+                sendPAMessage(input?.value || '');
+            }
+        });
+        // ── PA Modal wiring ──────────────────────────────────────────────
+        document.getElementById('paBriefModalClose')?.addEventListener('click', closePAModal);
+        document.getElementById('paBriefModal')?.addEventListener('click', e => {
+            if (e.target === e.currentTarget) closePAModal();
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closePAModal();
+        });
+
+        document.getElementById('paBriefBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('paBriefBtn');
+            btn.textContent = '…';
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/pa/brief', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'daily' }) });
+                const data = await res.json();
+                showPAModal('Daily Briefing', data.briefing || data.error || 'No briefing generated.');
+            } catch (e) { showPAModal('Error', 'Failed to generate briefing.'); }
+            btn.textContent = 'Brief me'; btn.disabled = false;
+        });
+        document.getElementById('paPrioritizeBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('paPrioritizeBtn');
+            btn.textContent = '…';
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/pa/prioritize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                const data = await res.json();
+                showPAModal('Priorities', data.priorities || data.error || 'No response.');
+            } catch (e) { showPAModal('Error', 'Failed to prioritise.'); }
+            btn.textContent = 'Prioritise'; btn.disabled = false;
+        });
+        document.getElementById('paDraftsList')?.addEventListener('click', async e => {
+            const btn = e.target.closest('.pa-draft-discard');
+            if (btn) {
+                await fetch(`/api/pa/drafts/${btn.dataset.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'discarded' }) });
+                loadPADrafts();
+            }
+        });
+    }
+
+    // ── Inbox Tab ────────────────────────────────────────────────────────────
+    let inboxActiveSource = '';
+    let inboxInitialised = false;
+
+    function initInboxTab() {
+        loadInboxCounts();
+        loadInbox();
+        if (!inboxInitialised) {
+            inboxInitialised = true;
+            setupInboxHandlers();
+        }
+    }
+
+    function urgencyLabel(score) {
+        return ({ 1: 'FYI', 2: 'Low', 3: 'Medium', 4: 'High', 5: 'Critical' })[score] || 'Medium';
+    }
+
+    function sourceIcon(source) {
+        return source === 'gmail' ? '✉' : source === 'outlook' ? '📧' : source === 'whatsapp' ? '💬' : '📩';
+    }
+
+    function renderInboxItem(msg) {
+        const card = document.createElement('div');
+        card.className = `inbox-card urgency-${msg.urgency_score}`;
+        card.dataset.id = msg.id;
+        const date = msg.received_at ? new Date(msg.received_at).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        card.innerHTML = `
+            <div class="inbox-card-header">
+                <span class="inbox-source-icon" title="${msg.source}">${sourceIcon(msg.source)}</span>
+                <span class="inbox-sender">${msg.sender_name || msg.sender_address || 'Unknown'}</span>
+                <span class="inbox-urgency inbox-urgency-${msg.urgency_score}">${urgencyLabel(msg.urgency_score)}</span>
+                <span class="inbox-date">${date}</span>
+                <button class="inbox-dismiss" title="Dismiss" data-id="${msg.id}">✕</button>
+            </div>
+            ${msg.subject ? `<div class="inbox-subject">${msg.subject}</div>` : ''}
+            ${msg.ai_summary ? `<div class="inbox-summary">${msg.ai_summary}</div>` : msg.preview ? `<div class="inbox-summary">${msg.preview}</div>` : ''}
+            <div class="inbox-reply-section">
+                <textarea class="inbox-reply-input" placeholder="Edit reply before sending…" rows="3">${msg.ai_suggested_reply || ''}</textarea>
+                <div class="inbox-reply-actions">
+                    <button class="btn-save btn-small inbox-send-btn" data-id="${msg.id}">Send</button>
+                </div>
+            </div>`;
+        return card;
+    }
+
+    function renderGroupedItem(g) {
+        const card = document.createElement('div');
+        card.className = `inbox-card urgency-${g.urgency_score}`;
+        card.dataset.sender = g.sender_address;
+        card.dataset.source = g.source;
+        card.dataset.id = g.representative_id;
+        const date = g.latest_received_at ? new Date(g.latest_received_at).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const countBadge = g.msg_count > 1 ? `<span class="inbox-msg-count">${g.msg_count}</span>` : '';
+        card.innerHTML = `
+            <div class="inbox-card-header">
+                <span class="inbox-source-icon" title="${g.source}">${sourceIcon(g.source)}</span>
+                <span class="inbox-sender">${g.sender_name || g.sender_address || 'Unknown'}</span>
+                ${countBadge}
+                <span class="inbox-urgency inbox-urgency-${g.urgency_score}">${urgencyLabel(g.urgency_score)}</span>
+                <span class="inbox-date">${date}</span>
+                <button class="inbox-dismiss-sender" title="Dismiss all" data-sender="${g.sender_address}" data-source="${g.source}">✕</button>
+            </div>
+            ${g.latest_preview ? `<div class="inbox-summary">${g.latest_preview}</div>` : ''}
+            <div class="inbox-reply-section">
+                <textarea class="inbox-reply-input" placeholder="Reply…" rows="2"></textarea>
+                <div class="inbox-reply-actions">
+                    <button class="btn-save btn-small inbox-send-btn" data-id="${g.representative_id}">Send</button>
+                </div>
+            </div>`;
+        return card;
+    }
+
+    async function loadInbox() {
+        const list = document.getElementById('inboxList');
+        if (!list) return;
+        list.innerHTML = '<div class="inbox-loading">Loading…</div>';
+        try {
+            // Use grouped endpoint for WA (or when no filter active — default view)
+            const useGrouped = !inboxActiveSource || inboxActiveSource === 'whatsapp';
+            const url = useGrouped
+                ? '/api/messages/grouped' + (inboxActiveSource ? `?source=${inboxActiveSource}` : '')
+                : '/api/messages?source=' + inboxActiveSource;
+            const res = await fetch(url);
+            const msgs = await res.json();
+            list.innerHTML = '';
+            if (!msgs.length) { list.innerHTML = '<div class="inbox-empty">No messages to triage.</div>'; return; }
+            msgs.forEach(msg => list.appendChild(useGrouped ? renderGroupedItem(msg) : renderInboxItem(msg)));
+        } catch (e) {
+            list.innerHTML = '<div class="inbox-empty">Failed to load messages.</div>';
+        }
+    }
+
+    async function loadInboxCounts() {
+        try {
+            const res = await fetch('/api/messages/counts');
+            const counts = await res.json();
+            const badge = (id, n) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = n > 0 ? n : '';
+                el.style.display = n > 0 ? 'inline' : 'none';
+            };
+            badge('inboxBadgeAll', counts.total);
+            badge('inboxBadgeGmail', counts.gmail);
+            badge('inboxBadgeOutlook', counts.outlook);
+            badge('inboxBadgeWhatsapp', counts.whatsapp);
+            const tabBadge = document.getElementById('inboxTabBadge');
+            if (tabBadge) { tabBadge.textContent = counts.total > 0 ? counts.total : ''; tabBadge.style.display = counts.total > 0 ? 'inline' : 'none'; }
+        } catch (e) { /* */ }
+    }
+
+    function setupInboxHandlers() {
+        document.querySelectorAll('.inbox-source-tab').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.inbox-source-tab').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                inboxActiveSource = this.dataset.source;
+                loadInbox();
+            });
+        });
+        document.getElementById('inboxSyncBtn')?.addEventListener('click', async function() {
+            this.textContent = 'Syncing…'; this.disabled = true;
+            try { await fetch('/api/messages/sync', { method: 'POST' }); setTimeout(() => { loadInbox(); loadInboxCounts(); }, 2000); } catch (e) { /* */ }
+            setTimeout(() => { this.textContent = 'Sync'; this.disabled = false; }, 3000);
+        });
+        document.getElementById('inboxList')?.addEventListener('click', async function(e) {
+            const dismissBtn = e.target.closest('.inbox-dismiss');
+            if (dismissBtn) {
+                const id = dismissBtn.dataset.id;
+                const card = dismissBtn.closest('.inbox-card');
+                try {
+                    await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+                    card?.remove();
+                    loadInboxCounts();
+                    if (!document.querySelector('.inbox-card')) document.getElementById('inboxList').innerHTML = '<div class="inbox-empty">No messages to triage.</div>';
+                } catch (e) { /* */ }
+                return;
+            }
+            const dismissSenderBtn = e.target.closest('.inbox-dismiss-sender');
+            if (dismissSenderBtn) {
+                const sender = dismissSenderBtn.dataset.sender;
+                const source = dismissSenderBtn.dataset.source;
+                const card = dismissSenderBtn.closest('.inbox-card');
+                try {
+                    await fetch('/api/messages/by-sender', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source, sender_address: sender }) });
+                    card?.remove();
+                    loadInboxCounts();
+                    if (!document.querySelector('.inbox-card')) document.getElementById('inboxList').innerHTML = '<div class="inbox-empty">No messages to triage.</div>';
+                } catch (e) { /* */ }
+                return;
+            }
+            const sendBtn = e.target.closest('.inbox-send-btn');
+            if (sendBtn) {
+                const id = sendBtn.dataset.id;
+                const card = sendBtn.closest('.inbox-card');
+                const replyText = card?.querySelector('.inbox-reply-input')?.value?.trim();
+                if (!replyText) return;
+                sendBtn.textContent = 'Sending…'; sendBtn.disabled = true;
+                try {
+                    const res = await fetch(`/api/messages/${id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reply_text: replyText }) });
+                    if (res.ok) { card.classList.add('inbox-card-sent'); setTimeout(() => { card.remove(); loadInboxCounts(); }, 800); }
+                    else { sendBtn.textContent = 'Failed'; sendBtn.disabled = false; }
+                } catch (e) { sendBtn.textContent = 'Error'; sendBtn.disabled = false; }
+            }
+        });
+    }
+
+    // Refresh inbox badge every 60s
+    setInterval(() => loadInboxCounts(), 60000);
+    loadInboxCounts();
+
+    // PA lives in sidebar — init immediately on page load
+    initPATab();
 })();

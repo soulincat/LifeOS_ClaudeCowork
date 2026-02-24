@@ -4,19 +4,29 @@
         tax_residency_history: [],
         companies: [],
         reporting_periods: [],
-        health_insurance: null
+        health_insurance: null,
+        cycle_config: null
     };
 
     async function loadSetup() {
         try {
-            const res = await fetch('/api/setup');
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to load');
+            const [setupRes, cycleRes] = await Promise.all([
+                fetch('/api/setup'),
+                fetch('/api/health/cycle-config')
+            ]);
+            const data = await setupRes.json();
+            if (!setupRes.ok) throw new Error(data.error || 'Failed to load');
             setupData.tax_residency = data.tax_residency;
             setupData.tax_residency_history = Array.isArray(data.tax_residency_history) ? data.tax_residency_history : [];
             setupData.companies = Array.isArray(data.companies) ? data.companies : [];
             setupData.reporting_periods = Array.isArray(data.reporting_periods) ? data.reporting_periods : [];
             setupData.health_insurance = data.health_insurance && typeof data.health_insurance === 'object' ? data.health_insurance : null;
+            if (cycleRes.ok) {
+                const cycleData = await cycleRes.json();
+                setupData.cycle_config = cycleData && typeof cycleData === 'object' ? cycleData : null;
+            } else {
+                setupData.cycle_config = null;
+            }
             renderSetup();
         } catch (e) {
             console.warn('Load setup:', e);
@@ -55,6 +65,14 @@
         set('setupHealthCheckupBenefits', hi.checkup_benefits || '');
         set('setupHealthRenewalDate', hi.renewal_date || '');
         set('setupHealthNotes', hi.notes || '');
+
+        const cc = setupData.cycle_config || {};
+        set('setupCycleLastPeriodStart', cc.last_period_start || '');
+        set('setupCyclePeriodLength', cc.period_length_days != null ? cc.period_length_days : '');
+        set('setupCycleLength', cc.cycle_length_days != null ? cc.cycle_length_days : '');
+        set('setupCycleFollicular', cc.follicular_days != null ? cc.follicular_days : '');
+        set('setupCycleOvulatory', cc.ovulatory_days != null ? cc.ovulatory_days : '');
+        set('setupCyclePms', cc.pms_days != null ? cc.pms_days : '');
     }
 
     function renderEntityList(containerId, items, keys, sectionKey, labels) {
@@ -152,6 +170,20 @@
             renewal_date: renewal ? renewal.value || null : null,
             notes: notes ? notes.value.trim() || null : null
         };
+        const lastPeriod = document.getElementById('setupCycleLastPeriodStart')?.value?.trim();
+        const periodLen = document.getElementById('setupCyclePeriodLength')?.value;
+        const cycleLen = document.getElementById('setupCycleLength')?.value;
+        const follicular = document.getElementById('setupCycleFollicular')?.value;
+        const ovulatory = document.getElementById('setupCycleOvulatory')?.value;
+        const pms = document.getElementById('setupCyclePms')?.value;
+        setupData.cycle_config = lastPeriod ? {
+            last_period_start: lastPeriod,
+            period_length_days: periodLen ? parseInt(periodLen, 10) : 4,
+            cycle_length_days: cycleLen ? parseInt(cycleLen, 10) : 31,
+            follicular_days: follicular ? parseInt(follicular, 10) : 14,
+            ovulatory_days: ovulatory ? parseInt(ovulatory, 10) : 2,
+            pms_days: pms ? parseInt(pms, 10) : 3
+        } : null;
     }
 
     async function saveAllSetup() {
@@ -175,6 +207,14 @@
             });
             if (!res.ok) throw new Error('Save failed');
             setupData.tax_residency = tr;
+            if (setupData.cycle_config && setupData.cycle_config.last_period_start) {
+                const cr = await fetch('/api/health/cycle-config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(setupData.cycle_config)
+                });
+                if (!cr.ok) console.warn('Cycle config save failed');
+            }
             if (typeof showToast === 'function') showToast('Setup saved', 'success');
         } catch (e) {
             if (typeof showToast === 'function') showToast('Failed to save setup', 'error');
@@ -209,5 +249,105 @@
         saveSetupSection('reporting_periods', setupData.reporting_periods).then(() => renderSetup());
     });
 
-    window.loadSetup = loadSetup;
+    // ── Integrations section ────────────────────────────────────────────────
+
+    async function loadIntegrations() {
+        try {
+            const res = await fetch('/api/setup/integrations');
+            if (!res.ok) return;
+            const { payload } = await res.json();
+            const p = payload || {};
+            const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+            set('setupStripeKey', p.stripe_key || '');
+            set('setupWiseToken', p.wise_token || '');
+            set('setupWiseProfileId', p.wise_profile_id || '');
+            set('setupCalendarNames', Array.isArray(p.calendar_names) ? p.calendar_names.join(', ') : (p.calendar_names || '집'));
+
+            // Load mailboxes
+            const selectedInboxes = Array.isArray(p.mail_inboxes) ? p.mail_inboxes : [];
+            await renderMailboxes(selectedInboxes);
+        } catch (e) { /* ignore */ }
+    }
+
+    async function renderMailboxes(selected = []) {
+        const container = document.getElementById('setupMailboxList');
+        if (!container) return;
+        container.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">Loading…</span>';
+        try {
+            const res = await fetch('/api/messages/mailboxes');
+            const boxes = await res.json();
+            if (!boxes.length) { container.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">No mailboxes found. Add accounts in System Settings → Internet Accounts.</span>'; return; }
+            container.innerHTML = boxes.map(b => {
+                const checked = selected.includes(b) ? 'checked' : '';
+                return `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;background:var(--bg-raised);border:1px solid var(--border);border-radius:4px;padding:3px 8px;">
+                    <input type="checkbox" class="setup-mailbox-cb" value="${b}" ${checked}> ${b}
+                </label>`;
+            }).join('');
+        } catch (e) {
+            container.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">Mail.app not accessible.</span>';
+        }
+    }
+
+    document.getElementById('setupIntegrationsSaveBtn')?.addEventListener('click', async function() {
+        const g = id => document.getElementById(id)?.value?.trim() || '';
+        const calRaw = g('setupCalendarNames');
+        const calNames = calRaw ? calRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const selectedMailboxes = [...document.querySelectorAll('.setup-mailbox-cb:checked')].map(cb => cb.value);
+
+        const payload = {
+            stripe_key: g('setupStripeKey') || undefined,
+            wise_token: g('setupWiseToken') || undefined,
+            wise_profile_id: g('setupWiseProfileId') || undefined,
+            calendar_names: calNames,
+            mail_inboxes: selectedMailboxes,
+        };
+        // Remove undefined keys
+        Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+
+        const statusEl = document.getElementById('setupIntegrationsSaveStatus');
+        try {
+            const res = await fetch('/api/setup/integrations', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                if (statusEl) { statusEl.textContent = 'Saved ✓'; setTimeout(() => { statusEl.textContent = ''; }, 2000); }
+                // Apply API keys to running process
+                await fetch('/api/setup/apply-integrations', { method: 'POST' });
+            }
+        } catch (e) {
+            if (statusEl) statusEl.textContent = 'Failed to save';
+        }
+    });
+
+    document.getElementById('setupCalendarSyncBtn')?.addEventListener('click', async function() {
+        const statusEl = document.getElementById('setupCalendarSyncStatus');
+        if (statusEl) statusEl.textContent = 'Syncing…';
+        try {
+            const r = await fetch('/api/upcoming/sync-calendar', { method: 'POST' });
+            const d = await r.json();
+            if (statusEl) { statusEl.textContent = d.error ? `Error: ${d.error}` : `Done — ${d.synced} events synced`; }
+        } catch (e) {
+            if (statusEl) statusEl.textContent = 'Failed';
+        }
+    });
+
+    document.getElementById('setupMailSyncBtn')?.addEventListener('click', async function() {
+        const statusEl = document.getElementById('setupMailSyncStatus');
+        if (statusEl) statusEl.textContent = 'Syncing…';
+        try {
+            const r = await fetch('/api/messages/sync-mail', { method: 'POST' });
+            const d = await r.json();
+            if (statusEl) { statusEl.textContent = d.error ? `Error: ${d.error}` : `Done — ${d.synced} new emails`; }
+        } catch (e) {
+            if (statusEl) statusEl.textContent = 'Failed';
+        }
+    });
+
+    const _origLoadSetup = loadSetup;
+    window.loadSetup = async function() {
+        await _origLoadSetup();
+        await loadIntegrations();
+    };
 })();

@@ -9,27 +9,12 @@ const github = require('../integrations/github');
  */
 router.get('/', async (req, res) => {
     try {
-        let projects = db.prepare('SELECT * FROM projects ORDER BY last_updated DESC').all();
-        
-        // If no projects in DB, insert defaults so we always return rows with ids (needed for project modal)
-        if (projects.length === 0) {
-            const insert = db.prepare('INSERT OR IGNORE INTO projects (name, github_repo, last_updated, metrics) VALUES (?, ?, ?, ?)');
-            const defaults = [
-                ['Soulin Social', null, '2025-01-24', JSON.stringify({ current: { paid_members: 2400, mrr: 8200 }, last_month: { paid_members: 2200, mrr: 7800 } })],
-                ['KINS', null, '2025-01-25', JSON.stringify({ current: { sales: 3500, subscribers: 8900 }, last_month: { sales: 3200, subscribers: 8200 } })],
-                ['Cathy K', null, '2025-01-26', JSON.stringify({ current: { followers: 14000, subscribers: 14000 }, last_month: { followers: 12000, subscribers: 12000 } })],
-                ['Soulin Agency', null, '2025-01-22', JSON.stringify({ current: { revenue: 1900, reach: 18300 }, last_month: { revenue: 1650, reach: 17200 } })]
-            ];
-            defaults.forEach(row => insert.run(...row));
-            projects = db.prepare('SELECT * FROM projects ORDER BY last_updated DESC').all();
-        }
-        
-        // Parse metrics JSON
-        projects = projects.map(project => ({
+        const rows = db.prepare('SELECT * FROM projects ORDER BY last_updated DESC').all();
+        // No auto-insert of default projects: add projects manually or run `npm run seed` once for demo data
+        const projects = rows.map(project => ({
             ...project,
             metrics: typeof project.metrics === 'string' ? JSON.parse(project.metrics) : project.metrics
         }));
-        
         res.json(projects);
     } catch (error) {
         console.error('Error fetching projects:', error);
@@ -136,17 +121,26 @@ router.patch('/:id', (req, res) => {
         const { id } = req.params;
         const body = req.body;
         const allowed = ['name', 'description', 'github_repo', 'metrics', 'revenue_worst', 'revenue_base', 'revenue_lucky',
-            'hours_per_week', 'budget_to_invest', 'months_to_results', 'business_model', 'ai_assumptions', 'ai_analysis'];
-        const numericFields = ['revenue_worst', 'revenue_base', 'revenue_lucky', 'hours_per_week', 'budget_to_invest', 'months_to_results'];
+            'hours_per_week', 'budget_to_invest', 'months_to_results', 'business_model', 'ai_assumptions', 'ai_analysis', 'status',
+            'next_action', 'health_status', 'progress_pct', 'current_phase', 'phase_list', 'priority_rank',
+            'timeline_start', 'timeline_end', 'blocks_project_ids', 'depends_on_project_ids'];
+        const numericFields = ['revenue_worst', 'revenue_base', 'revenue_lucky', 'hours_per_week', 'budget_to_invest', 'months_to_results', 'progress_pct', 'priority_rank'];
+        const statusValues = ['active', 'paused', 'completed', 'archived'];
         const updates = [];
         const values = [];
         allowed.forEach(f => {
             if (body[f] !== undefined) {
+                if (f === 'status' && body[f] !== null && body[f] !== '' && !statusValues.includes(String(body[f]).toLowerCase())) {
+                    return; // skip invalid status
+                }
                 updates.push(f + ' = ?');
-                if (f === 'metrics') {
+                const jsonFields = ['metrics', 'phase_list', 'blocks_project_ids', 'depends_on_project_ids'];
+                if (jsonFields.includes(f)) {
                     values.push(typeof body[f] === 'object' ? JSON.stringify(body[f]) : body[f]);
                 } else if (numericFields.includes(f)) {
                     values.push(body[f] == null ? null : Number(body[f]));
+                } else if (f === 'status') {
+                    values.push(body[f] == null ? 'active' : String(body[f]).toLowerCase());
                 } else {
                     values.push(body[f]);
                 }

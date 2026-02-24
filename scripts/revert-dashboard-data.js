@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Set LinkedIn to 10K and project data per user request
+ * DEV ONLY — OVERWRITES social metrics and project metrics.
+ * Set LinkedIn to 10K and project data per user request.
+ * Do NOT run on a database with real numbers you want to keep.
  */
 const path = require('path');
 const Database = require('better-sqlite3');

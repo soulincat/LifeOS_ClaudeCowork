@@ -145,21 +145,19 @@ class StripeIntegration {
                 `);
                 const existing = checkStmt.get(todayStr);
 
+                const sourceId = 'stripe_revenue_' + todayStr;
                 if (existing) {
-                    // Update existing entry
                     const updateStmt = db.prepare(`
-                        UPDATE finance_entries 
-                        SET amount = ? 
+                        UPDATE finance_entries SET amount = ?, is_synced = 1, source_id = ?
                         WHERE date = ? AND type = 'revenue' AND source = 'stripe'
                     `);
-                    updateStmt.run(revenue, todayStr);
+                    updateStmt.run(revenue, sourceId, todayStr);
                 } else {
-                    // Insert new entry
                     const stmt = db.prepare(`
-                        INSERT INTO finance_entries (date, type, amount, account_type, source)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO finance_entries (date, type, amount, account_type, source, is_synced, source_id)
+                        VALUES (?, ?, ?, ?, ?, 1, ?)
                     `);
-                    stmt.run(todayStr, 'revenue', revenue, 'business', 'stripe');
+                    stmt.run(todayStr, 'revenue', revenue, 'business', 'stripe', sourceId);
                 }
                 console.log(`✅ Synced Stripe revenue (month-to-date): $${revenue.toFixed(2)}`);
             }
@@ -172,19 +170,19 @@ class StripeIntegration {
                 `);
                 const existing = checkStmt.get(todayStr);
 
+                const sourceId = 'stripe_expense_' + todayStr;
                 if (existing) {
                     const updateStmt = db.prepare(`
-                        UPDATE finance_entries 
-                        SET amount = ? 
+                        UPDATE finance_entries SET amount = ?, is_synced = 1, source_id = ?
                         WHERE date = ? AND type = 'expense' AND source = 'stripe'
                     `);
-                    updateStmt.run(expenses, todayStr);
+                    updateStmt.run(expenses, sourceId, todayStr);
                 } else {
                     const stmt = db.prepare(`
-                        INSERT INTO finance_entries (date, type, amount, account_type, source)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO finance_entries (date, type, amount, account_type, source, is_synced, source_id)
+                        VALUES (?, ?, ?, ?, ?, 1, ?)
                     `);
-                    stmt.run(todayStr, 'expense', expenses, 'business', 'stripe');
+                    stmt.run(todayStr, 'expense', expenses, 'business', 'stripe', sourceId);
                 }
                 console.log(`✅ Synced Stripe expenses (month-to-date): $${expenses.toFixed(2)}`);
             }
@@ -198,19 +196,19 @@ class StripeIntegration {
                 `);
                 const existing = checkStmt.get(todayStr);
 
+                const sourceId = 'stripe_profit_' + todayStr;
                 if (existing) {
                     const updateStmt = db.prepare(`
-                        UPDATE finance_entries 
-                        SET amount = ? 
+                        UPDATE finance_entries SET amount = ?, is_synced = 1, source_id = ?
                         WHERE date = ? AND type = 'profit' AND source = 'stripe'
                     `);
-                    updateStmt.run(profit, todayStr);
+                    updateStmt.run(profit, sourceId, todayStr);
                 } else {
                     const stmt = db.prepare(`
-                        INSERT INTO finance_entries (date, type, amount, account_type, source)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO finance_entries (date, type, amount, account_type, source, is_synced, source_id)
+                        VALUES (?, ?, ?, ?, ?, 1, ?)
                     `);
-                    stmt.run(todayStr, 'profit', profit, 'business', 'stripe');
+                    stmt.run(todayStr, 'profit', profit, 'business', 'stripe', sourceId);
                 }
                 console.log(`✅ Synced Stripe profit (month-to-date): $${profit.toFixed(2)}`);
             }

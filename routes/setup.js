@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db/database');
 
 const SECTIONS = ['tax_residency', 'tax_residency_history', 'companies', 'reporting_periods', 'health_insurance'];
+const OPEN_SECTIONS = [...SECTIONS, 'integrations']; // sections accessible via GET/PUT without strict list
 
 function parsePayload(row) {
     if (!row || row.payload == null) return null;
@@ -36,12 +37,11 @@ router.get('/', (req, res) => {
 
 /**
  * GET /api/setup/:section
- * Get one section (tax_residency | tax_residency_history | companies | reporting_periods)
  */
 router.get('/:section', (req, res) => {
     try {
         const { section } = req.params;
-        if (!SECTIONS.includes(section)) {
+        if (!OPEN_SECTIONS.includes(section)) {
             return res.status(400).json({ error: 'Invalid section' });
         }
         const row = db.prepare('SELECT payload, updated_at FROM setup_sections WHERE section_key = ?').get(section);
@@ -55,15 +55,18 @@ router.get('/:section', (req, res) => {
 
 /**
  * PUT /api/setup/:section
- * Save one section. Body: { payload: any }
+ * For 'integrations': body is the payload object directly (not wrapped in { payload: ... })
  */
 router.put('/:section', (req, res) => {
     try {
         const { section } = req.params;
-        if (!SECTIONS.includes(section)) {
+        if (!OPEN_SECTIONS.includes(section)) {
             return res.status(400).json({ error: 'Invalid section' });
         }
-        const payload = req.body && req.body.payload !== undefined ? req.body.payload : null;
+        // integrations section: body IS the payload
+        const payload = section === 'integrations'
+            ? req.body
+            : (req.body && req.body.payload !== undefined ? req.body.payload : null);
         const json = payload !== null ? JSON.stringify(payload) : null;
         db.prepare(`
             INSERT INTO setup_sections (section_key, payload, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -73,6 +76,25 @@ router.put('/:section', (req, res) => {
     } catch (error) {
         console.error('Error saving setup:', error);
         res.status(500).json({ error: 'Failed to save setup' });
+    }
+});
+
+/**
+ * POST /api/setup/apply-integrations
+ * Apply stored integration keys to the running process.env (Stripe, Wise).
+ */
+router.post('/apply-integrations', (req, res) => {
+    try {
+        const row = db.prepare("SELECT payload FROM setup_sections WHERE section_key = 'integrations'").get();
+        if (!row) return res.json({ applied: [] });
+        const p = JSON.parse(row.payload || '{}');
+        const applied = [];
+        if (p.stripe_key) { process.env.STRIPE_SECRET_KEY = p.stripe_key; applied.push('stripe'); }
+        if (p.wise_token) { process.env.WISE_API_TOKEN = p.wise_token; applied.push('wise_token'); }
+        if (p.wise_profile_id) { process.env.WISE_PROFILE_ID = p.wise_profile_id; applied.push('wise_profile'); }
+        res.json({ success: true, applied });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 

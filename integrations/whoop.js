@@ -1,172 +1,240 @@
 const db = require('../db/database');
 
 /**
- * Whoop API Integration
- * Fetches health metrics (recovery, sleep, HRV) from Whoop API
- * Daily sync: Fetches data for yesterday
+ * Whoop API Integration (OAuth2 + v2 API)
+ * Fetches health metrics: recovery, sleep, HRV, cycle (strain)
+ * Docs: https://developer.whoop.com/api
  */
 class WhoopIntegration {
     constructor() {
-        this.apiToken = process.env.WHOOP_API_TOKEN;
-        this.baseUrl = 'https://api.prod.whoop.com/developer/v1';
+        this.legacyToken = process.env.WHOOP_API_TOKEN;
+        this.baseUrl = 'https://api.prod.whoop.com/developer/v2';
     }
 
-    /**
-     * Fetch recovery data for a specific date range
-     * Whoop API uses start/end timestamps
-     */
+    hasStoredTokens() {
+        try {
+            const row = db.prepare('SELECT access_token FROM whoop_oauth WHERE id = 1').get();
+            return !!(row && row.access_token);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async getAccessToken() {
+        if (this.hasStoredTokens()) {
+            const token = await this._getOrRefreshOAuthToken();
+            if (token) return token;
+        }
+        if (this.legacyToken) return this.legacyToken;
+        return null;
+    }
+
+    async _getOrRefreshOAuthToken() {
+        const row = db.prepare('SELECT access_token, refresh_token, expires_at FROM whoop_oauth WHERE id = 1').get();
+        if (!row) return null;
+        const now = Math.floor(Date.now() / 1000);
+        const buffer = 300;
+        if (row.expires_at > now + buffer) return row.access_token;
+        if (!row.refresh_token) return row.access_token;
+        const clientId = process.env.WHOOP_CLIENT_ID;
+        const clientSecret = process.env.WHOOP_CLIENT_SECRET;
+        if (!clientId || !clientSecret) return row.access_token;
+        try {
+            const body = new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: row.refresh_token,
+                client_id: clientId,
+                client_secret: clientSecret,
+            });
+            const res = await fetch('https://api.prod.whoop.com/oauth/oauth2/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString()
+            });
+            if (!res.ok) {
+                console.error('Whoop token refresh failed:', res.status);
+                return null; // Force re-auth instead of using stale token
+            }
+            const data = await res.json();
+            const expiresAt = Math.floor(Date.now() / 1000) + (data.expires_in || 3600);
+            db.prepare(`
+                UPDATE whoop_oauth SET access_token = ?, refresh_token = COALESCE(?, refresh_token), expires_at = ?, updated_at = datetime('now') WHERE id = 1
+            `).run(data.access_token, data.refresh_token || null, expiresAt);
+            return data.access_token;
+        } catch (e) {
+            console.error('Whoop token refresh failed:', e);
+            return row.access_token;
+        }
+    }
+
+    async _apiGet(path, startDate, endDate) {
+        const token = await this.getAccessToken();
+        if (!token) return null;
+        const start = new Date(startDate).toISOString();
+        const end = new Date(endDate).toISOString();
+        const url = `${this.baseUrl}${path}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&limit=25`;
+        try {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) throw new Error(`Whoop API ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.error('Whoop API error', path, error.message);
+            return null;
+        }
+    }
+
     async fetchRecovery(startDate, endDate) {
-        if (!this.apiToken) {
-            console.log('⚠️  WHOOP_API_TOKEN not configured');
-            return null;
-        }
-
-        try {
-            const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-            const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
-
-            const response = await fetch(
-                `${this.baseUrl}/recovery?start=${startTimestamp}&end=${endTimestamp}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.apiToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            if (!response.ok) {
-                if (response.status === 401) {
-                    console.error('⚠️  Whoop API authentication failed. Check your API token.');
-                }
-                throw new Error(`Whoop API error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error fetching Whoop recovery:', error);
-            return null;
-        }
+        return this._apiGet('/recovery', startDate, endDate);
     }
 
-    /**
-     * Fetch sleep data for a specific date range
-     */
     async fetchSleep(startDate, endDate) {
-        if (!this.apiToken) {
-            return null;
-        }
+        return this._apiGet('/activity/sleep', startDate, endDate);
+    }
 
-        try {
-            const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-            const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
-
-            const response = await fetch(
-                `${this.baseUrl}/sleep?start=${startTimestamp}&end=${endTimestamp}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.apiToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error(`Whoop API error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error fetching Whoop sleep:', error);
-            return null;
-        }
+    async fetchCycles(startDate, endDate) {
+        return this._apiGet('/cycle', startDate, endDate);
     }
 
     /**
-     * Sync health metrics for yesterday (daily sync)
+     * Sync health metrics for a date range. Uses cycle_id to map recovery/sleep to calendar date.
+     * Stores: recovery %, sleep (h/m), HRV (ms), cycle_phase (Strain X.X).
      */
-    async syncDailyMetrics() {
-        if (!this.apiToken) {
-            console.log('⚠️  Whoop API token not configured, skipping sync');
-            return;
+    async syncDateRange(startDate, endDate) {
+        const token = await this.getAccessToken();
+        if (!token) {
+            console.log('⚠️  Whoop: no token, skipping sync');
+            return { synced: 0, error: 'not_connected' };
         }
 
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        yesterday.setHours(0, 0, 0, 0);
-        const endDate = new Date(yesterday);
-        endDate.setHours(23, 59, 59, 999);
-        const dateStr = yesterday.toISOString().split('T')[0];
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
 
         try {
-            // Fetch recovery and sleep data for the full day
-            const recoveryData = await this.fetchRecovery(yesterday, endDate);
-            const sleepData = await this.fetchSleep(yesterday, endDate);
+            const [cycleData, recoveryData, sleepData] = await Promise.all([
+                this.fetchCycles(start, end),
+                this.fetchRecovery(start, end),
+                this.fetchSleep(start, end)
+            ]);
 
-            if (!recoveryData && !sleepData) {
-                console.log('No Whoop data available for', dateStr);
-                return;
-            }
+            // Use local date (not UTC) so e.g. a 6am wakeup in UTC+7 maps to the correct local calendar date
+            const localDate = (d) => d.toLocaleDateString('en-CA'); // always YYYY-MM-DD
 
-            // Parse recovery data (Whoop returns array of records)
-            let recovery = null;
-            let hrv = null;
-            
-            if (recoveryData && recoveryData.records && recoveryData.records.length > 0) {
-                // Get the most recent recovery record for the day
-                const latestRecovery = recoveryData.records[recoveryData.records.length - 1];
-                recovery = latestRecovery.score?.recovery_score || latestRecovery.recovery_score || null;
-                hrv = latestRecovery.score?.hrv_milliarcseconds 
-                    ? Math.round(latestRecovery.score.hrv_milliarcseconds / 1000)
-                    : latestRecovery.hrv || null;
-            }
-
-            // Parse sleep data
-            let sleepHours = null;
-            let sleepMinutes = null;
-            
-            if (sleepData && sleepData.records && sleepData.records.length > 0) {
-                // Sum all sleep sessions for the day
-                let totalSleepMs = 0;
-                sleepData.records.forEach(record => {
-                    const sleepTime = record.score?.total_sleep_time_ms || record.total_sleep_time_ms || 0;
-                    totalSleepMs += sleepTime;
-                });
-                
-                if (totalSleepMs > 0) {
-                    sleepHours = Math.floor(totalSleepMs / (1000 * 60 * 60));
-                    sleepMinutes = Math.floor((totalSleepMs % (1000 * 60 * 60)) / (1000 * 60));
+            // cycle_id -> { dateStr, strain }
+            const cycleMap = {};
+            if (cycleData && cycleData.records && cycleData.records.length > 0) {
+                for (const r of cycleData.records) {
+                    const startTime = r.start ? new Date(r.start) : null;
+                    if (startTime) {
+                        const dateStr = localDate(startTime);
+                        const strain = r.score && r.score.strain != null ? r.score.strain : null;
+                        cycleMap[r.id] = { dateStr, strain };
+                    }
                 }
             }
 
-            // Insert or update health metrics
+            // dateStr -> { recovery, hrv, sleepMs, strain }
+            const byDate = {};
+
+            if (recoveryData && recoveryData.records && recoveryData.records.length > 0) {
+                for (const r of recoveryData.records) {
+                    const info = cycleMap[r.cycle_id];
+                    const dateStr = info ? info.dateStr : (r.created_at ? localDate(new Date(r.created_at)) : null);
+                    if (!dateStr) continue;
+                    if (!byDate[dateStr]) byDate[dateStr] = {};
+                    const score = r.score || {};
+                    if (score.recovery_score != null) byDate[dateStr].recovery = Math.round(score.recovery_score);
+                    if (score.hrv_rmssd_milli != null) byDate[dateStr].hrv = Math.round(score.hrv_rmssd_milli);
+                    if (info && info.strain != null) byDate[dateStr].strain = info.strain;
+                }
+            }
+
+            if (sleepData && sleepData.records && sleepData.records.length > 0) {
+                for (const r of sleepData.records) {
+                    const info = cycleMap[r.cycle_id];
+                    const dateStr = info ? info.dateStr : (r.start ? localDate(new Date(r.start)) : null);
+                    if (!dateStr) continue;
+                    if (!byDate[dateStr]) byDate[dateStr] = {};
+                    const score = r.score || {};
+                    const stage = score.stage_summary || {};
+                    let totalMs = (stage.total_light_sleep_time_milli || 0) + (stage.total_slow_wave_sleep_time_milli || 0) + (stage.total_rem_sleep_time_milli || 0);
+                    if (totalMs === 0 && stage.total_in_bed_time_milli != null)
+                        totalMs = Math.max(0, (stage.total_in_bed_time_milli || 0) - (stage.total_awake_time_milli || 0));
+                    // Keep only the longest sleep record per day (ignore naps)
+                    if (totalMs > 0 && totalMs > (byDate[dateStr].sleepMs || 0)) byDate[dateStr].sleepMs = totalMs;
+                    const sleepPct = score.sleep_performance_percentage ?? score.sleepPerformancePercentage;
+                    if (sleepPct != null) byDate[dateStr].sleep_performance_pct = Math.round(sleepPct);
+                    if (info && info.strain != null) byDate[dateStr].strain = info.strain;
+                }
+            }
+
             const stmt = db.prepare(`
-                INSERT INTO health_metrics (date, recovery, sleep_hours, sleep_minutes, hrv)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO health_metrics (date, recovery, sleep_hours, sleep_minutes, sleep_performance_pct, hrv, strain, cycle_phase, monthly_phase, sync_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'whoop')
                 ON CONFLICT(date) DO UPDATE SET
-                    recovery = excluded.recovery,
-                    sleep_hours = excluded.sleep_hours,
-                    sleep_minutes = excluded.sleep_minutes,
-                    hrv = excluded.hrv
+                    recovery = COALESCE(excluded.recovery, recovery),
+                    sleep_hours = COALESCE(excluded.sleep_hours, sleep_hours),
+                    sleep_minutes = COALESCE(excluded.sleep_minutes, sleep_minutes),
+                    sleep_performance_pct = COALESCE(excluded.sleep_performance_pct, sleep_performance_pct),
+                    hrv = COALESCE(excluded.hrv, hrv),
+                    strain = COALESCE(excluded.strain, strain),
+                    cycle_phase = COALESCE(excluded.cycle_phase, cycle_phase),
+                    sync_source = 'whoop'
             `);
 
-            stmt.run(dateStr, recovery, sleepHours, sleepMinutes, hrv);
-            console.log(`✅ Synced Whoop metrics for ${dateStr} - Recovery: ${recovery}%, Sleep: ${sleepHours}h ${sleepMinutes}m`);
+            let synced = 0;
+            for (const [dateStr, row] of Object.entries(byDate)) {
+                const sleepMs = row.sleepMs || 0;
+                const sleepHours = sleepMs > 0 ? Math.floor(sleepMs / (1000 * 60 * 60)) : null;
+                const sleepMinutes = sleepMs > 0 ? Math.floor((sleepMs % (1000 * 60 * 60)) / (1000 * 60)) : null;
+                stmt.run(
+                    dateStr,
+                    row.recovery ?? null,
+                    sleepHours,
+                    sleepMinutes,
+                    row.sleep_performance_pct ?? null,
+                    row.hrv ?? null,
+                    row.strain ?? null,
+                    null,
+                    null
+                );
+                synced++;
+            }
+
+            if (synced > 0) console.log(`✅ Whoop synced ${synced} days (recovery, sleep, HRV, strain)`);
+            return { synced };
         } catch (error) {
-            console.error('Error syncing Whoop metrics:', error);
+            console.error('Error syncing Whoop:', error);
+            return { synced: 0, error: error.message };
         }
     }
 
     /**
-     * Get latest health metrics from database
+     * Sync last N days (e.g. 14). Call this after connect or on "Sync WHOOP" button.
      */
+    async syncLastDays(days = 14) {
+        const end = new Date();
+        const start = new Date();
+        start.setDate(start.getDate() - Math.max(1, days));
+        return this.syncDateRange(start, end);
+    }
+
+    /**
+     * Daily sync: yesterday + today (for cron/scheduled job)
+     */
+    async syncDailyMetrics() {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const end = new Date();
+        return this.syncDateRange(yesterday, end);
+    }
+
     getLatestMetrics() {
         const stmt = db.prepare(`
-            SELECT * FROM health_metrics 
-            ORDER BY date DESC 
-            LIMIT 1
+            SELECT * FROM health_metrics ORDER BY date DESC LIMIT 1
         `);
         return stmt.get();
     }

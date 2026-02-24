@@ -1,6 +1,29 @@
 # Where your data lives and how to get it back
 
-All your saved data (todos, finance, projects, goals, etc.) is stored in **one SQLite file**. Nothing in the app deletes it; this doc shows where it is and how to restore from backups.
+All your saved data (todos, finance, projects, goals, etc.) is stored in **one SQLite file**. The app does not overwrite or auto-seed your data on startup; real numbers come from **manual input** (UI) or **integrations** (Whoop, Stripe, Wise, Soulinsocial, GitHub).
+
+**For the full DB structure in one place and which tables can be overwritten vs protected, see [db/DB-STRUCTURE.md](db/DB-STRUCTURE.md).** That doc has:
+- Every table and main columns
+- Where the live DB and all backups live (and how to access them)
+- Write rules: never overwritten (manual only) vs upserted by sync vs dev-only scripts
+
+This doc (DATA-FILES.md) focuses on file locations and restore steps.
+
+---
+
+## Data flow (no random overwrites)
+
+| Source | What it fills |
+|--------|----------------|
+| **Manual (UI)** | Todos, finance entries, goals, wishlist, upcoming, health (if no Whoop), social (if no Soulinsocial) |
+| **Whoop** | Health metrics (recovery, sleep, HRV) via sync |
+| **Stripe** | Revenue, expense, profit (business) via sync |
+| **Wise** | Spending (personal) via sync |
+| **Soulinsocial** | Social metrics + scheduled posts via sync |
+| **GitHub** | Project last_updated via sync |
+
+- **Seed / dummy data**: The server does **not** run seed on startup unless you set `LIFEOS_SEED_IF_EMPTY=1`. To get demo data once, run `npm run seed`.
+- **Dev-only scripts** (do **not** run on a DB with real numbers): `scripts/fill-dummy-data.js`, `scripts/revert-dashboard-data.js` — they overwrite social/finance/projects for screenshots or testing.
 
 ---
 

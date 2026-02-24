@@ -12,31 +12,29 @@ router.get('/', (req, res) => {
         const showAll = req.query.showAll === 'true';
         const today = new Date().toISOString().split('T')[0];
         
-        // Get all undone todos
+        // Get all undone todos (order by sort_order then created_at)
         const undoneStmt = db.prepare(`
             SELECT * FROM todos 
             WHERE completed = 0 AND archived = 0
-            ORDER BY created_at DESC
+            ORDER BY sort_order ASC, created_at DESC
         `);
         const undoneTodos = undoneStmt.all();
         
         // Get completed todos
         let doneTodos;
         if (showAll) {
-            // Show all completed tasks (including archived)
             const doneStmt = db.prepare(`
                 SELECT * FROM todos 
                 WHERE completed = 1
-                ORDER BY completed_at DESC
+                ORDER BY sort_order ASC, completed_at DESC
             `);
             doneTodos = doneStmt.all();
         } else {
-            // Show all completed from today (non-archived)
             const doneStmt = db.prepare(`
                 SELECT * FROM todos 
                 WHERE completed = 1 AND archived = 0
                 AND DATE(completed_at) = ?
-                ORDER BY completed_at DESC
+                ORDER BY sort_order ASC, completed_at DESC
             `);
             doneTodos = doneStmt.all(today);
         }
@@ -58,17 +56,40 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
     try {
         const { text, due_date } = req.body;
-        
+        const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM todos WHERE completed = 0 AND archived = 0').get();
+        const sortOrder = maxOrder ? maxOrder.next_order : 0;
+
         const stmt = db.prepare(`
-            INSERT INTO todos (text, due_date)
-            VALUES (?, ?)
+            INSERT INTO todos (text, due_date, sort_order)
+            VALUES (?, ?, ?)
         `);
-        
-        const result = stmt.run(text, due_date || null);
+
+        const result = stmt.run(text, due_date || null, sortOrder);
         res.json({ id: result.lastInsertRowid, success: true });
     } catch (error) {
         console.error('Error creating todo:', error);
         res.status(500).json({ error: 'Failed to create todo' });
+    }
+});
+
+/**
+ * PUT /api/todos/reorder
+ * Reorder todos by id list (ids in desired order).
+ */
+router.put('/reorder', (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ids array required' });
+        }
+        const updateStmt = db.prepare('UPDATE todos SET sort_order = ? WHERE id = ?');
+        ids.forEach((id, index) => {
+            updateStmt.run(index, id);
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error reordering todos:', error);
+        res.status(500).json({ error: 'Failed to reorder todos' });
     }
 });
 

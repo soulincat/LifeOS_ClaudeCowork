@@ -15,7 +15,7 @@ const rows = db.prepare(`
 `).all(currentMonth + '%');
 
 if (rows.length === 0) {
-  console.log(`[Life OS] Monthly report due for ${currentMonth}. Add one in the Scenarios tab or ask the Agent.`);
+  console.log(`[Life OS] Monthly report due for ${currentMonth}. Add one in the Scenarios tab.`);
   const url = process.env.REMINDER_URL;
   if (url) {
     fetch(url, {

@@ -47,24 +47,32 @@
 ---
 
 ### 3. **Whoop API** 💪
-**Purpose**: Automatically sync health metrics (recovery, sleep, HRV)
+**Purpose**: Automatically sync health metrics (recovery, sleep, HRV) from your WHOOP device.
 
-**Setup**:
-1. Get API token from [Whoop Developer Portal](https://app.whoop.com/developer/)
-2. Add to `.env`:
+**Setup (OAuth – recommended)**:
+1. Register an app at [WHOOP for Developers](https://developer.whoop.com/) to get **Client ID** and **Client Secret**.
+2. Set **Redirect URI** in the WHOOP developer portal to:  
+   `http://localhost:3001/api/health/whoop/callback` (use your app’s port if different).
+3. Add to `.env`:
    ```bash
-   WHOOP_API_TOKEN=your_whoop_token_here
+   WHOOP_CLIENT_ID=your_client_id
+   WHOOP_CLIENT_SECRET=your_client_secret
+   # Optional if not 3001:
+   # WHOOP_REDIRECT_URI=http://localhost:3001/api/health/whoop/callback
    ```
+4. In the dashboard, open the **Health** section and click **Connect WHOOP**. Sign in with WHOOP and approve; you’ll be redirected back and tokens are stored for sync.
+
+**Legacy (static token)**  
+If you still have a token from the older portal, you can set `WHOOP_API_TOKEN=...` in `.env`; OAuth takes precedence if configured.
 
 **What it syncs**:
 - **Recovery**: Daily recovery score (%)
 - **Sleep**: Total sleep hours and minutes
 - **HRV**: Heart rate variability (ms)
-- **Frequency**: Daily (runs at 8 AM)
+- **Frequency**: Daily (runs at 8 AM via sync job)
 
-**API Endpoint**: `POST /api/sync/daily`
-
-**Note**: Whoop API requires authentication and may have rate limits.
+**API**: [WHOOP API](https://developer.whoop.com/api) (OAuth2 + v2 endpoints).  
+**Endpoints**: `GET /api/health/whoop/connect` (start OAuth), `GET /api/health/whoop/status` (connection status), `POST /api/sync/daily` (runs Whoop sync).
 
 ---
 

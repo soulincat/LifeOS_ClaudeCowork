@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * Fill dashboard with dummy numbers for screenshot
+ * DEV/SCREENSHOT ONLY — OVERWRITES DATA.
+ * Fill dashboard with dummy numbers for screenshot.
  * - Social media followers (total ~20.6K)
  * - Finance metrics (revenue, profit, expenses, etc.)
+ * Do NOT run on a database with real numbers you want to keep.
  */
 const path = require('path');
 const Database = require('better-sqlite3');

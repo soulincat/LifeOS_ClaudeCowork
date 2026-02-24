@@ -1,0 +1,15 @@
+{
+  "name": "lifeos-mcp-server",
+  "version": "1.0.0",
+  "description": "LifeOS MCP server — exposes tools for Claude to read priorities and ingest triage results",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^16.3.1"
+  }
+}

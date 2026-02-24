@@ -184,9 +184,10 @@ The dashboard now uses SQLite for data persistence and supports multiple API int
 ### Database
 
 - **Location**: `lifeos.db` in project root
+- **Full structure and write rules**: See [db/DB-STRUCTURE.md](db/DB-STRUCTURE.md) for all tables, backup locations, and which data can be overwritten vs protected
 - **Type**: SQLite (file-based, no server needed)
 - **Auto-initialization**: Tables are created automatically on first run
-- **Seeding**: Initial data is seeded automatically if database is empty
+- **Seeding**: No automatic seeding (your data is never overwritten on startup). To get demo data once, run `npm run seed`, or set `LIFEOS_SEED_IF_EMPTY=1` to seed only when the DB is empty
 
 ### API Integrations
 

@@ -1,28 +1,112 @@
+// Shared utility — must be top-level so all module-scope functions can use it
+function escHtml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Health display: set values and WHOOP-style colors (green / yellow / red)
+function updateHealthDisplay(health) {
+    const recoveryEl = document.getElementById('healthRecoveryValue');
+    const sleepEl = document.getElementById('healthSleepValue');
+    const hrvEl = document.getElementById('healthHrvValue');
+    const strainEl = document.getElementById('healthStrainValue');
+    const cycleEl = document.getElementById('healthCycleValue');
+    const monthlyEl = document.getElementById('healthMonthlyPhase');
+
+    if (recoveryEl) {
+        const v = health.recovery != null ? Number(health.recovery) : null;
+        recoveryEl.textContent = v != null ? v + '%' : '—';
+        recoveryEl.className = 'info-value health-recovery';
+        if (v != null) {
+            if (v >= 67) recoveryEl.classList.add('health-recovery-green');
+            else if (v >= 34) recoveryEl.classList.add('health-recovery-yellow');
+            else recoveryEl.classList.add('health-recovery-red');
+        }
+    }
+    if (sleepEl) {
+        const v = health.sleep_performance_pct != null ? Number(health.sleep_performance_pct) : null;
+        sleepEl.textContent = v != null ? v + '%' : '—';
+        sleepEl.className = 'info-value health-sleep';
+        if (v != null) {
+            if (v >= 85) sleepEl.classList.add('health-sleep-green');
+            else if (v >= 67) sleepEl.classList.add('health-sleep-yellow');
+            else sleepEl.classList.add('health-sleep-red');
+        }
+    }
+    if (hrvEl) hrvEl.textContent = (health.hrv != null ? health.hrv + 'ms' : '—');
+    if (strainEl) {
+        strainEl.textContent = (health.strain != null ? Number(health.strain).toFixed(1) : '—');
+        strainEl.className = 'info-value health-strain';
+        strainEl.classList.remove('health-strain-green', 'health-strain-yellow', 'health-strain-red');
+        if (health.strain != null && health.recovery != null) {
+            const strain = Number(health.strain);
+            const recovery = Number(health.recovery);
+            let strainClass = 'health-strain-yellow';
+            if (recovery >= 67) {
+                if (strain >= 8 && strain <= 16) strainClass = 'health-strain-green';
+                else if (strain > 18) strainClass = 'health-strain-red';
+                else if (strain > 16) strainClass = 'health-strain-yellow';
+                else if (strain < 6) strainClass = 'health-strain-yellow';
+            } else if (recovery >= 34) {
+                if (strain >= 5 && strain <= 12) strainClass = 'health-strain-green';
+                else if (strain > 15) strainClass = 'health-strain-red';
+                else strainClass = 'health-strain-yellow';
+            } else {
+                if (strain >= 0 && strain <= 8) strainClass = 'health-strain-green';
+                else if (strain > 12) strainClass = 'health-strain-red';
+                else strainClass = 'health-strain-yellow';
+            }
+            strainEl.classList.add(strainClass);
+        }
+    }
+    if (cycleEl) {
+        const rawPhase = health.cycle_phase || '';
+        const phaseLabels = { follicular: 'Follicular - feel OK', ovulatory: 'Ovulatory - horny', luteal: 'Luteal - feel OK', pms: 'PMS - depression', period: 'Period' };
+        let displayPhase = rawPhase;
+        if (rawPhase && !rawPhase.includes(' - ')) {
+            const key = rawPhase.toLowerCase().replace(/\s+/g, '');
+            displayPhase = phaseLabels[key] || (phaseLabels[rawPhase.toLowerCase()] || rawPhase);
+        }
+        cycleEl.textContent = displayPhase || '—';
+        cycleEl.className = 'info-value health-cycle-value';
+        cycleEl.classList.remove('health-cycle-green', 'health-cycle-yellow', 'health-cycle-red');
+        const phase = (displayPhase || '').toLowerCase();
+        if (phase.includes('follicular') || phase.includes('luteal')) cycleEl.classList.add('health-cycle-green');
+        else if (phase.includes('ovulatory')) cycleEl.classList.add('health-cycle-yellow');
+        else if (phase.includes('pms')) cycleEl.classList.add('health-cycle-red');
+    }
+    if (monthlyEl) monthlyEl.textContent = health.monthly_phase || '—';
+    const healthSyncedBadge = document.getElementById('healthSyncedBadge');
+    if (healthSyncedBadge) {
+        if (health.sync_source === 'whoop') {
+            healthSyncedBadge.textContent = 'Synced from Whoop';
+            healthSyncedBadge.style.display = 'block';
+        } else {
+            healthSyncedBadge.style.display = 'none';
+        }
+    }
+}
+
 // Health Alert Logic
 function updateHealthAlert() {
-    const recoveryEl = document.querySelector('.info-row .info-value.accent');
-    const sleepEl = Array.from(document.querySelectorAll('.info-row')).find(row => 
-        row.querySelector('.info-label').textContent === 'Sleep'
-    );
-    const cycleEl = Array.from(document.querySelectorAll('.info-row')).find(row => 
-        row.querySelector('.info-label').textContent === 'Cycle'
-    );
-    
+    const recoveryEl = document.getElementById('healthRecoveryValue');
+    const sleepEl = document.getElementById('healthSleepValue');
+    const cycleEl = document.getElementById('healthCycleValue');
     const alertEl = document.getElementById('healthAlert');
     
-    if (!recoveryEl || !sleepEl || !cycleEl || !alertEl) return;
+    if (!recoveryEl || !sleepEl || !alertEl) return;
     
-    const recovery = parseInt(recoveryEl.textContent);
-    const sleepText = sleepEl.querySelector('.info-value').textContent;
-    const cycleText = cycleEl.querySelector('.info-value').textContent;
+    const recovery = parseInt(recoveryEl.textContent, 10) || 0;
+    const sleepText = sleepEl.textContent;
+    const cycleText = cycleEl ? cycleEl.textContent : '';
+    // Parse sleep: now shown as % (e.g. "85%") or legacy "7h 24m"
+    const sleepPctMatch = sleepText.match(/(\d+)%/);
+    const sleepHoursMatch = sleepText.match(/(\d+)h/);
+    const sleepHours = sleepPctMatch ? null : (sleepHoursMatch ? parseInt(sleepHoursMatch[1], 10) : 0);
+    const sleepPct = sleepPctMatch ? parseInt(sleepPctMatch[1], 10) : null;
     
-    // Parse sleep hours (e.g., "7h 24m" -> 7)
-    const sleepMatch = sleepText.match(/(\d+)h/);
-    const sleepHours = sleepMatch ? parseInt(sleepMatch[1]) : 0;
-    
-    // Check conditions
+    // Check conditions (sleep: low % or legacy low hours)
     const lowRecovery = recovery < 70;
-    const lowSleep = sleepHours < 7;
+    const lowSleep = (sleepPct != null && sleepPct < 67) || (sleepHours != null && sleepHours < 7);
     const isLutealOrPreMenstrual = cycleText.toLowerCase().includes('luteal') || 
                                    cycleText.toLowerCase().includes('pre-menstrual') ||
                                    cycleText.toLowerCase().includes('before menstruation');
@@ -48,37 +132,89 @@ function updateHealthAlert() {
 async function loadDashboardData() {
     let socialFollowersTotal = 0; // used by dashboard project cards (e.g. Cathy K = this total)
 
+    // WHOOP OAuth callback feedback
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('whoop_connected')) {
+        if (typeof showToast === 'function') showToast('WHOOP connected. Sync will pull your recovery, sleep & HRV.', 'success');
+        window.history.replaceState({}, '', window.location.pathname || '/');
+    }
+    if (params.has('whoop_error')) {
+        const msg = params.get('whoop_error') || 'Connection failed';
+        if (typeof showToast === 'function') showToast('WHOOP: ' + msg, 'error');
+        window.history.replaceState({}, '', window.location.pathname || '/');
+    }
+
     // --- Health ---
     try {
         const healthResponse = await fetch('/api/health');
         const health = await healthResponse.json();
-        
-        // Update health display (only health section; do not touch finance rows)
-        const healthSection = document.getElementById('healthSection');
-        const healthRows = healthSection ? healthSection.querySelectorAll('.info-row') : [];
-        healthRows.forEach(row => {
-            const label = row.querySelector('.info-label')?.textContent;
-            const valueEl = row.querySelector('.info-value');
-            if (!valueEl) return;
-            
-            if (label === 'Recovery') {
-                valueEl.textContent = `${health.recovery}%`;
-            } else if (label === 'Sleep') {
-                valueEl.textContent = `${health.sleep_hours}h ${health.sleep_minutes}m`;
-            } else if (label === 'HRV') {
-                valueEl.textContent = `${health.hrv}ms`;
-            } else if (label === 'Cycle') {
-                valueEl.textContent = health.cycle_phase || 'Luteal Phase (low energy)';
-            }
-        });
-        
-        // Update monthly phase in header
-        const healthMonthlyPhaseEl = document.getElementById('healthMonthlyPhase');
-        if (healthMonthlyPhaseEl && health.monthly_phase) {
-            healthMonthlyPhaseEl.textContent = health.monthly_phase;
-        }
-        
+        updateHealthDisplay(health);
         updateHealthAlert();
+
+        // WHOOP connection status and Sync button
+        try {
+            const whoopStatusRes = await fetch('/api/health/whoop/status');
+            const whoopStatusData = await whoopStatusRes.json();
+            const whoopBtn = document.getElementById('whoopConnectLink');
+            const whoopSyncBtn = document.getElementById('whoopSyncBtn');
+            const whoopStatusEl = document.getElementById('whoopStatus');
+            if (whoopBtn && whoopStatusEl) {
+                if (whoopStatusData.connected) {
+                    whoopBtn.style.display = 'none';
+                    whoopStatusEl.textContent = 'WHOOP connected';
+                    if (whoopSyncBtn) {
+                        whoopSyncBtn.style.display = '';
+                        whoopSyncBtn.onclick = async function() {
+                            whoopSyncBtn.disabled = true;
+                            whoopStatusEl.textContent = 'Syncing…';
+                            try {
+                                const r = await fetch('/api/health/whoop/sync?days=14', { method: 'POST' });
+                                const data = await r.json();
+                                if (data.needsReconnect) {
+                                    whoopStatusEl.textContent = 'Token expired';
+                                    whoopBtn.style.display = '';
+                                    whoopBtn.textContent = 'Reconnect WHOOP';
+                                    whoopSyncBtn.style.display = 'none';
+                                } else if (data.success) {
+                                    whoopStatusEl.textContent = data.synced > 0 ? `WHOOP (${data.synced} new)` : 'WHOOP connected';
+                                    // Always re-fetch health from DB after sync
+                                    const freshHealth = await fetch('/api/health');
+                                    const health = await freshHealth.json();
+                                    updateHealthDisplay(health);
+                                    updateHealthAlert();
+                                } else {
+                                    whoopStatusEl.textContent = data.error || 'Sync failed';
+                                }
+                            } catch (e) {
+                                whoopStatusEl.textContent = 'Sync failed';
+                            }
+                            whoopSyncBtn.disabled = false;
+                        };
+                    }
+                    // Auto-sync once when connected and page loads (pulls last 14 days)
+                    const r = await fetch('/api/health/whoop/sync?days=14', { method: 'POST' });
+                    const syncData = await r.json();
+                    if (syncData.needsReconnect) {
+                        whoopStatusEl.textContent = 'Token expired';
+                        whoopBtn.style.display = '';
+                        whoopBtn.textContent = 'Reconnect WHOOP';
+                        if (whoopSyncBtn) whoopSyncBtn.style.display = 'none';
+                    } else if (syncData.success) {
+                        const label = syncData.synced > 0 ? `WHOOP (${syncData.synced} new)` : 'WHOOP connected';
+                        whoopStatusEl.textContent = label;
+                        // Always re-fetch from DB after sync so display is up to date
+                        const freshHealth = await fetch('/api/health');
+                        const health = await freshHealth.json();
+                        updateHealthDisplay(health);
+                        updateHealthAlert();
+                    }
+                } else {
+                    whoopBtn.style.display = '';
+                    whoopStatusEl.textContent = 'Not connected';
+                    if (whoopSyncBtn) whoopSyncBtn.style.display = 'none';
+                }
+            }
+        } catch (e) { /* ignore */ }
     } catch (e) { console.warn('Health load failed', e); }
 
     // --- Finance ---
@@ -200,9 +336,18 @@ async function loadDashboardData() {
         // Update finance month
         const financeMonthEl = document.getElementById('financeMonth');
         if (financeMonthEl) {
-            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                               'July', 'August', 'September', 'October', 'November', 'December'];
             financeMonthEl.textContent = monthNames[new Date().getMonth()];
+        }
+        // Synced sources badge (Stripe/Wise — read-only)
+        const syncedBadge = document.getElementById('financeSyncedBadge');
+        if (syncedBadge && Array.isArray(finance.synced_sources) && finance.synced_sources.length > 0) {
+            const labels = finance.synced_sources.map(s => s === 'stripe' ? 'Stripe' : s === 'wise' ? 'Wise' : s);
+            syncedBadge.textContent = 'Synced from ' + labels.join(' • ') + ' (read-only)';
+            syncedBadge.style.display = 'block';
+        } else if (syncedBadge) {
+            syncedBadge.style.display = 'none';
         }
     } catch (e) { console.warn('Finance display failed', e); }
 
@@ -337,6 +482,17 @@ async function loadDashboardData() {
                 }
                 if (lastEl) lastEl.textContent = lastVal != null ? formatMetricValue(primaryKey, lastVal) : '—';
                 if (labelEl) labelEl.textContent = kpi ? kpi.label : '—';
+                const status = (project.status || 'active').toLowerCase();
+                let statusBadge = card.querySelector('.project-card-status-badge');
+                if (!statusBadge && updatedEl) {
+                    statusBadge = document.createElement('span');
+                    statusBadge.className = 'project-card-status-badge project-card-status-' + status;
+                    updatedEl.parentNode.insertBefore(statusBadge, updatedEl);
+                }
+                if (statusBadge) {
+                    statusBadge.textContent = status !== 'active' ? status : '';
+                    statusBadge.className = 'project-card-status-badge project-card-status-' + status;
+                }
 
                 let growthPct = null;
                 if (lastVal != null && thisVal != null && typeof lastVal === 'number' && typeof thisVal === 'number') {
@@ -460,6 +616,13 @@ function formatMetricValue(key, value) {
 // Initialize health alert on page load
 updateHealthAlert();
 
+// Connect WHOOP button: full-page navigation to OAuth (works even before status loads)
+document.getElementById('whoopConnectLink')?.addEventListener('click', function() {
+    var base = window.location.origin || 'http://localhost:3001';
+    if (base === 'null' || !base) base = 'http://localhost:3001';
+    window.location.href = base + '/api/health/whoop/connect';
+});
+
 // Refresh GitHub contribution graph with daily cache-busting
 function refreshGitHubGraph() {
     const graphImg = document.getElementById('githubContributionGraph');
@@ -479,12 +642,431 @@ function refreshGitHubGraph() {
 // Social numbers are set in HTML and not overwritten by JS (so they stay correct).
 function updateSocialNumbers() { /* no-op: keep HTML values */ }
 
+// ═══════════════════════════════════════════════════════════════════
+// HOME PANEL — unified overview data loader
+// ═══════════════════════════════════════════════════════════════════
+let homeInitialised = false;
+
+async function loadHomeData() {
+    const base = location.origin;
+    const fmt = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v));
+
+    // ── Pulse Strip: date ──
+    const now = new Date();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const dateEl = document.getElementById('pulseDate');
+    const dayEl = document.getElementById('pulseDay');
+    if (dateEl) dateEl.textContent = months[now.getMonth()] + ' ' + now.getDate();
+    if (dayEl) dayEl.textContent = days[now.getDay()];
+
+    // ── Greeting ──
+    const hour = now.getHours();
+    const greetingEl = document.getElementById('dashGreeting');
+    const subEl = document.getElementById('dashGreetingSub');
+    if (greetingEl) {
+        if (hour < 12) greetingEl.textContent = 'Good morning.';
+        else if (hour < 17) greetingEl.textContent = 'Good afternoon.';
+        else greetingEl.textContent = 'Good evening.';
+    }
+
+    // ── Background Whoop sync (fire-and-forget — keeps recovery data fresh) ──
+    fetch(base + '/api/health/whoop/sync?days=2', { method: 'POST' }).catch(() => {});
+
+    // ── Pulse Strip: recovery, unread, meetings, blocker (single API call) ──
+    try {
+        const pulseRes = await fetch(base + '/api/home/pulse');
+        const pulse = await pulseRes.json();
+        const recoveryEl = document.getElementById('pulseRecoveryText');
+        const recoveryChip = document.getElementById('pulseRecovery');
+        if (pulse.recovery != null && recoveryEl) {
+            recoveryEl.textContent = 'Recovery ' + pulse.recovery + '%';
+            if (recoveryChip) recoveryChip.className = 'pulse-chip ' + (pulse.recovery >= 66 ? 'pulse-chip-good' : pulse.recovery >= 33 ? 'pulse-chip-warn' : 'pulse-chip-warn');
+        }
+        const unreadEl = document.getElementById('pulseUnreadText');
+        const unreadChip = document.getElementById('pulseUnread');
+        if (unreadEl) unreadEl.textContent = (pulse.unread || 0) + ' unread';
+        if (unreadChip) unreadChip.className = 'pulse-chip ' + (pulse.unread > 0 ? 'pulse-chip-warn' : 'pulse-chip-neutral');
+        const dashCount = document.getElementById('dashInboxCount');
+        if (dashCount) dashCount.textContent = pulse.unread > 0 ? pulse.unread : '';
+        const meetEl = document.getElementById('pulseMeetingsText');
+        const meetChip = document.getElementById('pulseMeetings');
+        if (pulse.meetings > 0) {
+            if (meetEl) meetEl.textContent = pulse.meetings + ' meeting' + (pulse.meetings > 1 ? 's' : '');
+            if (meetChip) meetChip.style.display = '';
+        } else if (meetChip) { meetChip.style.display = 'none'; }
+        const blockerEl = document.getElementById('pulseBlockerText');
+        const blockerChip = document.getElementById('pulseBlocker');
+        if (pulse.blocker) {
+            if (blockerEl) blockerEl.textContent = pulse.blocker;
+            if (blockerChip) blockerChip.style.display = '';
+        } else if (blockerChip) { blockerChip.style.display = 'none'; }
+    } catch (e) { /* pulse endpoint not available, fall back silently */ }
+
+    // ── Focus Card (scored task from derived state engine) ──
+    try {
+        const focusRes = await fetch(base + '/api/home/focus');
+        const focus = await focusRes.json();
+        const focusCard = document.getElementById('focusCard');
+        if (focus && !focus.empty && focusCard) {
+            focusCard.style.display = '';
+            document.getElementById('focusTitle').textContent = focus.text || '';
+            document.getElementById('focusDesc').textContent = focus.description || '';
+            const meta = document.getElementById('focusMeta');
+            const tags = [];
+            if (focus.project_name) tags.push(focus.project_name);
+            if (focus.override === 'calendar') tags.push('Calendar');
+            if (focus.meta) tags.push(focus.meta);
+            meta.innerHTML = tags.map(t => '<span class="focus-tag">' + t + '</span>').join('');
+            if (subEl) subEl.textContent = focus.project_name ? 'Top task from ' + focus.project_name : 'Your next action';
+        } else if (focusCard) {
+            focusCard.style.display = 'none';
+            if (subEl) subEl.textContent = 'No open tasks. Add milestones and tasks to your projects.';
+        }
+    } catch (e) { console.warn('Home: focus failed', e); }
+
+    // ── Inbox: counts + feed ──
+    try {
+        const countRes = await fetch(base + '/api/messages/counts');
+        const counts = await countRes.json();
+        const tabAll = document.getElementById('dashTabAll');
+        const tabWa = document.getElementById('dashTabWa');
+        const tabEmail = document.getElementById('dashTabEmail');
+        if (tabAll) tabAll.textContent = (counts.total || 0) > 0 ? counts.total : '';
+        if (tabWa) tabWa.textContent = (counts.whatsapp || 0) > 0 ? counts.whatsapp : '';
+        if (tabEmail) tabEmail.textContent = ((counts.gmail || 0) + (counts.outlook || 0)) > 0 ? (counts.gmail || 0) + (counts.outlook || 0) : '';
+    } catch (e) { /* */ }
+    try {
+        const msgRes = await fetch(base + '/api/messages/grouped?limit=6');
+        const inboxMsgs = await msgRes.json();
+        renderHomeInbox(inboxMsgs, 'all');
+    } catch (e) { renderHomeInbox([], 'all'); }
+
+    // ── Project Cards (collapsed by default, expand on click) ──
+    try {
+        const projRes = await fetch(base + '/api/home/projects-expanded');
+        const projects = (await projRes.json()) || [];
+        const grid = document.getElementById('dashProjectCards');
+        const countEl = document.getElementById('dashProjectCount');
+        if (countEl) countEl.textContent = projects.length > 0 ? projects.length : '';
+        if (grid) {
+            grid.innerHTML = '';
+            projects.forEach(project => {
+                const name = project.name || 'Project';
+                const health = project.health_status || 'green';
+                const healthClass = 'dash-project-health-' + health;
+                const healthLabel = health.charAt(0).toUpperCase() + health.slice(1);
+                const pct = project.progress_pct || 0;
+                const phase = project.current_phase || '';
+                const nextAction = project.next_action || '';
+                const rank = project.priority_rank || 4;
+                const blockerCount = (project.blockers || []).length;
+
+                // Task list (hidden in collapsed state)
+                let tasksHtml = '';
+                if (project.tasks && project.tasks.length > 0) {
+                    const taskItems = project.tasks.map(t => {
+                        const done = t.status === 'done';
+                        const blocker = t.is_blocker && !done;
+                        const cls = (done ? ' dash-task-done' : '') + (blocker ? ' dash-task-blocker' : '');
+                        return '<div class="dash-task-item' + cls + '">' +
+                            '<span class="dash-task-check">' + (done ? '\u2713' : '\u25cb') + '</span>' +
+                            '<span class="dash-task-text">' + t.text + '</span>' +
+                            (t.due_date ? '<span class="dash-task-due">' + t.due_date + '</span>' : '') +
+                        '</div>';
+                    }).join('');
+                    tasksHtml = '<div class="dash-project-tasks">' + taskItems;
+                    if (project.more_tasks > 0) tasksHtml += '<div class="dash-task-more">and ' + project.more_tasks + ' more...</div>';
+                    tasksHtml += '</div>';
+                }
+
+                // Horizon milestone
+                let horizonHtml = '';
+                if (project.horizon_milestone) {
+                    horizonHtml = '<div class="dash-project-horizon">Next milestone: ' + project.horizon_milestone.name + ' <span class="dash-horizon-date">' + (project.horizon_milestone.target_date || project.horizon_milestone.phase) + '</span></div>';
+                }
+
+                // Blockers + dependency warnings
+                let alertsHtml = '';
+                if ((project.blockers && project.blockers.length > 0) || (project.dependency_warnings && project.dependency_warnings.length > 0)) {
+                    alertsHtml = '<div class="dash-project-alerts">';
+                    if (project.blockers) alertsHtml += project.blockers.map(b => '<div class="dash-project-blocker-item">\u26a0 ' + b + '</div>').join('');
+                    if (project.dependency_warnings) alertsHtml += project.dependency_warnings.map(d => '<div class="dash-project-dep-warn">\u26d4 ' + d.upstream_name + ': ' + (d.dependency_description || 'blocked') + '</div>').join('');
+                    alertsHtml += '</div>';
+                }
+
+                // Collapsed summary line
+                const summaryParts = [];
+                if (phase) summaryParts.push(phase.replace(/_/g, ' '));
+                if (blockerCount > 0) summaryParts.push(blockerCount + ' blocker' + (blockerCount > 1 ? 's' : ''));
+                if (nextAction) summaryParts.push(nextAction.length > 60 ? nextAction.slice(0, 57) + '...' : nextAction);
+                const summaryText = summaryParts.join(' \u00b7 ');
+
+                const card = document.createElement('div');
+                card.className = 'dash-project-card dash-project-collapsed' + (health === 'red' ? ' dash-project-card-red' : health === 'yellow' ? ' dash-project-card-yellow' : '');
+                card.dataset.projectId = project.id;
+                card.innerHTML =
+                    '<div class="dash-project-card-header">' +
+                        '<span class="dash-project-card-toggle">\u25b6</span>' +
+                        '<span class="dash-project-card-name">P' + rank + ': ' + name + '</span>' +
+                        '<div class="dash-project-card-header-right">' +
+                            '<div class="dash-project-progress-mini"><div class="dash-project-progress-fill" style="width:' + pct + '%"></div></div>' +
+                            '<span class="dash-project-card-pct">' + pct + '%</span>' +
+                            '<span class="dash-project-card-health ' + healthClass + '">' + healthLabel + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="dash-project-summary">' + summaryText + '</div>' +
+                    '<div class="dash-project-detail">' +
+                        '<div class="dash-project-progress-wrap">' +
+                            '<div class="dash-project-progress-bar"><div class="dash-project-progress-fill" style="width:' + pct + '%"></div></div>' +
+                            '<span class="dash-project-progress-text">' + pct + '%' + (phase ? ' \u2022 ' + phase.replace(/_/g, ' ') : '') + '</span>' +
+                        '</div>' +
+                        (nextAction ? '<div class="dash-project-next-action">Next: ' + nextAction + '</div>' : '') +
+                        tasksHtml + horizonHtml + alertsHtml +
+                    '</div>';
+
+                // Toggle expand/collapse on header click
+                card.querySelector('.dash-project-card-header').addEventListener('click', () => {
+                    card.classList.toggle('dash-project-collapsed');
+                    card.classList.toggle('dash-project-expanded');
+                });
+
+                grid.appendChild(card);
+            });
+        }
+    } catch (e) { console.warn('Home: projects-expanded failed', e); }
+
+    // Wire up event handlers once
+    if (!homeInitialised) {
+        homeInitialised = true;
+        setupHomeHandlers();
+    }
+}
+
+function renderHomeInbox(msgs, filter) {
+    const feed = document.getElementById('dashInboxFeed');
+    const body = document.getElementById('dashInboxBody');
+    const viewAll = document.getElementById('dashInboxViewAll');
+    if (!feed) return;
+    const sourceIcon = (s) => s === 'gmail' ? '\u2709' : s === 'outlook' ? '\ud83d\udce7' : s === 'whatsapp' ? '\ud83d\udcac' : '\ud83d\udce9';
+    let filtered = msgs;
+    if (filter === 'whatsapp') filtered = msgs.filter(m => m.source === 'whatsapp');
+    else if (filter === 'email') filtered = msgs.filter(m => m.source === 'gmail' || m.source === 'outlook');
+    else if (filter === 'cal') filtered = []; // upcoming meetings handled separately
+    // Collapse inbox entirely when no messages — no empty state noise
+    if (!filtered.length) {
+        if (body) body.style.display = 'none';
+        if (viewAll) viewAll.style.display = 'none';
+        feed.innerHTML = '';
+        return;
+    }
+    if (body) body.style.display = '';
+    if (viewAll) viewAll.style.display = '';
+    feed.innerHTML = '';
+    filtered.slice(0, 6).forEach(msg => {
+        const date = msg.latest_received_at || msg.received_at;
+        const timeStr = date ? new Date(date).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const urgency = msg.urgency_score || 3;
+        const el = document.createElement('div');
+        el.className = 'dash-inbox-item';
+        el.innerHTML =
+            '<div class="dash-inbox-item-icon">' + sourceIcon(msg.source) + '</div>' +
+            '<div class="dash-inbox-item-body">' +
+                '<div class="dash-inbox-item-top">' +
+                    '<span class="dash-inbox-item-sender">' + (msg.sender_name || msg.sender_address || 'Unknown') + '</span>' +
+                    (msg.msg_count > 1 ? '<span class="dash-inbox-item-urgency dash-inbox-item-urgency-' + urgency + '">' + msg.msg_count + '</span>' : '') +
+                    '<span class="dash-inbox-item-urgency dash-inbox-item-urgency-' + urgency + '">' + ({1:'FYI',2:'Low',3:'Med',4:'High',5:'Critical'})[urgency] + '</span>' +
+                    '<span class="dash-inbox-item-time">' + timeStr + '</span>' +
+                '</div>' +
+                '<div class="dash-inbox-item-preview">' + (msg.latest_preview || msg.preview || msg.ai_summary || '') + '</div>' +
+            '</div>';
+        feed.appendChild(el);
+    });
+}
+
+function setupHomeHandlers() {
+    // Inbox tabs
+    let homeInboxMsgs = [];
+    document.getElementById('dashInboxTabs')?.addEventListener('click', function(e) {
+        const tab = e.target.closest('.dash-inbox-tab');
+        if (!tab) return;
+        this.querySelectorAll('.dash-inbox-tab').forEach(b => b.classList.remove('active'));
+        tab.classList.add('active');
+        const filter = tab.dataset.filter;
+        // Re-fetch for fresh data
+        fetch('/api/messages/grouped?limit=6' + (filter === 'whatsapp' ? '&source=whatsapp' : filter === 'email' ? '&source=gmail' : ''))
+            .then(r => r.json())
+            .then(msgs => renderHomeInbox(msgs, filter))
+            .catch(() => renderHomeInbox([], filter));
+    });
+
+    // "View all" link → switch to inbox tab
+    document.getElementById('dashInboxViewAll')?.addEventListener('click', function() {
+        if (typeof showPanel === 'function') showPanel('inbox');
+    });
+
+    // Quick suggestion chips — click to fill + send
+    document.getElementById('dashPaChips')?.addEventListener('click', function(e) {
+        const chip = e.target.closest('.dash-pa-chip');
+        if (!chip) return;
+        const prompt = chip.dataset.prompt;
+        if (prompt && typeof sendHomePAMessage === 'function') {
+            sendHomePAMessage(prompt);
+        }
+    });
+
+    // PA Chat bar
+    const paInput = document.getElementById('dashPaInput');
+    const paSend = document.getElementById('dashPaSend');
+    const paResponse = document.getElementById('dashPaResponse');
+    const paResponseText = document.getElementById('dashPaResponseText');
+    const paClose = document.getElementById('dashPaClose');
+
+    if (paInput) {
+        paInput.addEventListener('input', function() {
+            paSend.disabled = !this.value.trim();
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+        });
+        paInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (this.value.trim()) sendHomePAMessage(this.value.trim());
+            }
+        });
+    }
+    if (paSend) paSend.addEventListener('click', function() {
+        if (paInput && paInput.value.trim()) sendHomePAMessage(paInput.value.trim());
+    });
+    if (paClose) paClose.addEventListener('click', function() {
+        if (paResponse) paResponse.classList.remove('active');
+    });
+
+    function escHtml(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    async function sendHomePAMessage(message) {
+        if (!paInput || !paResponse || !paResponseText) return;
+        paInput.value = '';
+        paInput.style.height = 'auto';
+        paSend.disabled = true;
+        paResponse.classList.add('active');
+        paResponseText.innerHTML = '<span class="pa-thinking">Thinking…</span>';
+        try {
+            const res = await fetch('/api/pa/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            });
+            const data = await res.json();
+            const text = data.response || data.error || 'No response';
+
+            // Strip COMMAND blocks from raw text BEFORE escaping
+            // Claude sometimes wraps them in ``` code fences — remove those too
+            let displayText = text
+                .replace(/```[^\n]*\nCOMMAND:[\s\S]*?```/g, '')  // ``` fenced COMMAND blocks
+                .replace(/^COMMAND:\s*\w+\s*\n\{[\s\S]*?\}/gm, '')  // bare COMMAND: ... {json}
+                .replace(/^COMMAND:\s*\w+[^\n]*$/gm, '')            // any remaining COMMAND: lines
+                .replace(/```\s*\n?\s*```/g, '')                     // leftover empty fences
+                .replace(/\n{3,}/g, '\n\n')                          // collapse extra blank lines
+                .trim();
+
+            // Markdown-ish formatting
+            let html = escHtml(displayText)
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+
+            paResponseText.innerHTML = html;
+
+            // Render confirmation cards for pending send actions
+            const pendingActions = data.pendingActions || [];
+            if (pendingActions.length) {
+                const wrap = document.createElement('div');
+                wrap.className = 'pa-confirm-wrap';
+                pendingActions.forEach((action, idx) => {
+                    const p = action.params;
+                    const card = document.createElement('div');
+                    card.className = 'pa-confirm-card';
+
+                    if (action.command === 'send_whatsapp') {
+                        const toName   = p.recipient_name || p.recipient;
+                        const labelBadge = p._label === 'vip' ? ' <span class="contact-tag" style="vertical-align:middle;font-size:10px;">⭐ VIP</span>' : '';
+                        const typeBadge  = p._type ? ` <span class="contact-tag" style="vertical-align:middle;font-size:10px;">${escHtml(p._type)}</span>` : '';
+                        card.innerHTML = `
+                            <div class="pa-confirm-header">
+                                <span class="pa-confirm-icon">💬</span>
+                                WhatsApp → <strong>${escHtml(toName)}</strong>${labelBadge}${typeBadge}
+                                <span style="font-size:10px;color:var(--text-dim);margin-left:6px;">${escHtml(p.recipient)}</span>
+                            </div>
+                            <div class="pa-confirm-body">${escHtml(p.message)}</div>
+                            <div class="pa-confirm-actions">
+                                <button class="pa-confirm-yes">Send</button>
+                                <button class="pa-confirm-cancel">Cancel</button>
+                            </div>`;
+                    } else if (action.command === 'send_email') {
+                        const toName   = p.recipient_name || p.to;
+                        const labelBadge = p._label === 'vip' ? ' <span class="contact-tag" style="vertical-align:middle;font-size:10px;">⭐ VIP</span>' : '';
+                        const preview = (p.body || '').slice(0, 200) + ((p.body || '').length > 200 ? '…' : '');
+                        card.innerHTML = `
+                            <div class="pa-confirm-header">
+                                <span class="pa-confirm-icon">✉️</span>
+                                Email → <strong>${escHtml(toName)}</strong>${labelBadge}
+                                ${toName !== p.to ? `<span style="font-size:10px;color:var(--text-dim);margin-left:6px;">${escHtml(p.to)}</span>` : ''}
+                            </div>
+                            <div class="pa-confirm-subject" style="font-size:11px;color:var(--text-dim);margin:4px 0;">Subject: ${escHtml(p.subject || '')}</div>
+                            <div class="pa-confirm-body">${escHtml(preview)}</div>
+                            <div class="pa-confirm-actions">
+                                <button class="pa-confirm-yes">Send</button>
+                                <button class="pa-confirm-cancel">Cancel</button>
+                            </div>`;
+                    }
+
+                    card.querySelector('.pa-confirm-yes')?.addEventListener('click', async function() {
+                        this.disabled = true;
+                        this.textContent = 'Sending…';
+                        const payload = action.command === 'send_whatsapp'
+                            ? { type: 'whatsapp', recipient: p.recipient, message: p.message }
+                            : { type: 'email', recipient: p.to, subject: p.subject, message: p.body };
+                        try {
+                            const r = await fetch('/api/pa/send', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+                            const d = await r.json();
+                            card.innerHTML = d.success
+                                ? '<div class="pa-confirm-sent">✅ Sent</div>'
+                                : `<div class="pa-confirm-error">❌ ${escHtml(d.error || 'Send failed')}</div>`;
+                        } catch (e) {
+                            card.innerHTML = `<div class="pa-confirm-error">❌ ${escHtml(e.message)}</div>`;
+                        }
+                    });
+
+                    card.querySelector('.pa-confirm-cancel')?.addEventListener('click', function() {
+                        card.innerHTML = '<div class="pa-confirm-cancelled">Cancelled</div>';
+                    });
+
+                    wrap.appendChild(card);
+                });
+                paResponseText.appendChild(wrap);
+            }
+        } catch (e) {
+            paResponseText.textContent = 'Failed to reach PA. Is the server running?';
+        }
+    }
+}
+
+window.loadHomeData = loadHomeData;
+
 // Load all dashboard data on page load
 // Wait a bit to ensure all elements are rendered
 setTimeout(() => {
     console.log('Initializing dashboard...');
     refreshGitHubGraph();
     updateSocialNumbers();
+    // Load home panel (default) + dashboard data in parallel
+    loadHomeData();
     loadDashboardData();
 }, 100);
 
@@ -512,58 +1094,7 @@ function scheduleGitHubRefresh() {
 scheduleGitHubRefresh();
 
 // Refresh data every 5 minutes
-setInterval(loadDashboardData, 5 * 60 * 1000);
-
-// AI Notepad submission - Connect to Claude
-const sendMessage = async function() {
-    const textarea = document.querySelector('.ai-notepad-input');
-    const button = document.querySelector('.ai-notepad-btn');
-    const text = textarea.value.trim();
-    
-    if (!text) return;
-    
-    // Visual feedback
-    button.disabled = true;
-    
-    try {
-        // Send to Claude API via backend
-        const response = await fetch('/api/agent', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ message: text })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.response) {
-            // Success - clear input
-            textarea.value = '';
-            
-            // Optional: Display response somewhere or log it
-            console.log('Claude response:', data.response);
-        } else {
-            throw new Error(data.error || 'Failed to get response');
-        }
-    } catch (error) {
-        console.error('Error sending to Claude:', error);
-    } finally {
-        button.disabled = false;
-        textarea.focus();
-    }
-};
-
-// Button click
-document.querySelector('.ai-notepad-btn').addEventListener('click', sendMessage);
-
-// Enter key (but allow Shift+Enter for new line)
-document.querySelector('.ai-notepad-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
+setInterval(() => { loadDashboardData(); loadHomeData(); }, 5 * 60 * 1000);
 
 // Dashboard project card: open full-screen revenue projections modal
 let projectionsChartInstance = null;
@@ -699,7 +1230,9 @@ async function openProjectModal(projectId) {
         document.getElementById('pmDescription').value = project.description || '';
         document.getElementById('pmHoursWeek').value = project.hours_per_week || 10;
         document.getElementById('pmMonths').value = project.months_to_results || 6;
-        
+        const statusEl = document.getElementById('pmStatus');
+        if (statusEl) statusEl.value = (project.status || 'active').toLowerCase();
+
         const model = project.business_model || 'saas';
         document.querySelectorAll('input[name="pmModel"]').forEach(r => r.checked = r.value === model);
         
@@ -892,6 +1425,7 @@ document.getElementById('projectModalSave')?.addEventListener('click', async fun
         hours_per_week: Number(document.getElementById('pmHoursWeek')?.value) || 10,
         months_to_results: Number(document.getElementById('pmMonths')?.value) || 6,
         business_model: document.querySelector('input[name="pmModel"]:checked')?.value || 'saas',
+        status: document.getElementById('pmStatus')?.value || 'active',
         revenue_worst: analysis?.revenue_worst || null,
         revenue_base: analysis?.revenue_base || null,
         revenue_lucky: analysis?.revenue_best || null,
@@ -1008,12 +1542,14 @@ async function loadTodos() {
         // Build HTML: undone first, then done
         let html = '';
         
-        // Undone todos
+        // Undone todos (draggable; drag handle so checkbox still works)
+        const dragHandleSvg = '<span class="todo-drag-handle" draggable="true" title="Drag to reorder"><svg width="10" height="10" viewBox="0 0 10 10"><circle cx="2" cy="2" r=".8" fill="currentColor"/><circle cx="5" cy="2" r=".8" fill="currentColor"/><circle cx="8" cy="2" r=".8" fill="currentColor"/><circle cx="2" cy="5" r=".8" fill="currentColor"/><circle cx="5" cy="5" r=".8" fill="currentColor"/><circle cx="8" cy="5" r=".8" fill="currentColor"/></svg></span>';
         undoneTodos.forEach(todo => {
             html += `
-                <label class="todo-item">
+                <label class="todo-item todo-item-undone" data-id="${todo.id}">
+                    ${dragHandleSvg}
                     <input type="checkbox" class="todo-checkbox" data-id="${todo.id}">
-                    <span class="todo-text">${todo.text}</span>
+                    <span class="todo-text">${(todo.text || '').replace(/</g, '&lt;')}</span>
                 </label>
             `;
         });
@@ -1036,9 +1572,9 @@ async function loadTodos() {
             doneTodos.forEach(todo => {
                 const archivedClass = todo.archived ? 'todo-item-archived' : '';
                 html += `
-                    <label class="todo-item todo-item-done ${archivedClass}">
+                    <label class="todo-item todo-item-done ${archivedClass}" data-id="${todo.id}">
                         <input type="checkbox" class="todo-checkbox" data-id="${todo.id}" checked>
-                        <span class="todo-text">${todo.text}</span>
+                        <span class="todo-text">${(todo.text || '').replace(/</g, '&lt;')}</span>
                         ${todo.archived ? '<span class="todo-archived-badge">archived</span>' : ''}
                     </label>
                 `;
@@ -1050,6 +1586,8 @@ async function loadTodos() {
         todoList.innerHTML = html;
         
         updateTodoCount();
+        initTodoDragDrop(todoList);
+        initTodoCollapse(undoneTodos.length, doneTodos.length);
         
         // Initialize expand button
         const expandBtn = document.getElementById('expandDoneBtn');
@@ -1097,6 +1635,85 @@ async function loadTodos() {
     }
 }
 
+function initTodoDragDrop(todoList) {
+    if (!todoList) return;
+    const handle = (e) => e.target.closest('.todo-drag-handle');
+    todoList.addEventListener('dragstart', function(e) {
+        const h = handle(e);
+        if (!h) return;
+        const item = h.closest('.todo-item');
+        if (!item || !item.dataset.id) return;
+        e.dataTransfer.setData('text/plain', item.dataset.id);
+        e.dataTransfer.effectAllowed = 'move';
+        item.classList.add('todo-dragging');
+    });
+    todoList.addEventListener('dragend', function(e) {
+        const item = e.target.closest('.todo-item');
+        if (item) item.classList.remove('todo-dragging');
+    });
+    todoList.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    });
+    todoList.addEventListener('drop', async function(e) {
+        e.preventDefault();
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (!draggedId) return;
+        const targetItem = e.target.closest('.todo-item');
+        if (!targetItem || targetItem.dataset.id === draggedId) return;
+        const items = Array.from(todoList.querySelectorAll('.todo-item[data-id]'));
+        const ids = items.map(el => el.dataset.id);
+        const fromIdx = ids.indexOf(draggedId);
+        const toIdx = ids.indexOf(targetItem.dataset.id);
+        if (fromIdx === -1 || toIdx === -1) return;
+        ids.splice(fromIdx, 1);
+        ids.splice(toIdx, 0, draggedId);
+        const moved = items[fromIdx];
+        const toEl = items[toIdx];
+        if (moved && toEl && moved !== toEl) {
+            if (fromIdx < toIdx) toEl.parentNode.insertBefore(moved, toEl.nextSibling);
+            else toEl.parentNode.insertBefore(moved, toEl);
+        }
+        try {
+            const r = await fetch('/api/todos/reorder', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids })
+            });
+            if (!r.ok) await loadTodos();
+        } catch (err) {
+            await loadTodos();
+        }
+    });
+}
+
+const TODO_COLLAPSE_THRESHOLD = 5;
+let todoListCollapsed = true;
+
+function initTodoCollapse(undoneCount, doneCount) {
+    const wrapper = document.getElementById('todoListWrapper');
+    const btn = document.getElementById('todoCollapseBtn');
+    const section = document.getElementById('todoSection');
+    if (!wrapper || !btn || !section) return;
+    const totalItems = undoneCount + doneCount;
+    if (totalItems <= TODO_COLLAPSE_THRESHOLD) {
+        btn.style.display = 'none';
+        section.classList.remove('todo-section-collapsed');
+        wrapper.style.maxHeight = '';
+    } else {
+        btn.style.display = 'block';
+        section.classList.toggle('todo-section-collapsed', todoListCollapsed);
+        wrapper.style.maxHeight = todoListCollapsed ? '14rem' : 'none';
+        btn.textContent = todoListCollapsed ? `Show more (${totalItems} items)` : 'Show less';
+        btn.onclick = function() {
+            todoListCollapsed = !todoListCollapsed;
+            section.classList.toggle('todo-section-collapsed', todoListCollapsed);
+            wrapper.style.maxHeight = todoListCollapsed ? '14rem' : 'none';
+            btn.textContent = todoListCollapsed ? `Show more (${totalItems} items)` : 'Show less';
+        };
+    }
+}
+
 function updateTodoCount() {
     const checkboxes = document.querySelectorAll('.todo-checkbox');
     const checked = document.querySelectorAll('.todo-checkbox:checked').length;
@@ -1134,3 +1751,187 @@ window.addEventListener('load', function() {
 //     // Fetch from https://soulin-social-bot.vercel.app/api/posts
 //     // Display centerPost title for next 2 scheduled posts
 // }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTACTS
+// ─────────────────────────────────────────────────────────────────────────────
+let contactsData = [];
+
+async function loadContacts() {
+    const q     = document.getElementById('contactSearch')?.value.trim() || '';
+    const label = document.getElementById('contactFilterLabel')?.value || '';
+    const type  = document.getElementById('contactFilterType')?.value  || '';
+
+    let url = '/api/contacts?';
+    if (q)     url += `q=${encodeURIComponent(q)}&`;
+    if (label) url += `label=${encodeURIComponent(label)}&`;
+    if (type)  url += `type=${encodeURIComponent(type)}&`;
+
+    try {
+        const data = await fetch(url).then(r => r.json());
+        contactsData = Array.isArray(data) ? data : [];
+        renderContacts(contactsData);
+    } catch (e) {
+        renderContacts([]);
+    }
+}
+
+function renderContacts(contacts) {
+    const list = document.getElementById('contactsList');
+    if (!list) return;
+    if (!contacts.length) {
+        list.innerHTML = '<div class="contacts-empty">No contacts found.</div>';
+        return;
+    }
+    list.innerHTML = contacts.map(c => {
+        const initials = (c.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const isVip    = c.label === 'vip';
+        const tags = [
+            c.type ? `<span class="contact-tag">${c.type}</span>` : '',
+            c.relationship ? `<span class="contact-tag">${escHtml(c.relationship)}</span>` : '',
+            c.project_name ? `<span class="contact-tag project">${escHtml(c.project_name)}</span>` : '',
+        ].join('');
+        const reach = [
+            c.email ? `<span>✉ <a href="mailto:${escHtml(c.email)}">${escHtml(c.email)}</a></span>` : '',
+            c.phone ? `<span>📱 ${escHtml(c.phone)}</span>` : '',
+            c.whatsapp_jid ? `<span>💬 ${escHtml(c.whatsapp_jid)}</span>` : '',
+        ].filter(Boolean).join('');
+        return `
+        <div class="contact-card${isVip ? ' is-vip' : ''}" data-id="${c.id}">
+            <div class="contact-avatar ${c.type || 'personal'}">${initials}</div>
+            <div class="contact-body">
+                <div class="contact-name">
+                    ${isVip ? '<span class="contact-vip-star">⭐</span>' : ''}
+                    ${escHtml(c.name)}
+                </div>
+                ${tags ? `<div class="contact-tags">${tags}</div>` : ''}
+                ${reach ? `<div class="contact-reach">${reach}</div>` : ''}
+                ${c.notes ? `<div class="contact-notes">${escHtml(c.notes)}</div>` : ''}
+            </div>
+            <div class="contact-actions">
+                <button class="contact-btn" data-action="edit" data-id="${c.id}">Edit</button>
+                <button class="contact-btn danger" data-action="delete" data-id="${c.id}">×</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Wire action buttons
+    list.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const id = btn.dataset.id;
+            if (btn.dataset.action === 'edit') {
+                const c = contactsData.find(x => String(x.id) === String(id));
+                if (c) openContactForm(c);
+            } else if (btn.dataset.action === 'delete') {
+                if (!confirm(`Delete ${contactsData.find(x=>String(x.id)===String(id))?.name}?`)) return;
+                await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+                loadContacts();
+            }
+        });
+    });
+}
+
+function openContactForm(contact = null) {
+    const wrap = document.getElementById('contactFormWrap');
+    if (!wrap) return;
+    wrap.style.display = 'block';
+    document.getElementById('contactFormTitle').textContent = contact ? 'Edit Contact' : 'New Contact';
+    document.getElementById('contactFormId').value  = contact?.id || '';
+    document.getElementById('cfName').value         = contact?.name || '';
+    document.getElementById('cfEmail').value        = contact?.email || '';
+    document.getElementById('cfPhone').value        = contact?.phone || '';
+    document.getElementById('cfJid').value          = contact?.whatsapp_jid || '';
+    document.getElementById('cfLabel').value        = contact?.label || 'regular';
+    document.getElementById('cfType').value         = contact?.type || 'personal';
+    document.getElementById('cfRelationship').value = contact?.relationship || '';
+    document.getElementById('cfNotes').value        = contact?.notes || '';
+
+    // Populate project dropdown
+    fetch('/api/projects').then(r => r.json()).then(projects => {
+        const sel = document.getElementById('cfProject');
+        sel.innerHTML = '<option value="">None</option>';
+        (Array.isArray(projects) ? projects : []).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            if (contact?.project_id == p.id) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    }).catch(() => {});
+
+    // Auto-fill JID from phone on blur
+    document.getElementById('cfPhone').oninput = function() {
+        const jid = document.getElementById('cfJid');
+        if (!jid.value || jid.value.endsWith('@s.whatsapp.net')) {
+            const num = this.value.replace(/[\s\-\+\(\)]/g, '');
+            jid.value = num ? num + '@s.whatsapp.net' : '';
+        }
+    };
+
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeContactForm() {
+    const wrap = document.getElementById('contactFormWrap');
+    if (wrap) wrap.style.display = 'none';
+}
+
+async function saveContact() {
+    const id   = document.getElementById('contactFormId').value;
+    const body = {
+        name:         document.getElementById('cfName').value.trim(),
+        email:        document.getElementById('cfEmail').value.trim() || null,
+        phone:        document.getElementById('cfPhone').value.trim() || null,
+        whatsapp_jid: document.getElementById('cfJid').value.trim()  || null,
+        label:        document.getElementById('cfLabel').value,
+        type:         document.getElementById('cfType').value,
+        project_id:   document.getElementById('cfProject').value || null,
+        relationship: document.getElementById('cfRelationship').value.trim() || null,
+        notes:        document.getElementById('cfNotes').value.trim() || null,
+    };
+    if (!body.name) { alert('Name is required'); return; }
+
+    const url    = id ? `/api/contacts/${id}` : '/api/contacts';
+    const method = id ? 'PATCH' : 'POST';
+    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    closeContactForm();
+    loadContacts();
+}
+
+async function syncWhatsAppContacts() {
+    const btn = document.getElementById('syncWaContactsBtn');
+    if (btn) { btn.textContent = '⏳ Syncing…'; btn.disabled = true; }
+    try {
+        const r = await fetch('/api/contacts/sync-whatsapp', { method: 'POST' });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        if (btn) btn.textContent = `✅ +${d.added} added`;
+        setTimeout(() => { if (btn) { btn.textContent = '💬 Sync WA'; btn.disabled = false; } }, 3000);
+        loadContacts();
+    } catch (e) {
+        if (btn) { btn.textContent = '❌ Failed'; btn.disabled = false; }
+        console.warn('WA sync failed:', e.message);
+        setTimeout(() => { if (btn) { btn.textContent = '💬 Sync WA'; } }, 3000);
+    }
+}
+
+function setupContactHandlers() {
+    document.getElementById('addContactBtn')?.addEventListener('click', () => openContactForm());
+    document.getElementById('contactFormCancel')?.addEventListener('click', closeContactForm);
+    document.getElementById('contactFormSave')?.addEventListener('click', saveContact);
+    document.getElementById('syncWaContactsBtn')?.addEventListener('click', syncWhatsAppContacts);
+
+    let searchTimer;
+    document.getElementById('contactSearch')?.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(loadContacts, 300);
+    });
+    document.getElementById('contactFilterLabel')?.addEventListener('change', loadContacts);
+    document.getElementById('contactFilterType')?.addEventListener('change', loadContacts);
+}
+
+// Init contacts when tab is switched to
+document.addEventListener('DOMContentLoaded', () => {
+    setupContactHandlers();
+});
+window.__loadContacts = loadContacts; // called by app-tabs.js on tab switch

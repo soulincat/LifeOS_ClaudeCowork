@@ -160,21 +160,19 @@ class WiseIntegration {
                 `);
                 const existing = checkStmt.get(todayStr);
 
+                const sourceId = 'wise_spending_' + todayStr;
                 if (existing) {
-                    // Update existing entry
                     const updateStmt = db.prepare(`
-                        UPDATE finance_entries 
-                        SET amount = ? 
+                        UPDATE finance_entries SET amount = ?, is_synced = 1, source_id = ?
                         WHERE date = ? AND type = 'spending' AND source = 'wise'
                     `);
-                    updateStmt.run(totalSpending, todayStr);
+                    updateStmt.run(totalSpending, sourceId, todayStr);
                 } else {
-                    // Insert new entry
                     const stmt = db.prepare(`
-                        INSERT INTO finance_entries (date, type, amount, account_type, source)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO finance_entries (date, type, amount, account_type, source, is_synced, source_id)
+                        VALUES (?, ?, ?, ?, ?, 1, ?)
                     `);
-                    stmt.run(todayStr, 'spending', totalSpending, 'personal', 'wise');
+                    stmt.run(todayStr, 'spending', totalSpending, 'personal', 'wise', sourceId);
                 }
                 console.log(`✅ Synced Wise spending (month-to-date): $${totalSpending.toFixed(2)}`);
             }

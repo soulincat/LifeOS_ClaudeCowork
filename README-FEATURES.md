@@ -125,9 +125,10 @@ rm ~/Library/LaunchAgents/com.lifeos.dashboard.plist
 - Make sure server is running (`npm start`)
 
 **Auto-launch not working?**
-- Check logs: `tail -f ~/Library/Logs/lifeos-dashboard.log`
-- Verify LaunchAgent: `launchctl list | grep lifeos`
-- Make sure Node.js is in PATH
+- The app runs on **port 3001** (browser must open http://localhost:3001). If it was opening 3000, re-run: `./scripts/setup-auto-launch.sh` then log out and back in (or reboot).
+- Check logs: `tail -f ~/Library/Logs/lifeos-dashboard.log` and `tail -f ~/Library/Logs/lifeos-dashboard-error.log`
+- Verify LaunchAgent: `launchctl list | grep lifeos` (should show com.lifeos.dashboard).
+- If the server never starts, Node may not be in PATH when the agent runs. Add your Node path (e.g. from `which node`) to the PATH in `~/Library/LaunchAgents/com.lifeos.dashboard.plist` (EnvironmentVariables → PATH), then run `launchctl unload ~/Library/LaunchAgents/com.lifeos.dashboard.plist` and `launchctl load ~/Library/LaunchAgents/com.lifeos.dashboard.plist`.
 
 **Dark mode not persisting?**
 - Check browser localStorage permissions

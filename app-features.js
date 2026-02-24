@@ -125,7 +125,12 @@ async function loadAllData() {
                 if (label === 'Recovery') valueEl.textContent = (health.recovery ?? '') + '%';
                 else if (label === 'Sleep') valueEl.textContent = (health.sleep_hours ?? 0) + 'h ' + (health.sleep_minutes ?? 0) + 'm';
                 else if (label === 'HRV') valueEl.textContent = (health.hrv ?? '') + 'ms';
-                else if (label === 'Cycle') valueEl.textContent = health.cycle_phase || '—';
+                else if (label === 'Cycle') {
+                    const raw = health.cycle_phase || '';
+                    const phaseLabels = { follicular: 'Follicular - feel OK', ovulatory: 'Ovulatory - horny', luteal: 'Luteal - feel OK', pms: 'PMS - depression', period: 'Period' };
+                    const display = raw && !raw.includes(' - ') ? (phaseLabels[raw.toLowerCase().replace(/\s+/g, '')] || phaseLabels[raw.toLowerCase()] || raw) : raw;
+                    valueEl.textContent = display || '—';
+                }
             });
             const phaseEl = document.getElementById('healthMonthlyPhase');
             if (phaseEl && health.monthly_phase) phaseEl.textContent = health.monthly_phase;

@@ -15,7 +15,7 @@ export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 sleep 3
 npm start > /dev/null 2>&1 &
 sleep 5
-open "http://localhost:3000"
+open "http://localhost:3001"
 EOF
 
 # Replace PROJECT_DIR placeholder

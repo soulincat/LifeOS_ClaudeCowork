@@ -111,6 +111,14 @@ router.get('/', (req, res) => {
         // Total net = investment + asset (always computed)
         finance.constants.total_net = investment + (finance.constants.asset || 0);
         
+        // Synced sources in this month (for "Synced from Stripe/Wise" badge)
+        const syncedStmt = db.prepare(`
+            SELECT DISTINCT source FROM finance_entries
+            WHERE date >= ? AND date <= ? AND is_synced = 1 AND source IN ('stripe', 'wise')
+        `);
+        const syncedRows = syncedStmt.all(startDate, endDate);
+        finance.synced_sources = syncedRows.map(r => r.source).filter(Boolean);
+        
         res.json(finance);
     } catch (error) {
         console.error('Error fetching finance data:', error);
@@ -188,7 +196,7 @@ router.get('/history', (req, res) => {
 router.get('/entries', (req, res) => {
     try {
         const rows = db.prepare(`
-            SELECT id, date, type, amount, account_type, source, created_at
+            SELECT id, date, type, amount, account_type, source, is_synced, source_id, created_at
             FROM finance_entries
             ORDER BY date DESC, id DESC
         `).all();
@@ -215,8 +223,8 @@ router.post('/', (req, res) => {
         const targetDate = date || new Date().toISOString().split('T')[0];
 
         const stmt = db.prepare(`
-            INSERT INTO finance_entries (date, type, amount, account_type, source)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO finance_entries (date, type, amount, account_type, source, is_synced)
+            VALUES (?, ?, ?, ?, ?, 0)
         `);
 
         stmt.run(targetDate, type, amount, account_type || 'personal', source || 'manual');
@@ -224,6 +232,52 @@ router.post('/', (req, res) => {
     } catch (error) {
         console.error('Error adding finance entry:', error);
         res.status(500).json({ error: 'Failed to add finance entry' });
+    }
+});
+
+/**
+ * PATCH /api/finance/entries/:id
+ * Update a finance entry. Rejects if is_synced (Stripe/Wise).
+ */
+router.patch('/entries/:id', (req, res) => {
+    try {
+        const id = req.params.id;
+        const row = db.prepare('SELECT id, is_synced FROM finance_entries WHERE id = ?').get(id);
+        if (!row) return res.status(404).json({ error: 'Entry not found' });
+        if (row.is_synced) return res.status(403).json({ error: 'Synced entries (Stripe/Wise) cannot be edited. Add a manual entry to override.' });
+        const { date, type, amount, account_type, source } = req.body;
+        const updates = [];
+        const values = [];
+        if (date !== undefined) { updates.push('date = ?'); values.push(date); }
+        if (type !== undefined) { updates.push('type = ?'); values.push(type); }
+        if (amount !== undefined) { updates.push('amount = ?'); values.push(Number(amount)); }
+        if (account_type !== undefined) { updates.push('account_type = ?'); values.push(account_type); }
+        if (source !== undefined) { updates.push('source = ?'); values.push(source); }
+        if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+        values.push(id);
+        db.prepare('UPDATE finance_entries SET ' + updates.join(', ') + ' WHERE id = ?').run(...values);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating finance entry:', error);
+        res.status(500).json({ error: 'Failed to update finance entry' });
+    }
+});
+
+/**
+ * DELETE /api/finance/entries/:id
+ * Delete a finance entry. Rejects if is_synced (Stripe/Wise).
+ */
+router.delete('/entries/:id', (req, res) => {
+    try {
+        const id = req.params.id;
+        const row = db.prepare('SELECT id, is_synced FROM finance_entries WHERE id = ?').get(id);
+        if (!row) return res.status(404).json({ error: 'Entry not found' });
+        if (row.is_synced) return res.status(403).json({ error: 'Synced entries (Stripe/Wise) cannot be deleted.' });
+        db.prepare('DELETE FROM finance_entries WHERE id = ?').run(id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting finance entry:', error);
+        res.status(500).json({ error: 'Failed to delete finance entry' });
     }
 });
 

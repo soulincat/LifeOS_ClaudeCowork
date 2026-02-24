@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "lifeos": {
+      "command": "node",
+      "args": ["mcp-server/index.js"],
+      "description": "LifeOS tools — ingest_message, get_priorities, get_recent_context, get_pending_count"
+    },
+    "whatsapp": {
+      "command": "/opt/homebrew/bin/uv",
+      "args": [
+        "--directory",
+        "/Users/cat/code/whatsapp-mcp/whatsapp-mcp-server",
+        "run",
+        "main.py"
+      ],
+      "description": "WhatsApp — read/send messages via personal WhatsApp account"
+    }
+  }
+}

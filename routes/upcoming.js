@@ -44,6 +44,30 @@ router.post('/', (req, res) => {
 });
 
 /**
+ * PATCH /api/upcoming/:id
+ * Update an upcoming item (e.g. reschedule)
+ */
+router.patch('/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { due_date, title, description, type } = req.body;
+        const fields = [];
+        const values = [];
+        if (due_date !== undefined) { fields.push('due_date = ?'); values.push(due_date); }
+        if (title !== undefined) { fields.push('title = ?'); values.push(title); }
+        if (description !== undefined) { fields.push('description = ?'); values.push(description); }
+        if (type !== undefined) { fields.push('type = ?'); values.push(type); }
+        if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+        values.push(id);
+        db.prepare(`UPDATE upcoming_items SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating upcoming item:', error);
+        res.status(500).json({ error: 'Failed to update upcoming item' });
+    }
+});
+
+/**
  * DELETE /api/upcoming/:id
  * Delete an upcoming item
  */
@@ -56,6 +80,23 @@ router.delete('/:id', (req, res) => {
     } catch (error) {
         console.error('Error deleting upcoming item:', error);
         res.status(500).json({ error: 'Failed to delete upcoming item' });
+    }
+});
+
+/**
+ * POST /api/upcoming/sync-calendar
+ * Sync events from Apple Calendar into upcoming_items.
+ * Optional body: { calendarNames: ['집', '직장'] }
+ */
+router.post('/sync-calendar', (req, res) => {
+    try {
+        const { calendarNames } = req.body || {};
+        const { syncCalendarEvents } = require('../integrations/apple-calendar-read');
+        const result = syncCalendarEvents({ calendarNames });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Calendar sync error:', error.message);
+        res.status(500).json({ error: error.message });
     }
 });
 
