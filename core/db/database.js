@@ -672,15 +672,30 @@ if (fs.existsSync(schemaPath)) {
         `);
     } catch (e) { /* */ }
 
-    // Migrate: extend messages with priority tier, project, contact, category
+    // Migrate: extend messages with priority tier, project, contact, category, action_tag
     try {
         const mCols = db.prepare("PRAGMA table_info(messages)").all().map(r => r.name);
         if (!mCols.includes('project_id')) db.exec('ALTER TABLE messages ADD COLUMN project_id INTEGER REFERENCES projects(id)');
         if (!mCols.includes('contact_id')) db.exec('ALTER TABLE messages ADD COLUMN contact_id INTEGER REFERENCES contacts(id)');
         if (!mCols.includes('category')) db.exec('ALTER TABLE messages ADD COLUMN category TEXT');
         if (!mCols.includes('priority_tier')) db.exec("ALTER TABLE messages ADD COLUMN priority_tier TEXT DEFAULT 'medium'");
+        if (!mCols.includes('action_tag')) db.exec('ALTER TABLE messages ADD COLUMN action_tag TEXT');
         db.exec('CREATE INDEX IF NOT EXISTS idx_messages_priority_tier ON messages(priority_tier)');
         db.exec('CREATE INDEX IF NOT EXISTS idx_messages_project_id ON messages(project_id)');
+        // Backfill action_tag on existing messages (one-time)
+        const needsTag = db.prepare("SELECT COUNT(*) as c FROM messages WHERE action_tag IS NULL OR action_tag = ''").get();
+        if (needsTag.c > 0) {
+            try {
+                const { detectActionTag } = require('./derived-state');
+                const toFill = db.prepare("SELECT id, preview, subject FROM messages WHERE action_tag IS NULL OR action_tag = ''").all();
+                const upd = db.prepare('UPDATE messages SET action_tag = ? WHERE id = ?');
+                const fillMany = db.transaction((rows) => {
+                    for (const r of rows) upd.run(detectActionTag(r.preview, r.subject), r.id);
+                });
+                fillMany(toFill);
+                console.log(`Backfilled action_tag on ${toFill.length} messages`);
+            } catch (e) { console.warn('action_tag backfill skipped:', e.message); }
+        }
     } catch (e) { /* */ }
 
     // Migrate: extend inbox_items with priority tier, contact, category

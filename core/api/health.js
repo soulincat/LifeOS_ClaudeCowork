@@ -118,7 +118,8 @@ router.get('/whoop/status', (req, res) => {
     const hasLegacyToken = !!process.env.WHOOP_API_TOKEN;
     res.json({
         connected: hasOAuth || hasLegacyToken,
-        method: hasOAuth ? 'oauth' : (hasLegacyToken ? 'token' : null)
+        method: hasOAuth ? 'oauth' : (hasLegacyToken ? 'token' : null),
+        needsReconnect: !!whoop._needsReconnect
     });
 });
 
@@ -144,8 +145,10 @@ router.post('/whoop/sync', async (req, res) => {
  * GET /api/health
  * Get latest health metrics. cycle_phase is auto-computed from health_cycle_config when config exists.
  */
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
     try {
+        // Ensure WHOOP data is fresh (triggers sync + token refresh if stale)
+        try { await whoop.ensureFresh(120); } catch (e) { /* non-blocking */ }
         const metrics = whoop.getLatestMetrics();
         
         if (!metrics) {
@@ -179,7 +182,8 @@ router.get('/', (req, res) => {
             cycle_phase: cycleConfig ? (cycle_phase ?? null) : metrics.cycle_phase,
             monthly_phase: metrics.monthly_phase,
             date: metrics.date,
-            sync_source: metrics.sync_source || null
+            sync_source: metrics.sync_source || null,
+            needsReconnect: !!whoop._needsReconnect
         });
     } catch (error) {
         console.error('Error fetching health metrics:', error);

@@ -37,6 +37,72 @@ function isWidgetEnabled(name) {
     }
 })();
 
+// ── Update check: fetch version status and show banner if update available ──
+(async function checkForUpdates() {
+    try {
+        const res = await fetch('/api/system/update-status');
+        const data = await res.json();
+
+        if (data.update_available && data.latest_version) {
+            const banner = document.getElementById('updateBanner');
+            const versionText = document.getElementById('updateVersionText');
+            const updateBtn = document.getElementById('updateBtn');
+            const dismissBtn = document.getElementById('dismissUpdateBtn');
+
+            if (banner && versionText) {
+                versionText.textContent = `v${data.latest_version}`;
+                banner.style.display = 'block';
+
+                updateBtn.addEventListener('click', performUpdate);
+                dismissBtn.addEventListener('click', () => {
+                    banner.style.display = 'none';
+                    sessionStorage.setItem('update_dismissed', '1');
+                });
+
+                // Don't show if already dismissed this session
+                if (sessionStorage.getItem('update_dismissed') === '1') {
+                    banner.style.display = 'none';
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Update check failed:', e);
+    }
+})();
+
+async function performUpdate() {
+    const banner = document.getElementById('updateBanner');
+    const content = document.querySelector('.update-banner-content');
+    const progress = document.getElementById('updateProgress');
+
+    // Show progress
+    if (content) content.style.display = 'none';
+    if (progress) progress.style.display = 'block';
+
+    try {
+        const res = await fetch('/api/system/update', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+            if (progress) progress.innerHTML = '<span>✅ Update applied. Restarting...</span>';
+            // Page will reload when server restarts
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            if (progress) progress.innerHTML = `<span>❌ Update failed: ${data.error}</span>`;
+            setTimeout(() => {
+                if (content) content.style.display = 'flex';
+                if (progress) progress.style.display = 'none';
+            }, 2000);
+        }
+    } catch (e) {
+        if (progress) progress.innerHTML = `<span>❌ Error: ${e.message}</span>`;
+        setTimeout(() => {
+            if (content) content.style.display = 'flex';
+            if (progress) progress.style.display = 'none';
+        }, 2000);
+    }
+}
+
 // Health display: set values and WHOOP-style colors (green / yellow / red)
 function updateHealthDisplay(health) {
     const recoveryEl = document.getElementById('healthRecoveryValue');
@@ -746,19 +812,21 @@ async function loadHomeData() {
 
     // ── Inbox: counts + feed ──
     try {
-        const countRes = await fetch(base + '/api/messages/counts');
-        const counts = await countRes.json();
+        const msgRes = await fetch(base + '/api/messages/grouped-by-context');
+        const inboxGroups = await msgRes.json();
+        // Store globally for tab filtering
+        window._homeInboxGroups = inboxGroups;
+        // Update tab counts
+        const allCount = inboxGroups.reduce((s, g) => s + g.senders.length, 0);
+        const workCount = inboxGroups.filter(g => g.type === 'business' || g.project_id).reduce((s, g) => s + g.senders.length, 0);
+        const personalCount = inboxGroups.filter(g => g.type === 'personal' && !g.project_id).reduce((s, g) => s + g.senders.length, 0);
         const tabAll = document.getElementById('dashTabAll');
-        const tabWa = document.getElementById('dashTabWa');
-        const tabEmail = document.getElementById('dashTabEmail');
-        if (tabAll) tabAll.textContent = (counts.total || 0) > 0 ? counts.total : '';
-        if (tabWa) tabWa.textContent = (counts.whatsapp || 0) > 0 ? counts.whatsapp : '';
-        if (tabEmail) tabEmail.textContent = ((counts.gmail || 0) + (counts.outlook || 0)) > 0 ? (counts.gmail || 0) + (counts.outlook || 0) : '';
-    } catch (e) { /* */ }
-    try {
-        const msgRes = await fetch(base + '/api/messages/grouped?limit=6');
-        const inboxMsgs = await msgRes.json();
-        renderHomeInbox(inboxMsgs, 'all');
+        const tabWork = document.getElementById('dashTabWork');
+        const tabPersonal = document.getElementById('dashTabPersonal');
+        if (tabAll) tabAll.textContent = allCount > 0 ? allCount : '';
+        if (tabWork) tabWork.textContent = workCount > 0 ? workCount : '';
+        if (tabPersonal) tabPersonal.textContent = personalCount > 0 ? personalCount : '';
+        renderHomeInbox(inboxGroups, 'all');
     } catch (e) { renderHomeInbox([], 'all'); }
 
     // ── Project Cards (collapsed by default, expand on click) ──
@@ -898,18 +966,24 @@ async function loadHomeData() {
     }
 }
 
-function renderHomeInbox(msgs, filter) {
+function renderHomeInbox(groups, filter) {
     const feed = document.getElementById('dashInboxFeed');
     const body = document.getElementById('dashInboxBody');
     const viewAll = document.getElementById('dashInboxViewAll');
     if (!feed) return;
+
     const sourceIcon = (s) => s === 'gmail' ? '\u2709' : s === 'outlook' ? '\ud83d\udce7' : s === 'whatsapp' ? '\ud83d\udcac' : '\ud83d\udce9';
-    let filtered = msgs;
-    if (filter === 'whatsapp') filtered = msgs.filter(m => m.source === 'whatsapp');
-    else if (filter === 'email') filtered = msgs.filter(m => m.source === 'gmail' || m.source === 'outlook');
-    else if (filter === 'cal') filtered = []; // upcoming meetings handled separately
-    // Collapse inbox entirely when no messages — no empty state noise
-    if (!filtered.length) {
+    const ACTION_LABELS = { reply_needed: 'Reply', approval: 'Approve', payment: 'Payment', deadline: 'Deadline', meeting: 'Meeting', question: 'Question', fyi: 'FYI' };
+    const escH = (s) => s ? String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
+
+    // Filter groups based on tab
+    let filtered = groups;
+    if (filter === 'work') filtered = groups.filter(g => g.type === 'business' || g.project_id);
+    else if (filter === 'personal') filtered = groups.filter(g => g.type === 'personal' && !g.project_id);
+
+    // Flatten to check if empty
+    const totalSenders = filtered.reduce((s, g) => s + g.senders.length, 0);
+    if (!totalSenders) {
         if (body) body.style.display = 'none';
         if (viewAll) viewAll.style.display = 'none';
         feed.innerHTML = '';
@@ -918,46 +992,120 @@ function renderHomeInbox(msgs, filter) {
     if (body) body.style.display = '';
     if (viewAll) viewAll.style.display = '';
     feed.innerHTML = '';
-    filtered.slice(0, 6).forEach(msg => {
-        const date = msg.latest_received_at || msg.received_at;
-        const timeStr = date ? new Date(date).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-        const urgency = msg.urgency_score || 3;
-        const el = document.createElement('div');
-        el.className = 'dash-inbox-item';
-        el.innerHTML =
-            '<div class="dash-inbox-item-icon">' + sourceIcon(msg.source) + '</div>' +
-            '<div class="dash-inbox-item-body">' +
-                '<div class="dash-inbox-item-top">' +
-                    '<span class="dash-inbox-item-sender">' + (msg.sender_name || msg.sender_address || 'Unknown') + '</span>' +
-                    (msg.msg_count > 1 ? '<span class="dash-inbox-item-urgency dash-inbox-item-urgency-' + urgency + '">' + msg.msg_count + '</span>' : '') +
-                    '<span class="dash-inbox-item-urgency dash-inbox-item-urgency-' + urgency + '">' + ({1:'FYI',2:'Low',3:'Med',4:'High',5:'Critical'})[urgency] + '</span>' +
-                    '<span class="dash-inbox-item-time">' + timeStr + '</span>' +
+
+    let count = 0;
+    for (const group of filtered) {
+        if (count >= 6) break;
+
+        // Group header (project name or Personal/Work)
+        const header = document.createElement('div');
+        header.className = 'dash-inbox-group-header';
+        header.textContent = group.name;
+        feed.appendChild(header);
+
+        for (const msg of group.senders) {
+            if (count >= 6) break;
+            const date = msg.latest_received_at || msg.received_at;
+            const timeStr = date ? new Date(date).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+            const urgency = msg.urgency_score || 3;
+            const actionLabel = ACTION_LABELS[msg.action_tag] || '';
+            const actionClass = msg.action_tag ? ' action-' + msg.action_tag : '';
+
+            const el = document.createElement('div');
+            el.className = 'dash-inbox-item';
+            el.dataset.source = msg.source;
+            el.dataset.senderAddress = msg.sender_address || '';
+            el.innerHTML =
+                '<div class="dash-inbox-item-icon">' + sourceIcon(msg.source) + '</div>' +
+                '<div class="dash-inbox-item-body">' +
+                    '<div class="dash-inbox-item-top">' +
+                        '<span class="dash-inbox-item-sender">' + escH(msg.sender_name || msg.sender_address || 'Unknown') + '</span>' +
+                        (msg.msg_count > 1 ? '<span class="dash-inbox-item-count">' + msg.msg_count + '</span>' : '') +
+                        (actionLabel ? '<span class="dash-inbox-action-badge' + actionClass + '">' + actionLabel + '</span>' : '') +
+                        '<span class="dash-inbox-item-urgency dash-inbox-item-urgency-' + urgency + '">' + ({1:'FYI',2:'Low',3:'Med',4:'High',5:'Critical'})[urgency] + '</span>' +
+                        '<span class="dash-inbox-item-time">' + timeStr + '</span>' +
+                    '</div>' +
+                    '<div class="dash-inbox-item-preview">' + escH(msg.latest_preview || '') + '</div>' +
                 '</div>' +
-                '<div class="dash-inbox-item-preview">' + (msg.latest_preview || msg.preview || msg.ai_summary || '') + '</div>' +
-            '</div>';
-        feed.appendChild(el);
-    });
+                '<button class="dash-inbox-action-open" title="Open in inbox">Open</button>';
+            feed.appendChild(el);
+            count++;
+        }
+    }
 }
 
 function setupHomeHandlers() {
-    // Inbox tabs
-    let homeInboxMsgs = [];
+    // Inbox tabs (All / Work / Personal)
     document.getElementById('dashInboxTabs')?.addEventListener('click', function(e) {
         const tab = e.target.closest('.dash-inbox-tab');
         if (!tab) return;
         this.querySelectorAll('.dash-inbox-tab').forEach(b => b.classList.remove('active'));
         tab.classList.add('active');
         const filter = tab.dataset.filter;
-        // Re-fetch for fresh data
-        fetch('/api/messages/grouped?limit=6' + (filter === 'whatsapp' ? '&source=whatsapp' : filter === 'email' ? '&source=gmail' : ''))
-            .then(r => r.json())
-            .then(msgs => renderHomeInbox(msgs, filter))
-            .catch(() => renderHomeInbox([], filter));
+        // Use cached groups if available, otherwise re-fetch
+        if (window._homeInboxGroups) {
+            renderHomeInbox(window._homeInboxGroups, filter);
+        } else {
+            fetch('/api/messages/grouped-by-context')
+                .then(r => r.json())
+                .then(groups => { window._homeInboxGroups = groups; renderHomeInbox(groups, filter); })
+                .catch(() => renderHomeInbox([], filter));
+        }
     });
 
     // "View all" link → switch to inbox tab
     document.getElementById('dashInboxViewAll')?.addEventListener('click', function() {
         if (typeof showPanel === 'function') showPanel('inbox');
+    });
+
+    // Home inbox: click card to expand conversation, click "Open" to go to inbox
+    document.getElementById('dashInboxFeed')?.addEventListener('click', async function(e) {
+        // "Open" button → navigate to inbox tab
+        const openBtn = e.target.closest('.dash-inbox-action-open');
+        if (openBtn) {
+            e.stopPropagation();
+            const item = openBtn.closest('.dash-inbox-item');
+            if (item) {
+                window._inboxScrollTo = {
+                    source: item.dataset.source,
+                    sender: item.dataset.senderAddress
+                };
+            }
+            if (typeof showPanel === 'function') showPanel('inbox');
+            return;
+        }
+
+        // Click card → toggle conversation expansion
+        const item = e.target.closest('.dash-inbox-item');
+        if (!item) return;
+        const existing = item.nextElementSibling;
+        if (existing && existing.classList.contains('dash-inbox-convo')) {
+            existing.remove();
+            return;
+        }
+        const source = item.dataset.source;
+        const sender = item.dataset.senderAddress;
+        if (!source || !sender) return;
+
+        try {
+            const params = new URLSearchParams({ source, sender_address: sender, limit: '8' });
+            const res = await fetch('/api/messages/by-sender?' + params);
+            const messages = await res.json();
+            if (messages.length <= 1) return;
+
+            const convo = document.createElement('div');
+            convo.className = 'dash-inbox-convo';
+            messages.slice(1).forEach(m => {
+                const row = document.createElement('div');
+                row.className = 'dash-inbox-convo-msg';
+                const time = m.received_at ? new Date(m.received_at).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                const text = m.preview || m.ai_summary || m.subject || '';
+                row.innerHTML = '<span class="dash-inbox-convo-time">' + time + '</span>' +
+                    '<span class="dash-inbox-convo-text">' + (text.length > 120 ? text.slice(0, 120) + '...' : text) + '</span>';
+                convo.appendChild(row);
+            });
+            item.after(convo);
+        } catch (err) { /* silent */ }
     });
 
     // Quick suggestion chips — click to fill + send

@@ -19,7 +19,7 @@ require('dotenv').config({ override: true });
 const path = require('path');
 const db = require(path.join(__dirname, '../core/db/database'));
 const telegram = require(path.join(__dirname, '../integrations/telegram'));
-const { buildPAContext } = require(path.join(__dirname, '../integrations/pa/context'));
+const { buildPAContext, ensureFreshContext } = require(path.join(__dirname, '../integrations/pa/context'));
 
 const MODE = process.argv[2] || 'daily';
 const today = new Date().toISOString().slice(0, 10);
@@ -27,6 +27,8 @@ const today = new Date().toISOString().slice(0, 10);
 async function callClaude(prompt) {
     const Anthropic = require('@anthropic-ai/sdk');
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    // Sync stale data sources before building context
+    try { await ensureFreshContext(); } catch (e) { /* non-blocking */ }
     const context = (() => { try { return buildPAContext(); } catch (e) { return '(context unavailable)'; } })();
     const response = await anthropic.messages.create({
         model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929',

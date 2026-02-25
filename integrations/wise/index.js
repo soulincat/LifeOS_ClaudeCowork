@@ -13,12 +13,35 @@ const db = require('../../core/db/database');
 class WiseIntegration {
     constructor() {
         this.apiToken = process.env.WISE_API_TOKEN;
+        if (this.apiToken && this.apiToken.includes('your_')) this.apiToken = null;
         this.profileId = process.env.WISE_PROFILE_ID;
+        if (this.profileId && this.profileId.includes('your_')) this.profileId = null;
         this.baseUrl = 'https://api.transferwise.com';
     }
 
+    async checkStatus() {
+        if (!this.apiToken) return { connected: false, error: 'No API token' };
+        try {
+            const profileId = await this.getProfileId();
+            return { connected: !!profileId };
+        } catch (e) {
+            return { connected: false, error: e.message };
+        }
+    }
+
+    async startBackground() {
+        if (!this.apiToken) return;
+        // Initial sync after 15s delay (let server finish booting)
+        setTimeout(() => this.syncDailySpending().catch(e =>
+            console.warn('Wise initial sync:', e.message)), 15000);
+        // Repeat every 6 hours
+        this._interval = setInterval(() =>
+            this.syncDailySpending().catch(e =>
+                console.warn('Wise sync:', e.message)), 6 * 60 * 60 * 1000);
+    }
+
     /**
-     * Get profile ID if not set
+     * Get profile ID if not set — auto-detects from API
      */
     async getProfileId() {
         if (this.profileId) {
@@ -54,12 +77,11 @@ class WiseIntegration {
     }
 
     /**
-     * Fetch transactions for a date range
+     * Fetch transfers (outgoing payments) for a date range.
+     * Uses /v1/transfers endpoint which returns completed transfers.
      */
-    async fetchTransactions(startDate, endDate, accountId = null) {
-        if (!this.apiToken) {
-            return null;
-        }
+    async fetchTransfers(startDate, endDate) {
+        if (!this.apiToken) return null;
 
         try {
             const profileId = await this.getProfileId();
@@ -68,111 +90,82 @@ class WiseIntegration {
                 return null;
             }
 
-            // If accountId not provided, get first account
-            if (!accountId) {
-                const balancesResponse = await fetch(
-                    `${this.baseUrl}/v1/profiles/${profileId}/balances`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${this.apiToken}`,
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
+            const start = new Date(startDate).toISOString();
+            const end = new Date(endDate).toISOString();
+            const url = `${this.baseUrl}/v1/transfers?profile=${profileId}&createdDateStart=${start}&createdDateEnd=${end}&limit=100`;
 
-                if (!balancesResponse.ok) {
-                    throw new Error(`Wise API error: ${balancesResponse.status}`);
-                }
-
-                const balances = await balancesResponse.json();
-                if (balances.length === 0) {
-                    console.log('⚠️  No Wise accounts found');
-                    return null;
-                }
-                accountId = balances[0].id;
-            }
-
-            // Fetch transactions
-            const startTimestamp = new Date(startDate).getTime();
-            const endTimestamp = new Date(endDate).getTime();
-
-            const response = await fetch(
-                `${this.baseUrl}/v3/profiles/${profileId}/transactions?accountId=${accountId}&intervalStart=${startTimestamp}&intervalEnd=${endTimestamp}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.apiToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${this.apiToken}` }
+            });
 
             if (!response.ok) {
-                throw new Error(`Wise API error: ${response.status}`);
+                throw new Error(`Wise transfers API error: ${response.status}`);
             }
 
-            const data = await response.json();
-            return data;
+            return await response.json();
         } catch (error) {
-            console.error('Error fetching Wise transactions:', error);
+            console.error('Error fetching Wise transfers:', error);
             return null;
         }
     }
 
     /**
-     * Sync spending data (monthly sync from 1st to current date)
+     * Get balances across all currencies (v4 API).
+     */
+    async fetchBalances() {
+        if (!this.apiToken) return null;
+        try {
+            const profileId = await this.getProfileId();
+            if (!profileId) return null;
+            const res = await fetch(`${this.baseUrl}/v4/profiles/${profileId}/balances?types=STANDARD`, {
+                headers: { 'Authorization': `Bearer ${this.apiToken}` }
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch (e) { return null; }
+    }
+
+    /**
+     * Sync spending data (monthly transfers sum from 1st to today).
+     * Uses /v1/transfers — sums sourceValue of all outgoing transfers.
      */
     async syncDailySpending() {
-        if (!this.apiToken) {
-            console.log('⚠️  Wise API token not configured');
-            return;
-        }
+        if (!this.apiToken) return;
 
         try {
             const now = new Date();
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-            // Fetch all transactions from 1st of month to today
-            const transactions = await this.fetchTransactions(startOfMonth, today);
-            
-            if (!transactions || !transactions.content) {
-                console.log('No Wise transactions found for this month');
+            const transfers = await this.fetchTransfers(startOfMonth, now);
+            if (!transfers || !transfers.length) {
+                console.log('No Wise transfers found for this month');
                 return;
             }
 
             let totalSpending = 0;
-
-            // Process transactions (only outgoing/debit transactions)
-            transactions.content.forEach(transaction => {
-                if (transaction.type === 'DEBIT' || transaction.details?.type === 'DEBIT') {
-                    const amount = Math.abs(transaction.amount?.value || transaction.amount || 0);
-                    totalSpending += amount;
+            for (const t of transfers) {
+                // Only count outgoing (sent) transfers
+                if (t.status === 'outgoing_payment_sent' || t.status === 'funds_converted') {
+                    totalSpending += (t.sourceValue || 0);
                 }
-            });
+            }
 
             const todayStr = now.toISOString().split('T')[0];
 
             if (totalSpending > 0) {
-                // Check if entry exists for today
-                const checkStmt = db.prepare(`
-                    SELECT id FROM finance_entries 
-                    WHERE date = ? AND type = 'spending' AND source = 'wise'
-                `);
-                const existing = checkStmt.get(todayStr);
-
                 const sourceId = 'wise_spending_' + todayStr;
+                const existing = db.prepare(
+                    "SELECT id FROM finance_entries WHERE date = ? AND type = 'spending' AND source = 'wise'"
+                ).get(todayStr);
+
                 if (existing) {
-                    const updateStmt = db.prepare(`
-                        UPDATE finance_entries SET amount = ?, is_synced = 1, source_id = ?
-                        WHERE date = ? AND type = 'spending' AND source = 'wise'
-                    `);
-                    updateStmt.run(totalSpending, sourceId, todayStr);
+                    db.prepare(
+                        "UPDATE finance_entries SET amount = ?, is_synced = 1, source_id = ? WHERE date = ? AND type = 'spending' AND source = 'wise'"
+                    ).run(totalSpending, sourceId, todayStr);
                 } else {
-                    const stmt = db.prepare(`
-                        INSERT INTO finance_entries (date, type, amount, account_type, source, is_synced, source_id)
-                        VALUES (?, ?, ?, ?, ?, 1, ?)
-                    `);
-                    stmt.run(todayStr, 'spending', totalSpending, 'personal', 'wise', sourceId);
+                    db.prepare(
+                        "INSERT INTO finance_entries (date, type, amount, account_type, source, is_synced, source_id) VALUES (?, ?, ?, ?, ?, 1, ?)"
+                    ).run(todayStr, 'spending', totalSpending, 'personal', 'wise', sourceId);
                 }
                 console.log(`✅ Synced Wise spending (month-to-date): $${totalSpending.toFixed(2)}`);
             }

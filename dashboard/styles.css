@@ -802,6 +802,84 @@ body {
     height: 16px;
 }
 
+/* ── Update Banner ── */
+.update-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #203EAE 0%, #1a2f8f 100%);
+    color: white;
+    padding: 12px 16px;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.update-banner-content {
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.update-banner-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.update-banner-text strong {
+    font-weight: 600;
+}
+
+.update-banner-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-update, .btn-dismiss {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-update {
+    background: white;
+    color: #203EAE;
+}
+
+.btn-update:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn-dismiss {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+.btn-dismiss:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+.update-progress {
+    text-align: center;
+    font-size: 13px;
+    color: white;
+}
+
+/* Adjust main grid when banner is visible */
+body:has(.update-banner:not([style*="display:none"])) .os-grid {
+    height: calc(100vh - 40px);
+    margin-top: 40px;
+}
+
 .todo-expand-btn:hover {
     color: var(--text);
 }
@@ -3168,6 +3246,46 @@ body {
 .inbox-contact-label.blocked { opacity: 0.6; }
 .inbox-contact-label.ignored { opacity: 0.5; }
 
+/* Action tag badges */
+.inbox-action-tag {
+    font-size: 9px; border-radius: 4px; padding: 1px 5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; white-space: nowrap;
+}
+.action-reply    { background: #dbeafe; color: #1d4ed8; }
+.action-approval { background: #ffedd5; color: #c2410c; }
+.action-payment  { background: #dcfce7; color: #166534; }
+.action-deadline { background: #fee2e2; color: #b91c1c; }
+.action-meeting  { background: #ede9fe; color: #6d28d9; }
+.action-question { background: #ccfbf1; color: #0f766e; }
+.action-fyi      { background: var(--bg); color: var(--text-dim); }
+.dark-theme .action-reply    { background: #1e3a5f; color: #93c5fd; }
+.dark-theme .action-approval { background: #431407; color: #fdba74; }
+.dark-theme .action-payment  { background: #052e16; color: #86efac; }
+.dark-theme .action-deadline { background: #450a0a; color: #fca5a5; }
+.dark-theme .action-meeting  { background: #2e1065; color: #c4b5fd; }
+.dark-theme .action-question { background: #042f2e; color: #5eead4; }
+
+/* Contact type icon */
+.inbox-type-icon { font-size: 11px; flex-shrink: 0; }
+
+/* Inline save-contact form */
+.inbox-contact-form {
+    padding: 6px 10px; margin-top: 4px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+}
+.contact-form-row {
+    display: flex; gap: 6px; margin-bottom: 4px; align-items: center;
+}
+.contact-form-row:last-child { margin-bottom: 0; }
+.contact-form-name { flex: 1; font-size: 12px; padding: 3px 6px; }
+.contact-form-type,
+.contact-form-relationship,
+.contact-form-project { font-size: 11px; padding: 3px 4px; flex: 1; min-width: 0; }
+.contact-form-actions { justify-content: flex-end; }
+.contact-form-save { font-size: 11px; }
+.contact-form-cancel { font-size: 11px; background: transparent; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; padding: 2px 8px; border-radius: 4px; }
+.contact-form-cancel:hover { color: var(--text); }
+
 /* Project picker dropdown on inbox cards */
 .inbox-project-picker { border: 1px solid var(--accent); border-radius: 4px; background: var(--surface); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
 
@@ -3673,6 +3791,104 @@ body {
 .dash-inbox-item-urgency-3 { background: #fef3c7; color: #92400e; }
 .dash-inbox-item-urgency-2 { background: #f0fdf4; color: #166534; }
 .dash-inbox-item-urgency-1 { background: var(--bg); color: var(--text-dim); }
+
+/* ── Home Inbox: Group headers ──────────────────── */
+.dash-inbox-group-header {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    padding: 8px 0 2px;
+}
+.dash-inbox-group-header:first-child { padding-top: 0; }
+
+/* ── Home Inbox: Message count badge ──────────────────── */
+.dash-inbox-item-count {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 8px;
+    background: var(--border);
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+/* ── Home Inbox: Action tag badges ──────────────────── */
+.dash-inbox-action-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+.dash-inbox-action-badge.action-reply_needed { background: #dbeafe; color: #1e40af; }
+.dash-inbox-action-badge.action-approval { background: #ffedd5; color: #9a3412; }
+.dash-inbox-action-badge.action-payment { background: #dcfce7; color: #166534; }
+.dash-inbox-action-badge.action-deadline { background: #fef2f2; color: #991b1b; }
+.dash-inbox-action-badge.action-meeting { background: #f3e8ff; color: #6b21a8; }
+.dash-inbox-action-badge.action-question { background: #ccfbf1; color: #115e59; }
+.dash-inbox-action-badge.action-fyi { background: var(--bg); color: var(--text-dim); }
+
+/* ── Home Inbox: Open button ──────────────────── */
+.dash-inbox-action-open {
+    font-size: 10px;
+    padding: 2px 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--accent);
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.dash-inbox-item { position: relative; cursor: pointer; }
+.dash-inbox-item:hover .dash-inbox-action-open { opacity: 1; }
+.dash-inbox-action-open:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ── Home Inbox: Conversation expansion ──────────────────── */
+.dash-inbox-convo {
+    margin-left: 36px;
+    padding: 4px 0 8px;
+    border-left: 2px solid var(--border);
+}
+.dash-inbox-convo-msg {
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 8px;
+}
+.dash-inbox-convo-time {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--text-dim);
+    opacity: 0.7;
+    min-width: 80px;
+}
+.dash-inbox-convo-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Inbox: Card highlighted (scrolled-to from home) ──────────────────── */
+.inbox-card-highlighted {
+    outline: 2px solid var(--accent);
+    animation: inbox-pulse 0.5s ease-in-out 2;
+}
+@keyframes inbox-pulse {
+    50% { outline-color: transparent; }
+}
+
+/* ── Dark mode overrides for home inbox badges ──────────────────── */
+[data-theme="dark"] .dash-inbox-action-badge.action-reply_needed { background: #1e3a5f; color: #93c5fd; }
+[data-theme="dark"] .dash-inbox-action-badge.action-approval { background: #431407; color: #fdba74; }
+[data-theme="dark"] .dash-inbox-action-badge.action-payment { background: #052e16; color: #86efac; }
+[data-theme="dark"] .dash-inbox-action-badge.action-deadline { background: #450a0a; color: #fca5a5; }
+[data-theme="dark"] .dash-inbox-action-badge.action-meeting { background: #3b0764; color: #d8b4fe; }
+[data-theme="dark"] .dash-inbox-action-badge.action-question { background: #042f2e; color: #5eead4; }
+[data-theme="dark"] .dash-inbox-action-badge.action-fyi { background: var(--surface); color: var(--text-dim); }
 
 /* ── Project Cards (Home - collapsible) ──────────────────── */
 .dash-project-cards {

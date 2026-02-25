@@ -390,6 +390,32 @@ function scoreFocusCard(whoopRecovery) {
     };
 }
 
+// ── Action Tag Detection ─────────────────────────────────────────────────────
+// Detects what action a message demands from its content/subject.
+
+const ACTION_PATTERNS = [
+    { tag: 'approval',      patterns: [/\bapprov/i, /\bsign off/i, /\breview and confirm/i, /\bplease confirm/i, /\bauthori[sz]/i, /\bpermission/i] },
+    { tag: 'payment',       patterns: [/\binvoice/i, /\bpayment/i, /\btransfer/i, /\bamount due/i, /\boverdue/i, /\bbalance/i, /\bremittance/i] },
+    { tag: 'deadline',      patterns: [/\bdeadline/i, /\bdue by\b/i, /\bby end of day/i, /\beod\b/i, /\bdue date/i, /\bexpir/i, /\blast day/i] },
+    { tag: 'meeting',       patterns: [/\bmeeting\b/i, /\bcall\b/i, /\bzoom\b/i, /\bcalendar invite/i, /\bgoogle meet/i, /\bteams call/i, /\bschedule.*call/i] },
+    { tag: 'reply_needed',  patterns: [/\bplease respond/i, /\blet me know/i, /\bwhat do you think/i, /\bcan you\b/i, /\bcould you\b/i, /\bget back to/i, /\bwaiting for.*(?:reply|response|answer)/i, /\bneed your\b/i] },
+    { tag: 'question',      patterns: [/\?\s*$/, /^(?:what|how|when|where|who|why|which|is there|do you|are you|have you|can i|should)\b/i] },
+];
+
+/**
+ * Detect action tag from message content + subject.
+ * Returns one of: 'approval', 'payment', 'deadline', 'meeting', 'reply_needed', 'question', 'fyi'
+ */
+function detectActionTag(content, subject) {
+    const text = ((content || '') + ' ' + (subject || '')).trim();
+    if (!text) return 'fyi';
+
+    for (const { tag, patterns } of ACTION_PATTERNS) {
+        if (patterns.some(p => p.test(text))) return tag;
+    }
+    return 'fyi';
+}
+
 module.exports = {
     deriveHealthStatus,
     deriveProgress,
@@ -397,5 +423,6 @@ module.exports = {
     rederiveProject,
     computeUrgencyScore,
     lookupContact,
-    scoreFocusCard
+    scoreFocusCard,
+    detectActionTag
 };

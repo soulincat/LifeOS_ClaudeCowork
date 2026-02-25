@@ -1138,32 +1138,67 @@
 
     function esc(s) { return typeof escHtml === 'function' ? escHtml(s) : (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
 
+    const ACTION_TAG_CONFIG = {
+        reply_needed: { label: 'Reply needed', cls: 'action-reply' },
+        approval:     { label: 'Approval',     cls: 'action-approval' },
+        payment:      { label: 'Payment',      cls: 'action-payment' },
+        deadline:     { label: 'Deadline',      cls: 'action-deadline' },
+        meeting:      { label: 'Meeting',       cls: 'action-meeting' },
+        question:     { label: 'Question',      cls: 'action-question' },
+        fyi:          { label: 'FYI',           cls: 'action-fyi' },
+    };
+
     function renderInboxCard(msg) {
         const card = document.createElement('div');
         const tier = msg.priority_tier || 'medium';
         card.className = `inbox-card inbox-tier-${tier}`;
         card.dataset.id = msg.id;
         card.dataset.sender = msg.sender_address || '';
+        card.dataset.senderAddress = msg.sender_address || '';
         card.dataset.source = msg.source || '';
         const privacy = document.getElementById('inboxPrivacyMode')?.checked;
         const date = msg.received_at ? new Date(msg.received_at).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+        // Action tag badge (always visible)
+        const atCfg = ACTION_TAG_CONFIG[msg.action_tag] || ACTION_TAG_CONFIG.fyi;
+        const actionBadge = `<span class="inbox-action-tag ${atCfg.cls}">${atCfg.label}</span>`;
+
+        // Contact type icon (always visible)
+        const typeIcon = msg.contact_type === 'business' ? '<span class="inbox-type-icon" title="Work">💼</span>'
+            : msg.contact_type === 'personal' ? '<span class="inbox-type-icon" title="Personal">🏠</span>' : '';
+
         const categoryBadge = msg.category ? `<span class="inbox-category-badge">${esc(msg.category)}</span>` : '';
         const projectBadge = msg.project_name ? `<span class="inbox-project-badge">${esc(msg.project_name)}</span>` : '';
-        const senderDisplay = privacy ? '***' : esc(msg.sender_name || msg.sender_address || 'Unknown');
-        const contentHidden = privacy;
+
+        // Privacy mode: initials + type icon, hide content but keep action context
+        const fullName = msg.sender_name || msg.sender_address || 'Unknown';
+        const senderDisplay = privacy
+            ? fullName.split(/[\s@]+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase()
+            : esc(fullName);
+
         const labelIcon = msg.contact_label === 'vip' ? '<span class="inbox-contact-label vip" title="VIP">⭐</span>'
             : msg.contact_label === 'blocked' ? '<span class="inbox-contact-label blocked" title="Blocked">🚫</span>'
             : msg.contact_label === 'ignored' ? '<span class="inbox-contact-label ignored" title="Ignored">👻</span>'
             : '';
+
+        // Privacy: hide subject + preview text, keep everything else
+        const subjectHtml = msg.subject
+            ? `<div class="inbox-subject">${privacy ? '<span style="color:var(--text-dim)">—</span>' : esc(msg.subject)}</div>`
+            : '';
+        const summaryHtml = (msg.ai_summary || msg.preview)
+            ? `<div class="inbox-summary">${privacy ? '' : esc(msg.ai_summary || msg.preview)}</div>`
+            : '';
+
         card.innerHTML = `
             <div class="inbox-card-header">
                 <span class="inbox-source-icon" title="${msg.source}">${sourceIcon(msg.source)}</span>
-                ${labelIcon}<span class="inbox-sender">${senderDisplay}</span>
+                ${typeIcon}${labelIcon}<span class="inbox-sender">${senderDisplay}</span>
                 ${msg.msg_count > 1 ? `<span class="inbox-msg-count">${msg.msg_count}</span>` : ''}
-                ${categoryBadge}${projectBadge}
+                ${actionBadge}${categoryBadge}${projectBadge}
                 <span class="inbox-urgency inbox-urgency-${msg.urgency_score}">${urgencyLabel(msg.urgency_score)}</span>
                 <span class="inbox-date">${date}</span>
                 <div class="inbox-quick-actions">
+                    <button class="inbox-action-btn" data-action="save-contact" data-address="${esc(msg.sender_address || '')}" data-name="${esc(msg.sender_name || '')}" data-id="${msg.id}" data-contact-id="${msg.contact_id || ''}" title="Save contact">👤</button>
                     <button class="inbox-action-btn" data-action="block" data-address="${esc(msg.sender_address || '')}" title="Block sender">🚫</button>
                     <button class="inbox-action-btn" data-action="ignore" data-address="${esc(msg.sender_address || '')}" data-name="${esc(msg.sender_name || '')}" title="Ignore sender">👻</button>
                     <button class="inbox-action-btn" data-action="vip" data-address="${esc(msg.sender_address || '')}" data-name="${esc(msg.sender_name || '')}" title="Mark VIP">⭐</button>
@@ -1171,8 +1206,8 @@
                     <button class="inbox-dismiss" title="Dismiss" data-id="${msg.id}">✕</button>
                 </div>
             </div>
-            ${!contentHidden && msg.subject ? `<div class="inbox-subject">${esc(msg.subject)}</div>` : ''}
-            ${!contentHidden && (msg.ai_summary || msg.preview) ? `<div class="inbox-summary">${esc(msg.ai_summary || msg.preview)}</div>` : ''}
+            ${subjectHtml}
+            ${summaryHtml}
             <div class="inbox-reply-section">
                 <textarea class="inbox-reply-input" placeholder="Reply…" rows="2">${msg.ai_suggested_reply || ''}</textarea>
                 <div class="inbox-reply-actions">
@@ -1220,6 +1255,23 @@
             renderInboxSection('inboxListUrgent', urgent, 'inboxCountUrgent');
             renderInboxSection('inboxListMedium', medium, 'inboxCountMedium');
             renderInboxSection('inboxListIgnored', ignored, 'inboxCountIgnored');
+
+            // Scroll to specific sender if navigated from home tab
+            if (window._inboxScrollTo) {
+                const target = window._inboxScrollTo;
+                delete window._inboxScrollTo;
+                setTimeout(() => {
+                    const cards = document.querySelectorAll('.inbox-card');
+                    for (const card of cards) {
+                        if (card.dataset.senderAddress === target.sender && card.dataset.source === target.source) {
+                            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            card.classList.add('inbox-card-highlighted');
+                            setTimeout(() => card.classList.remove('inbox-card-highlighted'), 3000);
+                            break;
+                        }
+                    }
+                }, 200);
+            }
         } catch (e) {
             const el = document.getElementById('inboxListUrgent');
             if (el) el.innerHTML = '<div class="inbox-empty">Failed to load messages.</div>';
@@ -1316,6 +1368,97 @@
         } catch (e) { /* */ }
     }
 
+    async function inboxSaveContact(btn) {
+        const card = btn.closest('.inbox-card');
+        if (!card) return;
+        // Toggle: remove existing form if open
+        const existingForm = card.querySelector('.inbox-contact-form');
+        if (existingForm) { existingForm.remove(); return; }
+
+        const address = btn.dataset.address;
+        const name = btn.dataset.name || address;
+        const contactId = btn.dataset.contactId;
+
+        // Try to load existing contact data
+        let existing = null;
+        try {
+            if (contactId) {
+                existing = await fetch(`/api/contacts/${contactId}`).then(r => r.json());
+            } else {
+                existing = await fetch('/api/contacts/lookup', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sender_address: address })
+                }).then(r => r.json());
+            }
+        } catch (e) { /* no existing contact */ }
+
+        // Load active projects for dropdown
+        let projects = [];
+        try { projects = await fetch('/api/projects').then(r => r.json()); } catch (e) { /* */ }
+        const activeProjects = (Array.isArray(projects) ? projects : []).filter(p => p.status === 'active');
+
+        const form = document.createElement('div');
+        form.className = 'inbox-contact-form';
+        form.innerHTML = `
+            <div class="contact-form-row">
+                <input type="text" class="contact-form-name todo-input" placeholder="Name" value="${esc(existing?.name || name)}">
+                <select class="contact-form-type todo-input">
+                    <option value="personal" ${(!existing?.type || existing?.type === 'personal') ? 'selected' : ''}>🏠 Personal</option>
+                    <option value="business" ${existing?.type === 'business' ? 'selected' : ''}>💼 Work</option>
+                </select>
+            </div>
+            <div class="contact-form-row">
+                <select class="contact-form-relationship todo-input">
+                    <option value="">Relationship…</option>
+                    <option value="lover" ${existing?.relationship === 'lover' ? 'selected' : ''}>Lover</option>
+                    <option value="bestie" ${existing?.relationship === 'bestie' ? 'selected' : ''}>Bestie</option>
+                    <option value="key_partner" ${existing?.relationship === 'key_partner' ? 'selected' : ''}>Key Partner</option>
+                    <option value="client" ${existing?.relationship === 'client' ? 'selected' : ''}>Client</option>
+                    <option value="investor" ${existing?.relationship === 'investor' ? 'selected' : ''}>Investor</option>
+                    <option value="co_founder" ${existing?.relationship === 'co_founder' ? 'selected' : ''}>Co-founder</option>
+                    <option value="vendor" ${existing?.relationship === 'vendor' ? 'selected' : ''}>Vendor</option>
+                    <option value="acquaintance" ${existing?.relationship === 'acquaintance' ? 'selected' : ''}>Acquaintance</option>
+                </select>
+                <select class="contact-form-project todo-input">
+                    <option value="">Project…</option>
+                    ${activeProjects.map(p => `<option value="${p.id}" ${existing?.project_id == p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="contact-form-row contact-form-actions">
+                <button class="btn-save btn-small contact-form-save" data-address="${esc(address)}" data-contact-id="${existing?.id || ''}">Save</button>
+                <button class="btn-small contact-form-cancel">Cancel</button>
+            </div>
+        `;
+        card.appendChild(form);
+    }
+
+    async function submitContactForm(form) {
+        const address = form.querySelector('.contact-form-save').dataset.address;
+        const contactId = form.querySelector('.contact-form-save').dataset.contactId;
+        const name = form.querySelector('.contact-form-name').value.trim();
+        const type = form.querySelector('.contact-form-type').value;
+        const relationship = form.querySelector('.contact-form-relationship').value || null;
+        const projectId = form.querySelector('.contact-form-project').value || null;
+
+        if (!name) return;
+
+        try {
+            if (contactId) {
+                await fetch(`/api/contacts/${contactId}`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, type, relationship, project_id: projectId ? Number(projectId) : null })
+                });
+            } else {
+                await fetch('/api/contacts', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, phone: address, type, relationship, project_id: projectId ? Number(projectId) : null })
+                });
+            }
+            form.remove();
+            loadInbox();
+        } catch (e) { /* */ }
+    }
+
     async function inboxAssignProject(msgId, btn) {
         // Show a small inline project picker
         const existing = btn.closest('.inbox-card')?.querySelector('.inbox-project-picker');
@@ -1391,6 +1534,25 @@
 
         // Delegated click handlers on inbox sections
         document.getElementById('panel-inbox')?.addEventListener('click', async function(e) {
+            // Quick action: save contact
+            const saveBtn = e.target.closest('.inbox-action-btn[data-action="save-contact"]');
+            if (saveBtn) {
+                inboxSaveContact(saveBtn);
+                return;
+            }
+            // Save contact form submit
+            const submitBtn = e.target.closest('.contact-form-save');
+            if (submitBtn) {
+                const form = submitBtn.closest('.inbox-contact-form');
+                if (form) await submitContactForm(form);
+                return;
+            }
+            // Save contact form cancel
+            const cancelBtn = e.target.closest('.contact-form-cancel');
+            if (cancelBtn) {
+                cancelBtn.closest('.inbox-contact-form')?.remove();
+                return;
+            }
             // Quick action: block sender
             const blockBtn = e.target.closest('.inbox-action-btn[data-action="block"]');
             if (blockBtn) {

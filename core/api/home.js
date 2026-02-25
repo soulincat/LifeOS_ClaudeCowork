@@ -48,10 +48,16 @@ router.get('/focus', (req, res) => {
  * GET /api/home/pulse
  * Pulse strip data: recovery, unread count, meetings today, top blocker.
  */
-router.get('/pulse', (req, res) => {
+router.get('/pulse', async (req, res) => {
     try {
         const today = new Date().toISOString().slice(0, 10);
         const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+        // Ensure WHOOP data is fresh before reading
+        try {
+            const whoop = require('../../integrations/whoop');
+            await whoop.ensureFresh(120);
+        } catch (e) { /* non-blocking */ }
 
         // Recovery
         let recovery = null;

@@ -11,9 +11,19 @@ require('dotenv').config({ path: fs.existsSync(configEnvPath) ? configEnvPath : 
 require('./db/database');
 
 const db = require('./db/database');
+const migrations = require('./db/migrations');
 
 // Log which DB file we're using (so you can confirm it's your local file)
 console.log('Using database:', db.path);
+
+// Run database migrations
+try {
+    migrations.runMigrations();
+} catch (e) {
+    console.error('❌ Migration error:', e.message);
+    console.error('Server cannot start with failed migrations.');
+    process.exit(1);
+}
 
 // Seed only when explicitly enabled (prevents random overwrites; real data from manual input + integrations)
 const seedIfEmpty = process.env.LIFEOS_SEED_IF_EMPTY === '1' || process.env.LIFEOS_SEED_IF_EMPTY === 'true';
@@ -49,6 +59,63 @@ app.get('/api/health/whoop/connect', (req, res) => {
     url.searchParams.set('state', Math.random().toString(36).slice(2));
     res.redirect(302, url.toString());
 });
+// ── Gmail OAuth connect/callback ──
+app.get('/api/gmail/connect', (req, res) => {
+    const clientId = process.env.GMAIL_CLIENT_ID;
+    const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+        return res.status(500).send('Gmail OAuth not configured. Set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in .env');
+    }
+    const { google } = require('googleapis');
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/gmail/callback`;
+    const oAuth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+    const url = oAuth2Client.generateAuthUrl({
+        access_type: 'offline',
+        prompt: 'consent',
+        scope: [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/gmail.modify',
+        ],
+    });
+    res.redirect(302, url);
+});
+
+app.get('/api/gmail/callback', async (req, res) => {
+    const { code, error } = req.query;
+    if (error) return res.redirect('/?gmail_error=' + encodeURIComponent(error));
+    if (!code) return res.redirect('/?gmail_error=no_code');
+
+    try {
+        const { google } = require('googleapis');
+        const clientId = process.env.GMAIL_CLIENT_ID;
+        const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+        const redirectUri = `${req.protocol}://${req.get('host')}/api/gmail/callback`;
+        const oAuth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+
+        const { tokens } = await oAuth2Client.getToken(code);
+
+        // Save token to file for the Gmail integration to pick up
+        const tokenDir = path.join(process.env.HOME, '.config', 'lifeos');
+        if (!fs.existsSync(tokenDir)) fs.mkdirSync(tokenDir, { recursive: true });
+        const tokenPath = path.join(tokenDir, 'gmail-token.json');
+        fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
+        console.log('✅ Gmail OAuth tokens saved to', tokenPath);
+
+        res.redirect('/?gmail_connected=1');
+    } catch (err) {
+        console.error('Gmail OAuth callback error:', err.message);
+        res.redirect('/?gmail_error=' + encodeURIComponent(err.message));
+    }
+});
+
+// Gmail status check
+app.get('/api/gmail/status', (req, res) => {
+    const tokenPath = path.join(process.env.HOME, '.config', 'lifeos', 'gmail-token.json');
+    const connected = fs.existsSync(tokenPath);
+    res.json({ connected, tokenPath: connected ? tokenPath : null });
+});
+
 app.use('/api/health', require('./api/health'));
 app.use('/api/finance', require('./api/finance'));
 app.use('/api/projects', require('./api/projects'));
@@ -66,6 +133,7 @@ app.use('/api/telegram', require('./api/telegram'));
 app.use('/api/home', require('./api/home'));
 app.use('/api/project-tasks', require('./api/project-tasks'));
 app.use('/api/decision-triggers', require('./api/decision-triggers'));
+app.use('/api/system', require('./api/system'));
 app.use('/api/inbox', require('./api/inbox'));
 app.use('/api/contacts', require('./api/contacts'));
 app.use('/api/project-keywords', require('./api/project-keywords'));
@@ -121,8 +189,26 @@ try {
     }
 } catch (e) { /* ignore if DB not ready */ }
 
+// ── Graceful shutdown for updates/restarts ──
+const gracefulShutdown = () => {
+    console.log('\nGracefully shutting down...');
+    // Close HTTP server
+    server.close(() => {
+        console.log('HTTP server closed');
+        process.exit(0);  // systemd/Docker will restart if needed
+    });
+    // Force exit after 10 seconds
+    setTimeout(() => {
+        console.error('Forced shutdown (timeout)');
+        process.exit(1);
+    }, 10000);
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
 const HOST = process.env.HOST || '0.0.0.0';
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
     console.log(`Life OS Dashboard running at http://localhost:${PORT}`);
     console.log(`Open this URL in your browser to view the dashboard.`);
 

@@ -75,6 +75,12 @@ class WhoopIntegration extends Connector {
         const buffer = 300;
         if (row.expires_at > now + buffer) return row.access_token;
         if (!row.refresh_token) return row.access_token;
+
+        // Cooldown: don't spam refresh attempts if recently failed
+        if (this._refreshFailedAt && (Date.now() - this._refreshFailedAt) < 10 * 60 * 1000) {
+            return null; // Wait 10 min before retrying
+        }
+
         const clientId = process.env.WHOOP_CLIENT_ID;
         const clientSecret = process.env.WHOOP_CLIENT_SECRET;
         if (!clientId || !clientSecret) return row.access_token;
@@ -91,9 +97,13 @@ class WhoopIntegration extends Connector {
                 body: body.toString()
             });
             if (!res.ok) {
-                console.error('Whoop token refresh failed:', res.status);
-                return null; // Force re-auth instead of using stale token
+                this._refreshFailedAt = Date.now();
+                this._needsReconnect = true;
+                console.error('Whoop token refresh failed:', res.status, '— reconnect at /api/health/whoop/connect');
+                return null;
             }
+            this._refreshFailedAt = null;
+            this._needsReconnect = false;
             const data = await res.json();
             const expiresAt = Math.floor(Date.now() / 1000) + (data.expires_in || 3600);
             db.prepare(`
@@ -101,7 +111,8 @@ class WhoopIntegration extends Connector {
             `).run(data.access_token, data.refresh_token || null, expiresAt);
             return data.access_token;
         } catch (e) {
-            console.error('Whoop token refresh failed:', e);
+            this._refreshFailedAt = Date.now();
+            console.error('Whoop token refresh error:', e.message);
             return row.access_token;
         }
     }
@@ -269,6 +280,30 @@ class WhoopIntegration extends Connector {
         yesterday.setDate(yesterday.getDate() - 1);
         const end = new Date();
         return this.syncDateRange(yesterday, end);
+    }
+
+    /**
+     * Ensure data is fresh — if latest health_metrics row is older than maxAgeMinutes,
+     * trigger a sync (which also refreshes the OAuth token).
+     * Called from health/pulse API endpoints on page load.
+     */
+    async ensureFresh(maxAgeMinutes = 120) {
+        try {
+            const row = db.prepare('SELECT date FROM health_metrics ORDER BY date DESC LIMIT 1').get();
+            if (!row) return this.syncLastDays(3);
+
+            const today = new Date().toISOString().slice(0, 10);
+            const lastDate = row.date;
+            // If latest row is not today, sync
+            if (lastDate < today) {
+                return this.syncLastDays(3);
+            }
+            // If latest row IS today, check if token might be stale (try a lightweight refresh)
+            return { synced: 0, fresh: true };
+        } catch (e) {
+            console.warn('Whoop ensureFresh failed:', e.message);
+            return { synced: 0, error: e.message };
+        }
     }
 
     getLatestMetrics() {

@@ -85,6 +85,107 @@ router.get('/grouped', (req, res) => {
 });
 
 /**
+ * GET /api/messages/grouped-by-context
+ * Groups pending messages by project (if linked) or contact type (Personal/Work).
+ * Returns array of { name, type, project_id, senders: [...] }.
+ */
+router.get('/grouped-by-context', (req, res) => {
+    try {
+        const rows = db.prepare(`
+            SELECT
+                COALESCE(p.name,
+                    CASE WHEN c.type = 'business' THEN 'Work' ELSE 'Personal' END,
+                    'Uncategorized') AS group_name,
+                COALESCE(m.project_id, 0) AS group_id,
+                COALESCE(c.type, 'personal') AS group_type,
+                m.source,
+                m.sender_address,
+                m.sender_name,
+                MAX(m.urgency_score) AS urgency_score,
+                MAX(m.received_at) AS latest_received_at,
+                COUNT(*) AS msg_count,
+                (SELECT m2.preview FROM messages m2
+                 WHERE m2.sender_address = m.sender_address AND m2.source = m.source
+                   AND m2.status IN ('pending','approved')
+                 ORDER BY m2.received_at DESC LIMIT 1) AS latest_preview,
+                (SELECT m2.action_tag FROM messages m2
+                 WHERE m2.sender_address = m.sender_address AND m2.source = m.source
+                   AND m2.status IN ('pending','approved')
+                 ORDER BY m2.received_at DESC LIMIT 1) AS action_tag
+            FROM messages m
+            LEFT JOIN projects p ON m.project_id = p.id
+            LEFT JOIN contacts c ON m.contact_id = c.id
+            WHERE m.status IN ('pending','approved')
+            GROUP BY m.source, m.sender_address
+            ORDER BY MAX(m.urgency_score) DESC, MAX(m.received_at) DESC
+        `).all();
+
+        // Structure into groups
+        const groups = {};
+        for (const row of rows) {
+            const key = row.group_name;
+            if (!groups[key]) {
+                groups[key] = {
+                    name: key,
+                    type: row.group_type,
+                    project_id: row.group_id || null,
+                    senders: []
+                };
+            }
+            groups[key].senders.push(row);
+        }
+
+        // Sort: project groups first (by max urgency), then Work, then Personal, then Uncategorized
+        const result = Object.values(groups).sort((a, b) => {
+            // Projects first
+            if (a.project_id && !b.project_id) return -1;
+            if (!a.project_id && b.project_id) return 1;
+            // Among non-project groups: Work before Personal before Uncategorized
+            if (!a.project_id && !b.project_id) {
+                const order = { Work: 0, Personal: 1, Uncategorized: 2 };
+                return (order[a.name] ?? 2) - (order[b.name] ?? 2);
+            }
+            // Among project groups: by max urgency
+            const aMax = Math.max(...a.senders.map(s => s.urgency_score || 0));
+            const bMax = Math.max(...b.senders.map(s => s.urgency_score || 0));
+            return bMax - aMax;
+        });
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error fetching context-grouped messages:', error);
+        res.status(500).json({ error: 'Failed to fetch grouped messages' });
+    }
+});
+
+/**
+ * GET /api/messages/by-sender
+ * Returns individual messages for a specific sender.
+ * Query params: source, sender_address, limit (default 10)
+ */
+router.get('/by-sender', (req, res) => {
+    try {
+        const { source, sender_address, limit = 10 } = req.query;
+        if (!source || !sender_address)
+            return res.status(400).json({ error: 'source and sender_address required' });
+
+        const rows = db.prepare(`
+            SELECT id, source, sender_name, sender_address, subject, preview,
+                   received_at, urgency_score, ai_summary, action_tag
+            FROM messages
+            WHERE source = ? AND sender_address = ?
+            ORDER BY received_at DESC
+            LIMIT ?
+        `).all(source, sender_address, Number(limit));
+
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching sender messages:', error);
+        res.status(500).json({ error: 'Failed to fetch sender messages' });
+    }
+});
+
+/**
  * GET /api/messages/tiered
  * Returns messages grouped by sender, pre-sectioned into { urgent, medium, ignored }.
  * Each row = one sender with latest message, msg_count, and representative_id.
@@ -133,9 +234,14 @@ router.get('/tiered', (req, res) => {
                      WHERE m2.sender_address = m.sender_address AND m2.source = m.source
                        AND m2.status IN ('pending','approved')
                      ORDER BY m2.received_at DESC LIMIT 1) AS id,
+                    (SELECT m2.action_tag FROM messages m2
+                     WHERE m2.sender_address = m.sender_address AND m2.source = m.source
+                       AND m2.status IN ('pending','approved')
+                     ORDER BY m2.received_at DESC LIMIT 1) AS action_tag,
                     p.name AS project_name,
                     c.name AS contact_name,
-                    c.label AS contact_label
+                    c.label AS contact_label,
+                    c.type AS contact_type
                 FROM messages m
                 LEFT JOIN projects p ON m.project_id = p.id
                 LEFT JOIN contacts c ON m.contact_id = c.id
@@ -457,6 +563,24 @@ router.post('/sync-mail', (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('Mail sync error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/messages/sync-gmail
+ * Sync recent emails from Gmail API into the inbox.
+ * Optional query params: ?maxResults=50&hours=24
+ */
+router.post('/sync-gmail', async (req, res) => {
+    try {
+        const maxResults = parseInt(req.query.maxResults) || 50;
+        const hoursBack = parseInt(req.query.hours) || 24;
+        const { syncGmail } = require('../../integrations/gmail/sync');
+        const result = await syncGmail({ maxResults, hoursBack });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Gmail sync error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });

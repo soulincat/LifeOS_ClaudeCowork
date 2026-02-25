@@ -324,4 +324,22 @@ function buildPAContext() {
     return sections.join('\n\n');
 }
 
-module.exports = { buildPAContext };
+/**
+ * Trigger fresh syncs for stale data sources before building context.
+ * Call before buildPAContext() in briefings/Telegram to avoid stale numbers.
+ */
+async function ensureFreshContext() {
+    // WHOOP — refresh if data is stale (tighter threshold for briefings)
+    try {
+        const whoop = require('../whoop');
+        await whoop.ensureFresh(60);
+    } catch (e) { /* non-critical */ }
+
+    // Wise spending — sync if configured
+    try {
+        const wise = require('../wise');
+        if (wise.apiToken) await wise.syncDailySpending();
+    } catch (e) { /* non-critical */ }
+}
+
+module.exports = { buildPAContext, ensureFreshContext };

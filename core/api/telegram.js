@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
-const { buildPAContext } = require('../../integrations/pa/context');
+const { buildPAContext, ensureFreshContext } = require('../../integrations/pa/context');
 const telegram = require('../../integrations/telegram');
 
 const PA_BRIEF_PROMPT = `Generate a concise daily briefing for Telegram. Cover:
@@ -23,6 +23,8 @@ Keep it punchy and actionable. Use short bullet points. No filler.`;
 async function callClaude(prompt) {
     const Anthropic = require('@anthropic-ai/sdk');
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    // Sync stale data sources before building context
+    try { await ensureFreshContext(); } catch (e) { /* non-blocking */ }
     const context = (() => { try { return buildPAContext(); } catch (e) { return ''; } })();
     const response = await anthropic.messages.create({
         model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929',
