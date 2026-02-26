@@ -875,7 +875,7 @@ body {
 }
 
 /* Adjust main grid when banner is visible */
-body:has(.update-banner:not([style*="display:none"])) .os-grid {
+body.update-banner-visible .os-grid {
     height: calc(100vh - 40px);
     margin-top: 40px;
 }
@@ -959,19 +959,19 @@ body:has(.update-banner:not([style*="display:none"])) .os-grid {
     flex-shrink: 0;
 }
 
-.main-panel-dashboard .dashboard-social-fill .social-platform-card {
+.main-panel-socials .dashboard-social-fill .social-platform-card {
     min-height: 0;
     min-width: 0;
     padding: 4px 6px;
 }
 
-.main-panel-dashboard .dashboard-social-fill .social-platform-icon {
+.main-panel-socials .dashboard-social-fill .social-platform-icon {
     width: 16px;
     height: 16px;
     flex-shrink: 0;
 }
 
-.main-panel-dashboard .dashboard-social-fill .social-platform-metric {
+.main-panel-socials .dashboard-social-fill .social-platform-metric {
     font-size: 10px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1403,6 +1403,22 @@ body:has(.update-banner:not([style*="display:none"])) .os-grid {
     background: var(--bg);
 }
 
+.tab-bar-tab-project {
+    font-size: 11px;
+    opacity: 0.85;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.tab-bar-tab-project.active {
+    opacity: 1;
+}
+
+#projectTabsSlot {
+    display: contents;
+}
+
 /* Current focus strip (dashboard) */
 .current-focus-strip {
     background: var(--secondary);
@@ -1429,19 +1445,19 @@ body:has(.update-banner:not([style*="display:none"])) .os-grid {
 }
 
 /* Dashboard: no scroll; content fits; minimal gap between social and project cards */
-.main-panel-dashboard {
+.main-panel-socials {
     display: flex;
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
 }
 
-.main-panel-dashboard .projects-grid,
-.main-panel-dashboard .projection-cards-grid {
+.main-panel-socials .projects-grid,
+.main-panel-socials .projection-cards-grid {
     flex-shrink: 0;
 }
 
-.main-panel-dashboard .dashboard-social-fill {
+.main-panel-socials .dashboard-social-fill {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -1449,44 +1465,44 @@ body:has(.update-banner:not([style*="display:none"])) .os-grid {
     overflow: hidden;
 }
 
-.main-panel-dashboard .dashboard-social-fill .social-panel {
+.main-panel-socials .dashboard-social-fill .social-panel {
     flex-shrink: 0;
     padding: 8px;
     margin: 0 0 6px 0;
 }
 
-.main-panel-dashboard .dashboard-social-fill .social-panel-header {
+.main-panel-socials .dashboard-social-fill .social-panel-header {
     font-size: 11px;
     margin-bottom: 8px;
 }
 
-.main-panel-dashboard .dashboard-social-fill .social-metrics {
+.main-panel-socials .dashboard-social-fill .social-metrics {
     margin-bottom: 8px;
 }
 
-.main-panel-dashboard .dashboard-social-fill .social-metric-value {
+.main-panel-socials .dashboard-social-fill .social-metric-value {
     font-size: 14px;
 }
 
-.main-panel-dashboard .dashboard-social-fill .social-queue {
+.main-panel-socials .dashboard-social-fill .social-queue {
     padding-top: 8px;
     margin-top: 8px;
 }
 
-.main-panel-dashboard .dashboard-social-fill .social-post {
+.main-panel-socials .dashboard-social-fill .social-post {
     padding: 6px;
     margin-bottom: 4px;
     font-size: 10px;
 }
 
-.main-panel-dashboard .dashboard-social-fill .projection-cards-grid {
+.main-panel-socials .dashboard-social-fill .projection-cards-grid {
     flex-shrink: 0;
     margin-top: 4px;
     margin-bottom: 4px;
 }
 
 /* Social platform cards stick to bottom, right above tab bar */
-.main-panel-dashboard .dashboard-social-fill .social-platforms-grid {
+.main-panel-socials .dashboard-social-fill .social-platforms-grid {
     flex-shrink: 0;
     margin: 0;
     margin-top: auto;
@@ -3879,6 +3895,35 @@ body:has(.update-banner:not([style*="display:none"])) .os-grid {
 }
 @keyframes inbox-pulse {
     50% { outline-color: transparent; }
+}
+
+/* ── Inbox: Conversation history (expand within card) ──────────────────── */
+.inbox-card-header { cursor: pointer; }
+.inbox-convo-history {
+    padding: 6px 0 4px 28px;
+    border-top: 1px solid var(--border);
+    margin-top: 6px;
+}
+.inbox-convo-msg {
+    padding: 3px 0;
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.inbox-convo-time {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--text-dim);
+    opacity: 0.7;
+    min-width: 80px;
+}
+.inbox-convo-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
 }
 
 /* ── Dark mode overrides for home inbox badges ──────────────────── */

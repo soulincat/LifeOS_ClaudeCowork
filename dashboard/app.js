@@ -28,7 +28,7 @@ function isWidgetEnabled(name) {
         if (tab) tab.style.display = 'none';
     }
     if (!isWidgetEnabled('social')) {
-        const tab = document.querySelector('.tab-bar-tab[data-tab="dashboard"]');
+        const tab = document.querySelector('.tab-bar-tab[data-tab="socials"]');
         if (tab) tab.style.display = 'none';
     }
     if (!isWidgetEnabled('wishlist')) {
@@ -52,16 +52,19 @@ function isWidgetEnabled(name) {
             if (banner && versionText) {
                 versionText.textContent = `v${data.latest_version}`;
                 banner.style.display = 'block';
+                document.body.classList.add('update-banner-visible');
 
                 updateBtn.addEventListener('click', performUpdate);
                 dismissBtn.addEventListener('click', () => {
                     banner.style.display = 'none';
+                    document.body.classList.remove('update-banner-visible');
                     sessionStorage.setItem('update_dismissed', '1');
                 });
 
                 // Don't show if already dismissed this session
                 if (sessionStorage.getItem('update_dismissed') === '1') {
                     banner.style.display = 'none';
+                    document.body.classList.remove('update-banner-visible');
                 }
             }
         }
@@ -229,13 +232,13 @@ function updateHealthAlert() {
 }
 
 // Load dashboard data (each section independent so one failure doesn't block the rest)
-async function loadDashboardData() {
+async function loadSocialsData() {
     let socialFollowersTotal = 0;
 
     // Hide entire dashboard social section if social widget is disabled
     await getWidgetConfig();
     if (!isWidgetEnabled('social')) {
-        const socialFill = document.querySelector('#panel-dashboard .dashboard-social-fill');
+        const socialFill = document.querySelector('#panel-socials .dashboard-social-fill');
         if (socialFill) socialFill.style.display = 'none';
     }
 
@@ -485,7 +488,7 @@ async function loadDashboardData() {
                 const v = Number(m.value) || 0;
                 total += v;
                 const platform = (m.platform || '').toLowerCase();
-                const el = document.querySelector('#panel-dashboard .social-platform-metric[data-platform="' + platform + '"]');
+                const el = document.querySelector('#panel-socials .social-platform-metric[data-platform="' + platform + '"]');
                 if (el) el.textContent = fmt(v);
             });
             socialFollowersTotal = total;
@@ -510,7 +513,7 @@ async function loadDashboardData() {
         const overview = await overviewRes.json();
         if (overview) {
             const fmt = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v));
-            const socialMetrics = document.querySelectorAll('#panel-dashboard .social-metric');
+            const socialMetrics = document.querySelectorAll('#panel-socials .social-metric');
             if (socialMetrics.length >= 4) {
                 if (overview.posts != null) socialMetrics[1].querySelector('.social-metric-value').textContent = overview.posts.toString();
                 if (overview.impressions != null) socialMetrics[2].querySelector('.social-metric-value').textContent = fmt(overview.impressions);
@@ -636,7 +639,7 @@ async function loadDashboardData() {
 }
 
 // Expose for refresh button (before any code that might throw)
-window.loadDashboardData = loadDashboardData;
+window.loadSocialsData = loadSocialsData;
 
 function formatNumber(num) {
     if (num >= 1000) {
@@ -726,6 +729,28 @@ async function refreshGitHubGraph() {
 
 // Social numbers are set in HTML and not overwritten by JS (so they stay correct).
 function updateSocialNumbers() { /* no-op: keep HTML values */ }
+
+// ═══════════════════════════════════════════════════════════════════
+// DYNAMIC PROJECT TABS — one tab per project in the tab bar
+// ═══════════════════════════════════════════════════════════════════
+function renderProjectTabs(projects) {
+    const slot = document.getElementById('projectTabsSlot');
+    if (!slot) return;
+    // Clear previous project tabs
+    slot.innerHTML = '';
+    if (!Array.isArray(projects) || projects.length === 0) return;
+    // Sort by priority_rank
+    const sorted = [...projects].sort((a, b) => (a.priority_rank || 99) - (b.priority_rank || 99));
+    sorted.forEach(project => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tab-bar-tab tab-bar-tab-project';
+        btn.dataset.tab = 'project-' + project.id;
+        btn.textContent = project.name || 'Project';
+        btn.title = project.name || 'Project';
+        slot.appendChild(btn);
+    });
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // HOME PANEL — unified overview data loader
@@ -925,18 +950,24 @@ async function loadHomeData() {
                     card.classList.toggle('dash-project-expanded');
                 });
 
-                // Detail button → open project detail panel
+                // Detail button → switch to project's own tab
                 const detailBtn = card.querySelector('.dash-project-detail-btn');
                 if (detailBtn) {
                     detailBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        openProjectDetail(project.id);
+                        if (typeof window.showPanel === 'function') {
+                            window.showPanel('project-' + project.id);
+                        } else {
+                            openProjectDetail(project.id);
+                        }
                     });
                 }
 
                 grid.appendChild(card);
             });
         }
+        // Render dynamic project tabs in the tab bar
+        renderProjectTabs(projects);
     } catch (e) { console.warn('Home: projects-expanded failed', e); }
 
     // Generate project-specific PA quick chips from active projects
@@ -1270,11 +1301,11 @@ setTimeout(() => {
     updateSocialNumbers();
     // Load home panel (default) + dashboard data in parallel
     loadHomeData();
-    loadDashboardData();
+    loadSocialsData();
 }, 100);
 
-// Make loadDashboardData available globally for refresh
-window.loadDashboardData = loadDashboardData;
+// Make loadSocialsData available globally for refresh
+window.loadSocialsData = loadSocialsData;
 window.refreshGitHubGraph = refreshGitHubGraph;
 
 // Refresh GitHub graph daily (at midnight) and on page load
@@ -1297,7 +1328,7 @@ function scheduleGitHubRefresh() {
 scheduleGitHubRefresh();
 
 // Refresh data every 5 minutes
-setInterval(() => { loadDashboardData(); loadHomeData(); }, 5 * 60 * 1000);
+setInterval(() => { loadSocialsData(); loadHomeData(); }, 5 * 60 * 1000);
 
 // Dashboard project card: open full-screen revenue projections modal
 let projectionsChartInstance = null;
@@ -1581,7 +1612,7 @@ function closeProjectModal() {
     }
 }
 
-document.getElementById('panel-dashboard')?.addEventListener('click', function(e) {
+document.getElementById('panel-socials')?.addEventListener('click', function(e) {
     const card = e.target.closest('.project-card');
     if (!card) return;
     e.preventDefault();
@@ -1656,7 +1687,7 @@ document.getElementById('projectModalSave')?.addEventListener('click', async fun
         });
         if (res.ok) {
             if (typeof showToast === 'function') showToast('Plan saved', 'success');
-            loadDashboardData();
+            loadSocialsData();
         } else throw new Error('Failed');
     } catch (err) {
         if (typeof showToast === 'function') showToast('Failed to save', 'error');
@@ -1943,7 +1974,7 @@ window.loadTodos = loadTodos;
 // Fallback: load data again when window is fully loaded (in case first run failed)
 window.addEventListener('load', function() {
     if (typeof window.loadTodos === 'function') window.loadTodos();
-    if (typeof window.loadDashboardData === 'function') window.loadDashboardData();
+    if (typeof window.loadSocialsData === 'function') window.loadSocialsData();
     if (typeof window.refreshGitHubGraph === 'function') window.refreshGitHubGraph();
 });
 
@@ -2162,9 +2193,14 @@ let pdCurrentProject = null;       // full detail payload
 let pdTaskFilter = 'open';         // current task filter
 let pdDetailHandlersReady = false; // set up once, reuse across projects
 
-/** Open the project detail panel for a given project ID */
-function openProjectDetail(projectId) {
-    if (typeof window.showPanel === 'function') window.showPanel('project-detail');
+/** Open the project detail panel for a given project ID.
+ *  skipShowPanel: true when called from showPanel() itself (avoids recursion) */
+function openProjectDetail(projectId, skipShowPanel) {
+    if (!skipShowPanel && typeof window.showPanel === 'function') {
+        // Navigate to the project's own tab (which triggers showPanel → openProjectDetail with skip)
+        window.showPanel('project-' + projectId);
+        return;
+    }
     loadProjectDetail(projectId);
 }
 
