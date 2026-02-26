@@ -295,13 +295,10 @@
             <!-- Tab bar: top navigation row -->
             <div class="tab-bar" id="tabBar">
                 <button type="button" class="tab-bar-tab active" data-tab="home">Home</button>
-                <button type="button" class="tab-bar-tab" data-tab="dashboard">Dashboard</button>
-                <button type="button" class="tab-bar-tab" data-tab="goals">Goals</button>
-                <button type="button" class="tab-bar-tab" data-tab="scenarios">Projections</button>
                 <button type="button" class="tab-bar-tab" data-tab="inbox">Inbox <span class="inbox-tab-badge" id="inboxTabBadge" style="display:none"></span></button>
-                <button type="button" class="tab-bar-tab" data-tab="contacts">Contacts</button>
-                <button type="button" class="tab-bar-tab" data-tab="setup">Setup</button>
-                <button type="button" class="tab-bar-tab" data-tab="wishlist">Wishlist</button>
+                <span id="projectTabsSlot"></span>
+                <button type="button" class="tab-bar-tab" data-tab="socials">Socials</button>
+                <button type="button" class="tab-bar-tab" data-tab="more">More</button>
             </div>
             <div class="os-main-scroll">
             <!-- Panel: Home (default on load — unified overview) -->
@@ -366,7 +363,7 @@
             </div><!-- /panel-home -->
 
             <!-- Panel: Dashboard (existing social/projects overview) -->
-            <div id="panel-dashboard" class="main-panel main-panel-dashboard" style="display:none;">
+            <div id="panel-socials" class="main-panel main-panel-socials" style="display:none;">
             <!-- Social section: fills space between project cards and tab bar -->
             <div class="dashboard-social-fill">
             <div class="social-panel">
@@ -409,10 +406,20 @@
             </div>
             </div>
             </div>
-            <!-- /panel-dashboard -->
+            <!-- /panel-socials -->
 
-            <!-- Panel: Goals -->
-            <div id="panel-goals" class="main-panel" style="display: none;">
+            <!-- Panel: More (sub-tabs bar — content lives in panel-goals, panel-scenarios, etc.) -->
+            <div id="panel-more" class="main-panel panel-more" style="display: none;">
+                <div class="more-sub-tabs" id="moreSubTabs">
+                    <button type="button" class="more-sub-tab active" data-section="goals">Goals</button>
+                    <button type="button" class="more-sub-tab" data-section="scenarios">Projections</button>
+                    <button type="button" class="more-sub-tab" data-section="wishlist">Wishlist</button>
+                    <button type="button" class="more-sub-tab" data-section="setup">Setup</button>
+                </div>
+            </div>
+
+            <!-- More sub-panels (shown alongside panel-more when active) -->
+            <div id="panel-goals" class="main-panel more-section" style="display: none;">
                 <div class="panel-header panel-header-goals">
                     <button type="button" class="btn-add-todo" id="addGoalBtn" title="Add goal">+</button>
                 </div>
@@ -496,7 +503,7 @@
             </div>
 
             <!-- Panel: Projections (projections per project + combined chart) -->
-            <div id="panel-scenarios" class="main-panel main-panel-projections" style="display: none;">
+            <div id="panel-scenarios" class="main-panel more-section main-panel-projections" style="display: none;">
                 <div class="panel-header">
                     <h2 class="panel-title">Projections</h2>
                     <div class="panel-header-controls">
@@ -754,7 +761,7 @@
             </div>
 
             <!-- Panel: Wishlist (things you want; click item to edit) -->
-            <div id="panel-wishlist" class="main-panel" style="display: none;">
+            <div id="panel-wishlist" class="main-panel more-section" style="display: none;">
                 <div class="panel-header">
                     <h2 class="panel-title">Wishlist</h2>
                     <button type="button" class="btn-add-todo" id="addWishlistBtn" title="Add item">+</button>
@@ -817,7 +824,7 @@
                 </div>
             </div>
             <!-- Panel: Setup (tax residency, companies, reporting periods) -->
-            <div id="panel-setup" class="main-panel main-panel-setup" style="display: none;">
+            <div id="panel-setup" class="main-panel more-section main-panel-setup" style="display: none;">
                 <div class="panel-header">
                     <h2 class="panel-title">Setup</h2>
                     <button type="button" class="btn-save btn-small" id="setupSaveBtn" title="Save all setup">Save</button>
@@ -955,19 +962,15 @@
                 <div class="panel-header">
                     <h2 class="panel-title">Inbox</h2>
                     <div class="inbox-header-controls">
-                        <div class="inbox-source-tabs">
-                            <button type="button" class="inbox-source-tab active" data-source="">All <span class="inbox-badge" id="inboxBadgeAll"></span></button>
-                            <button type="button" class="inbox-source-tab" data-source="gmail">Gmail <span class="inbox-badge" id="inboxBadgeGmail"></span></button>
-                            <button type="button" class="inbox-source-tab" data-source="outlook">Outlook <span class="inbox-badge" id="inboxBadgeOutlook"></span></button>
-                            <button type="button" class="inbox-source-tab" data-source="whatsapp">WhatsApp <span class="inbox-badge" id="inboxBadgeWhatsapp"></span></button>
+                        <div class="inbox-source-tabs" id="inboxContextTabs">
+                            <button type="button" class="inbox-source-tab active" data-context="">All <span class="inbox-badge" id="inboxBadgeAll"></span></button>
+                            <!-- Dynamic tabs populated by JS -->
                         </div>
-                        <select id="inboxProjectFilter" class="todo-input" style="width:130px;font-size:11px;">
-                            <option value="">All projects</option>
-                        </select>
                         <label class="inbox-privacy-toggle" title="Privacy mode: hide sender &amp; content">
                             <input type="checkbox" id="inboxPrivacyMode"> Privacy
                         </label>
                         <button type="button" class="btn-small" id="inboxSyncBtn" title="Sync messages">Sync</button>
+                        <button type="button" class="btn-small" id="inboxContactsBtn" title="Contacts">Contacts</button>
                     </div>
                 </div>
 
@@ -1005,8 +1008,9 @@
                 </div>
             </div>
 
-            <!-- CONTACTS PANEL -->
-            <div id="panel-contacts" class="main-panel" style="display: none;">
+            <!-- CONTACTS OVERLAY (opened from Inbox header) -->
+            <div id="contactsOverlay" class="contacts-overlay" style="display: none;">
+            <div id="panel-contacts" class="contacts-overlay-inner">
                 <div class="panel-header">
                     <h2 class="panel-title">Contacts</h2>
                     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -1025,6 +1029,7 @@
                         </select>
                         <button type="button" class="btn-small" id="syncWaContactsBtn" title="Import from WhatsApp history">💬 Sync WA</button>
                         <button type="button" class="btn-small" id="addContactBtn">+ Add</button>
+                        <button type="button" class="btn-small btn-ghost" id="contactsCloseBtn" title="Close">✕</button>
                     </div>
                 </div>
 
@@ -1104,6 +1109,7 @@
                     <div class="contacts-empty">No contacts yet — add one with the + button.</div>
                 </div>
             </div><!-- /panel-contacts -->
+            </div><!-- /contactsOverlay -->
 
             <!-- PROJECT DETAIL PANEL -->
             <div id="panel-project-detail" class="main-panel" style="display: none;">

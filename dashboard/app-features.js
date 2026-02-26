@@ -411,7 +411,7 @@ function initAddUpcoming() {
                 form.style.display = 'none';
                 titleInput.value = '';
                 descInput.value = '';
-                await loadDashboardData();
+                await loadSocialsData();
                 showToast('Upcoming item added', 'success');
             } else {
                 throw new Error('Failed to add item');
@@ -508,7 +508,7 @@ function initAddFinance() {
                 form.style.display = 'none';
                 amountInput.value = '';
                 currencyInput.style.display = 'none';
-                await loadDashboardData();
+                await loadSocialsData();
                 showToast('Finance entry added', 'success');
             } else {
                 throw new Error('Failed to add entry');

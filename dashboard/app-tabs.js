@@ -1,27 +1,59 @@
 (function() {
     let currentTab = 'home';
+    let currentMoreSection = 'goals'; // default sub-section inside More
+
+    // More tab sub-sections — maps section key to panel id and loader
+    const moreSections = {
+        goals:     { panel: 'panel-goals',     loader: () => { if (typeof loadGoals === 'function') loadGoals(); } },
+        scenarios: { panel: 'panel-scenarios',  loader: () => { if (typeof initProjectionTab === 'function') initProjectionTab(); } },
+        wishlist:  { panel: 'panel-wishlist',   loader: () => { loadWishlist(); } },
+        setup:     { panel: 'panel-setup',      loader: () => { if (typeof loadSetup === 'function') loadSetup(); } }
+    };
+
+    function showMoreSection(section) {
+        currentMoreSection = section;
+        // Hide all more sub-panels
+        Object.values(moreSections).forEach(s => {
+            const el = document.getElementById(s.panel);
+            if (el) el.style.display = 'none';
+        });
+        // Show the active one
+        const active = moreSections[section];
+        if (active) {
+            const el = document.getElementById(active.panel);
+            if (el) el.style.display = 'block';
+            active.loader();
+        }
+        // Update sub-tab buttons
+        document.querySelectorAll('.more-sub-tab').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.section === section);
+        });
+    }
 
     function showPanel(tab) {
         currentTab = tab;
         document.querySelectorAll('.main-panel').forEach(el => { el.style.display = 'none'; });
         document.querySelectorAll('.tab-bar-tab').forEach(el => { el.classList.remove('active'); });
-        const panel = document.getElementById('panel-' + tab);
+
+        // Handle dynamic project tabs: project-{id} → show project-detail panel
+        const isProjectTab = tab.startsWith('project-') && tab !== 'project-detail';
+        const panelId = isProjectTab ? 'project-detail' : tab;
+        const panel = document.getElementById('panel-' + panelId);
         const tabBtn = document.querySelector('.tab-bar-tab[data-tab="' + tab + '"]');
-        const flexPanels = ['home', 'dashboard'];
+        const flexPanels = ['home', 'socials'];
         if (panel) panel.style.display = flexPanels.includes(tab) ? 'flex' : 'block';
         if (tabBtn) tabBtn.classList.add('active');
         // Show PA chat bar on all tabs
         const paWrap = document.getElementById('dashPaWrap');
         if (paWrap) paWrap.style.display = 'block';
         if (tab === 'home' && typeof loadHomeData === 'function') loadHomeData();
-        if (tab === 'dashboard' && typeof loadDashboardData === 'function') loadDashboardData();
-        if (tab === 'wishlist') loadWishlist();
-        if (tab === 'goals') loadGoals();
-        if (tab === 'scenarios' && typeof initProjectionTab === 'function') initProjectionTab();
-        if (tab === 'setup' && typeof loadSetup === 'function') loadSetup();
+        if (tab === 'socials' && typeof loadSocialsData === 'function') loadSocialsData();
         if (tab === 'inbox') initInboxTab();
-        if (tab === 'contacts' && typeof window.__loadContacts === 'function') window.__loadContacts();
-        // project-detail panel: no auto-load (loaded explicitly via openProjectDetail)
+        if (tab === 'more') showMoreSection(currentMoreSection);
+        if (isProjectTab) {
+            const projectId = tab.replace('project-', '');
+            if (typeof openProjectDetail === 'function') openProjectDetail(parseInt(projectId, 10), true);
+        }
     }
 
     async function loadWishlist() {
@@ -946,6 +978,12 @@
         if (tab) showPanel(tab);
     });
 
+    // More tab sub-navigation
+    document.getElementById('moreSubTabs')?.addEventListener('click', function(e) {
+        const section = e.target.closest('.more-sub-tab')?.dataset.section;
+        if (section) showMoreSection(section);
+    });
+
     window.showPanel = showPanel;
     window.loadWishlist = loadWishlist;
     window.loadGoals = loadGoals;
@@ -1124,7 +1162,6 @@
         if (!inboxInitialised) {
             inboxInitialised = true;
             setupInboxHandlers();
-            loadInboxProjectFilter();
         }
     }
 
@@ -1243,13 +1280,14 @@
         msgs.forEach(msg => container.appendChild(renderInboxCard(msg)));
     }
 
+    let inboxActiveContext = ''; // '' = all, 'personal', 'work', or project_id string
+
     async function loadInbox() {
         try {
             const source = inboxActiveSource;
-            const projectId = document.getElementById('inboxProjectFilter')?.value;
             let url = '/api/messages/tiered?';
             if (source) url += `source=${source}&`;
-            if (projectId) url += `project_id=${projectId}&`;
+            if (inboxActiveContext) url += `context=${inboxActiveContext}&`;
             const res = await fetch(url);
             const { urgent, medium, ignored } = await res.json();
             renderInboxSection('inboxListUrgent', urgent, 'inboxCountUrgent');
@@ -1282,30 +1320,41 @@
         try {
             const res = await fetch('/api/messages/counts');
             const counts = await res.json();
-            const badge = (id, n) => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.textContent = n > 0 ? n : '';
-                el.style.display = n > 0 ? 'inline' : 'none';
-            };
-            badge('inboxBadgeAll', counts.total);
-            badge('inboxBadgeGmail', counts.gmail);
-            badge('inboxBadgeOutlook', counts.outlook);
-            badge('inboxBadgeWhatsapp', counts.whatsapp);
+
+            // Update top-level tab badge
             const tabBadge = document.getElementById('inboxTabBadge');
             if (tabBadge) { tabBadge.textContent = counts.total > 0 ? counts.total : ''; tabBadge.style.display = counts.total > 0 ? 'inline' : 'none'; }
-        } catch (e) { /* */ }
-    }
 
-    async function loadInboxProjectFilter() {
-        const sel = document.getElementById('inboxProjectFilter');
-        if (!sel) return;
-        try {
-            const projects = await fetch('/api/projects').then(r => r.json());
-            sel.innerHTML = '<option value="">All projects</option>';
-            (Array.isArray(projects) ? projects : []).filter(p => p.status === 'active').forEach(p => {
-                sel.innerHTML += `<option value="${p.id}">${esc(p.name)}</option>`;
-            });
+            // Build dynamic context tabs
+            const container = document.getElementById('inboxContextTabs');
+            if (!container) return;
+
+            // Update All badge
+            const allBadge = document.getElementById('inboxBadgeAll');
+            if (allBadge) { allBadge.textContent = counts.total > 0 ? counts.total : ''; allBadge.style.display = counts.total > 0 ? 'inline' : 'none'; }
+
+            // Remove old dynamic tabs (keep the "All" button)
+            container.querySelectorAll('.inbox-source-tab[data-context]:not([data-context=""])').forEach(el => el.remove());
+
+            // Add context tabs from API
+            const contexts = counts.contexts || [];
+            for (const ctx of contexts) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'inbox-source-tab';
+                const ctxValue = ctx.project_id ? String(ctx.project_id) : (ctx.context_name === 'Personal' ? 'personal' : 'work');
+                btn.dataset.context = ctxValue;
+                if (ctxValue === inboxActiveContext) btn.classList.add('active');
+                btn.innerHTML = esc(ctx.context_name) + (ctx.count > 0 ? ' <span class="inbox-badge" style="display:inline">' + ctx.count + '</span>' : '');
+                btn.addEventListener('click', function() {
+                    container.querySelectorAll('.inbox-source-tab').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    inboxActiveContext = this.dataset.context;
+                    inboxActiveSource = '';
+                    loadInbox();
+                });
+                container.appendChild(btn);
+            }
         } catch (e) { /* */ }
     }
 
@@ -1492,18 +1541,17 @@
     }
 
     function setupInboxHandlers() {
-        // Source tab filtering
-        document.querySelectorAll('.inbox-source-tab').forEach(btn => {
-            btn.addEventListener('click', function() {
+        // "All" tab click
+        const allTab = document.querySelector('.inbox-source-tab[data-context=""]');
+        if (allTab) {
+            allTab.addEventListener('click', function() {
                 document.querySelectorAll('.inbox-source-tab').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
-                inboxActiveSource = this.dataset.source;
+                inboxActiveContext = '';
+                inboxActiveSource = '';
                 loadInbox();
             });
-        });
-
-        // Project filter
-        document.getElementById('inboxProjectFilter')?.addEventListener('change', () => loadInbox());
+        }
 
         // Privacy toggle
         document.getElementById('inboxPrivacyMode')?.addEventListener('change', () => loadInbox());
@@ -1513,6 +1561,22 @@
             this.textContent = 'Syncing…'; this.disabled = true;
             try { await fetch('/api/messages/sync', { method: 'POST' }); setTimeout(() => { loadInbox(); loadInboxCounts(); }, 2000); } catch (e) { /* */ }
             setTimeout(() => { this.textContent = 'Sync'; this.disabled = false; }, 3000);
+        });
+
+        // Contacts overlay toggle
+        document.getElementById('inboxContactsBtn')?.addEventListener('click', function() {
+            const overlay = document.getElementById('contactsOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                if (typeof window.__loadContacts === 'function') window.__loadContacts();
+            }
+        });
+        document.getElementById('contactsCloseBtn')?.addEventListener('click', function() {
+            const overlay = document.getElementById('contactsOverlay');
+            if (overlay) overlay.style.display = 'none';
+        });
+        document.getElementById('contactsOverlay')?.addEventListener('click', function(e) {
+            if (e.target === this) this.style.display = 'none';
         });
 
         // Section collapse/expand
@@ -1613,6 +1677,53 @@
                     if (res.ok) { card.classList.add('inbox-card-sent'); setTimeout(() => { card.remove(); loadInboxCounts(); updateSectionCounts(); }, 800); }
                     else { sendBtn.textContent = 'Failed'; sendBtn.disabled = false; }
                 } catch (e) { sendBtn.textContent = 'Error'; sendBtn.disabled = false; }
+                return;
+            }
+
+            // Click on card header → expand/collapse conversation history
+            const cardHeader = e.target.closest('.inbox-card-header');
+            if (cardHeader && !e.target.closest('.inbox-quick-actions') && !e.target.closest('button') && !e.target.closest('textarea')) {
+                const card = cardHeader.closest('.inbox-card');
+                if (!card) return;
+                const source = card.dataset.source;
+                const sender = card.dataset.senderAddress || card.dataset.sender;
+                const msgCount = parseInt(card.querySelector('.inbox-msg-count')?.textContent) || 1;
+
+                // Toggle existing conversation
+                const existing = card.querySelector('.inbox-convo-history');
+                if (existing) {
+                    existing.remove();
+                    return;
+                }
+
+                // Only fetch if there are multiple messages
+                if (msgCount <= 1) return;
+
+                try {
+                    const params = new URLSearchParams({ source, sender_address: sender, limit: '10' });
+                    const res = await fetch('/api/messages/by-sender?' + params);
+                    const messages = await res.json();
+                    if (messages.length <= 1) return;
+
+                    const convoDiv = document.createElement('div');
+                    convoDiv.className = 'inbox-convo-history';
+                    messages.slice(1).forEach(m => {
+                        const time = m.received_at ? new Date(m.received_at).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                        const actionTag = m.action_tag || 'fyi';
+                        const atCfg2 = ACTION_TAG_CONFIG[actionTag] || ACTION_TAG_CONFIG.fyi;
+                        const row = document.createElement('div');
+                        row.className = 'inbox-convo-msg';
+                        row.innerHTML =
+                            `<span class="inbox-convo-time">${time}</span>` +
+                            `<span class="inbox-action-tag ${atCfg2.cls}" style="font-size:9px;padding:1px 4px;">${atCfg2.label}</span>` +
+                            `<span class="inbox-convo-text">${esc((m.subject && m.subject !== m.preview) ? m.subject + ' — ' : '')}${esc((m.preview || m.ai_summary || '').slice(0, 120))}</span>`;
+                        convoDiv.appendChild(row);
+                    });
+                    // Insert after the header, before subject/summary
+                    const subjectEl = card.querySelector('.inbox-subject') || card.querySelector('.inbox-summary');
+                    if (subjectEl) card.insertBefore(convoDiv, subjectEl);
+                    else card.appendChild(convoDiv);
+                } catch (err) { /* silent */ }
             }
         });
     }

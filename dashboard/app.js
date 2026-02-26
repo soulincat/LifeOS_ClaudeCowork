@@ -22,18 +22,18 @@ function isWidgetEnabled(name) {
 // On load: fetch config and hide optional tabs/sections
 (async function applyWidgetConfig() {
     await getWidgetConfig();
-    // Hide optional tabs
+    // Hide optional tabs / sub-tabs
     if (!isWidgetEnabled('projections')) {
-        const tab = document.querySelector('.tab-bar-tab[data-tab="scenarios"]');
-        if (tab) tab.style.display = 'none';
+        const sub = document.querySelector('.more-sub-tab[data-section="scenarios"]');
+        if (sub) sub.style.display = 'none';
     }
     if (!isWidgetEnabled('social')) {
         const tab = document.querySelector('.tab-bar-tab[data-tab="socials"]');
         if (tab) tab.style.display = 'none';
     }
     if (!isWidgetEnabled('wishlist')) {
-        const tab = document.querySelector('.tab-bar-tab[data-tab="wishlist"]');
-        if (tab) tab.style.display = 'none';
+        const sub = document.querySelector('.more-sub-tab[data-section="wishlist"]');
+        if (sub) sub.style.display = 'none';
     }
 })();
 
@@ -1006,13 +1006,12 @@ function renderHomeInbox(groups, filter) {
 
     // Flatten to check if empty
     const totalSenders = filtered.reduce((s, g) => s + g.senders.length, 0);
+    if (body) body.style.display = '';
     if (!totalSenders) {
-        if (body) body.style.display = 'none';
         if (viewAll) viewAll.style.display = 'none';
-        feed.innerHTML = '';
+        feed.innerHTML = '<div style="color:var(--text-dim);padding:18px 0;text-align:center;font-size:13px;">No ' + (filter === 'all' ? '' : filter + ' ') + 'messages</div>';
         return;
     }
-    if (body) body.style.display = '';
     if (viewAll) viewAll.style.display = '';
     feed.innerHTML = '';
 

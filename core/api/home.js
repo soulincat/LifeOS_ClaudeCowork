@@ -66,17 +66,17 @@ router.get('/pulse', async (req, res) => {
             if (h) recovery = h.recovery;
         } catch (e) { /* */ }
 
-        // Unread count — try inbox_items first, fall back to messages table
+        // Unread count — conversation-level (distinct senders for WA + raw for email)
         let unread = 0;
         try {
+            const email = db.prepare("SELECT COUNT(*) as c FROM messages WHERE status = 'pending' AND source IN ('gmail','outlook')").get();
+            const waConvos = db.prepare("SELECT COUNT(DISTINCT sender_address) as c FROM messages WHERE status = 'pending' AND source = 'whatsapp'").get();
+            unread = (email?.c || 0) + (waConvos?.c || 0);
+        } catch (e) { /* */ }
+        try {
             const r = db.prepare('SELECT COUNT(*) as c FROM inbox_items WHERE is_unread = 1 AND is_dismissed = 0').get();
-            unread = r.c;
-        } catch (e) {
-            try {
-                const r = db.prepare("SELECT COUNT(*) as c FROM messages WHERE status = 'pending'").get();
-                unread = r.c;
-            } catch (e2) { /* */ }
-        }
+            if (r.c > unread) unread = r.c;
+        } catch (e) { /* */ }
 
         // Meetings today
         let meetings = 0;

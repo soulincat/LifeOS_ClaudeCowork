@@ -182,7 +182,7 @@ router.patch('/:id', (req, res) => {
         const allowed = ['name', 'description', 'github_repo', 'metrics', 'revenue_worst', 'revenue_base', 'revenue_lucky',
             'hours_per_week', 'budget_to_invest', 'months_to_results', 'business_model', 'ai_assumptions', 'ai_analysis', 'status',
             'next_action', 'health_status', 'progress_pct', 'current_phase', 'phase_list', 'priority_rank',
-            'timeline_start', 'timeline_end', 'blocks_project_ids', 'depends_on_project_ids'];
+            'timeline_start', 'timeline_end', 'blocks_project_ids', 'depends_on_project_ids', 'short_name'];
         const numericFields = ['revenue_worst', 'revenue_base', 'revenue_lucky', 'hours_per_week', 'budget_to_invest', 'months_to_results', 'progress_pct', 'priority_rank'];
         const statusValues = ['active', 'paused', 'completed', 'archived'];
         const updates = [];

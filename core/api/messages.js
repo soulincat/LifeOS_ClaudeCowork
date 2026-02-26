@@ -94,10 +94,16 @@ router.get('/grouped-by-context', (req, res) => {
         const rows = db.prepare(`
             SELECT
                 COALESCE(p.name,
-                    CASE WHEN c.type = 'business' THEN 'Work' ELSE 'Personal' END,
+                    CASE WHEN c.type = 'business' THEN 'Work'
+                         WHEN m.project_id IS NOT NULL THEN 'Work'
+                         WHEN m.source IN ('gmail','outlook') AND c.type IS NULL THEN 'Work'
+                         ELSE 'Personal' END,
                     'Uncategorized') AS group_name,
                 COALESCE(m.project_id, 0) AS group_id,
-                COALESCE(c.type, 'personal') AS group_type,
+                CASE WHEN c.type = 'business' THEN 'business'
+                     WHEN m.project_id IS NOT NULL THEN 'business'
+                     WHEN m.source IN ('gmail','outlook') AND c.type IS NULL THEN 'business'
+                     ELSE COALESCE(c.type, 'personal') END AS group_type,
                 m.source,
                 m.sender_address,
                 m.sender_name,
@@ -193,12 +199,20 @@ router.get('/by-sender', (req, res) => {
  */
 router.get('/tiered', (req, res) => {
     try {
-        const { source, project_id } = req.query;
+        const { source, project_id, context } = req.query;
         let baseWhere = "m.status IN ('pending','approved')";
         const params = [];
 
         if (source) { baseWhere += ' AND m.source = ?'; params.push(source); }
         if (project_id) { baseWhere += ' AND m.project_id = ?'; params.push(Number(project_id)); }
+        // Context filter: 'personal' = whatsapp without project, 'work' = email without project, or numeric project_id
+        if (context === 'personal') {
+            baseWhere += " AND m.project_id IS NULL AND m.source NOT IN ('gmail','outlook')";
+        } else if (context === 'work') {
+            baseWhere += " AND m.project_id IS NULL AND m.source IN ('gmail','outlook')";
+        } else if (context && !isNaN(Number(context))) {
+            baseWhere += ' AND m.project_id = ?'; params.push(Number(context));
+        }
 
         // Helper: grouped query for a specific tier filter
         function queryTier(tierWhere, limit) {
@@ -284,6 +298,7 @@ router.delete('/by-sender', (req, res) => {
 /**
  * GET /api/messages/counts
  * Returns pending count per source for the sidebar badge.
+ * Also returns counts by project context for dynamic tab badges.
  */
 router.get('/counts', (req, res) => {
     try {
@@ -309,6 +324,21 @@ router.get('/counts', (req, res) => {
         const waDiff = counts.whatsapp - (waConvos?.count || 0);
         counts.whatsapp = waConvos?.count || 0;
         counts.total = Math.max(0, counts.total - waDiff);
+
+        // Context tabs: counts grouped by project (or Personal for non-project)
+        const contextRows = db.prepare(`
+            SELECT
+                COALESCE(p.name, CASE WHEN m.source IN ('gmail','outlook') THEN 'Work' ELSE 'Personal' END) AS context_name,
+                COALESCE(m.project_id, 0) AS project_id,
+                COUNT(DISTINCT CASE WHEN m.source = 'whatsapp' THEN m.sender_address ELSE m.id END) AS count
+            FROM messages m
+            LEFT JOIN projects p ON m.project_id = p.id
+            WHERE m.status = 'pending'
+            GROUP BY context_name
+            ORDER BY count DESC
+        `).all();
+        counts.contexts = contextRows;
+
         res.json(counts);
     } catch (error) {
         console.error('Error fetching message counts:', error);

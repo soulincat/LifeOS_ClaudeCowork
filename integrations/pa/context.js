@@ -45,33 +45,26 @@ function buildPAContext() {
     } catch (e) { /* setup_sections may not exist yet */ }
 
     // ── Health / energy (Whoop) ──────────────────────────────────────────────
+    // Read from health_metrics (where WHOOP sync writes) — health_daily_data is a stale migration-era copy
     try {
         const health = db.prepare(`
-            SELECT recovery, sleep_hours, hrv, strain
-            FROM health_daily_data
+            SELECT date, recovery, sleep_hours, sleep_minutes, hrv, strain
+            FROM health_metrics
             ORDER BY date DESC LIMIT 1
         `).get();
         if (health) {
             const energy = health.recovery >= 70 ? 'High energy day' : health.recovery >= 50 ? 'Moderate energy' : 'Low energy — suggest lighter schedule';
-            sections.push(`WHOOP: Recovery ${health.recovery}%, Sleep ${health.sleep_hours}h, HRV ${health.hrv}${health.strain ? `, Strain ${health.strain}` : ''} → ${energy}`);
+            const sleepStr = health.sleep_minutes ? `${health.sleep_hours}h${health.sleep_minutes}m` : `${health.sleep_hours}h`;
+            sections.push(`WHOOP (${health.date}): Recovery ${health.recovery}%, Sleep ${sleepStr}, HRV ${health.hrv}${health.strain ? `, Strain ${health.strain.toFixed ? health.strain.toFixed(1) : health.strain}` : ''} → ${energy}`);
         }
-    } catch (e) {
-        // Fall back to legacy health_metrics
-        try {
-            const health = db.prepare('SELECT recovery, sleep_hours, hrv FROM health_metrics ORDER BY date DESC LIMIT 1').get();
-            if (health) {
-                const energy = health.recovery >= 70 ? 'High energy day' : health.recovery >= 50 ? 'Moderate energy' : 'Low energy';
-                sections.push(`WHOOP: Recovery ${health.recovery}%, Sleep ${health.sleep_hours}h, HRV ${health.hrv} → ${energy}`);
-            }
-        } catch (e2) { /* */ }
-    }
+    } catch (e) { /* health_metrics table may not exist */ }
 
     // ── Focus task ───────────────────────────────────────────────────────────
     try {
         const { scoreFocusCard } = require('../../core/db/derived-state');
         let recovery = 70;
         try {
-            const h = db.prepare('SELECT recovery FROM health_daily_data ORDER BY date DESC LIMIT 1').get();
+            const h = db.prepare('SELECT recovery FROM health_metrics ORDER BY date DESC LIMIT 1').get();
             if (h && h.recovery) recovery = h.recovery;
         } catch (e) { /* */ }
         const focus = scoreFocusCard(recovery);

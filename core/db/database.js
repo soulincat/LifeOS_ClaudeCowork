@@ -107,6 +107,8 @@ if (fs.existsSync(schemaPath)) {
         // Per-project KPI display (replaces hardcoded typeMap/kpiByProject)
         addP('display_kpi_key', 'TEXT');
         addP('display_kpi_label', 'TEXT');
+        // Short name for tab labels
+        addP('short_name', 'TEXT');
     } catch (e) { /* */ }
 
     // Migrate: Create project_tasks, project_milestones, project_dependencies, decision_triggers, inbox_items, vip_senders
