@@ -100,8 +100,13 @@ router.put('/reorder', (req, res) => {
 router.patch('/:id', (req, res) => {
     try {
         const { id } = req.params;
-        const { completed, text } = req.body;
-        
+        const { completed, text, due_date } = req.body;
+
+        if (due_date !== undefined) {
+            const stmt = db.prepare('UPDATE todos SET due_date = ? WHERE id = ?');
+            stmt.run(due_date || null, id);
+        }
+
         if (completed !== undefined) {
             const now = new Date().toISOString().split('T')[0];
             

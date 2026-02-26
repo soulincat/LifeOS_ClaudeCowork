@@ -640,6 +640,17 @@ function formatNumber(num) {
     return num.toString();
 }
 
+function timeAgo(date) {
+    const diff = Date.now() - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    const days = Math.floor(hrs / 24);
+    return days + 'd ago';
+}
+
 function pickPrimaryMetricKey(current, lastMonth, projectType) {
     const obj = current || lastMonth || {};
     const keys = Object.keys(obj).filter(k => k !== 'current' && k !== 'last_month' && obj[k] != null);
@@ -804,6 +815,37 @@ async function loadHomeData() {
             if (blockerChip) blockerChip.style.display = '';
         } else if (blockerChip) { blockerChip.style.display = 'none'; }
     } catch (e) { /* pulse endpoint not available, fall back silently */ }
+
+    // ── Sidebar: Important Messages (high urgency from inbox) ──
+    try {
+        const imRes = await fetch(base + '/api/messages/tiered?');
+        const { urgent, medium } = await imRes.json();
+        const important = [...(urgent || []), ...(medium || [])].slice(0, 5);
+        const listEl = document.getElementById('sidebarEmailsList');
+        const countEl = document.getElementById('sidebarEmailsCount');
+        if (countEl) countEl.textContent = important.length > 0 ? '(' + important.length + ')' : '';
+        if (listEl) {
+            if (important.length === 0) {
+                listEl.innerHTML = '<div class="email-item" style="color:var(--text-dim);font-size:12px;">No important messages</div>';
+            } else {
+                const escH = (s) => s ? String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+                listEl.innerHTML = important.map(m => {
+                    const date = m.received_at ? new Date(m.received_at) : null;
+                    const ago = date ? timeAgo(date) : '';
+                    const icon = m.source === 'whatsapp' ? '\ud83d\udcac' : '\u2709';
+                    const urgCls = (m.urgency_score || 3) >= 4 ? ' email-urgent' : '';
+                    const text = escH(m.subject || m.preview || m.ai_summary || '').slice(0, 60);
+                    return '<div class="email-item">' +
+                        '<div class="email-subject' + urgCls + '">' + text + '</div>' +
+                        '<div class="email-from">' + icon + ' ' + escH(m.sender_name || m.sender_address || 'Unknown') + (ago ? ' \u2022 ' + ago : '') + '</div>' +
+                        '</div>';
+                }).join('');
+            }
+        }
+    } catch (e) { console.warn('Sidebar emails failed', e); }
+
+    // ── Sidebar: Trigger calendar sync for upcoming events ──
+    fetch(base + '/api/upcoming/sync-calendar', { method: 'POST' }).catch(() => {});
 
     // ── Focus Card (scored task from derived state engine) ──
     try {
@@ -1321,288 +1363,7 @@ scheduleGitHubRefresh();
 // Refresh data every 5 minutes
 setInterval(() => { loadSocialsData(); loadHomeData(); }, 5 * 60 * 1000);
 
-// Dashboard project card: open full-screen revenue projections modal
-let projectionsChartInstance = null;
-
-function buildProjectionsSeries(projections, monthsTotal, growthPct) {
-    const g = growthPct / 100;
-    const out = { labels: [], datasets: [] };
-    const colors = {
-        worst: { A: 'rgba(220, 38, 38, 0.8)', B: 'rgba(234, 88, 12, 0.8)', C: 'rgba(202, 138, 4, 0.8)' },
-        base:  { A: 'rgba(32, 62, 174, 0.8)', B: 'rgba(59, 130, 246, 0.8)', C: 'rgba(99, 102, 241, 0.8)' },
-        best:  { A: 'rgba(16, 185, 129, 0.8)', B: 'rgba(34, 197, 94, 0.8)', C: 'rgba(52, 211, 153, 0.8)' }
-    };
-    for (let m = 0; m <= monthsTotal; m++) out.labels.push(m === 0 ? '0' : m + 'mo');
-
-    projections.forEach((sc, idx) => {
-        const key = sc.key || ['A', 'B', 'C'][idx] || '?';
-        const worst3 = sc.worst_3mo || 0, worst6 = sc.worst_6mo || 0;
-        const base3 = sc.baseline_3mo || 0, base6 = sc.baseline_6mo || 0;
-        const best3 = sc.best_3mo || 0, best6 = sc.best_6mo || 0;
-
-        function valueAt(month, v3, v6) {
-            if (month <= 0) return 0;
-            if (month <= 3) return (v3 / 3) * month;
-            if (month <= 6) return v3 + ((v6 - v3) / 3) * (month - 3);
-            const monthlyRate = (v6 - v3) / 3;
-            const rateAfter6 = monthlyRate * (1 + g);
-            return v6 + rateAfter6 * (month - 6);
-        }
-
-        ['worst', 'base', 'best'].forEach((variant, vi) => {
-            const v3 = variant === 'worst' ? worst3 : variant === 'base' ? base3 : best3;
-            const v6 = variant === 'worst' ? worst6 : variant === 'base' ? base6 : best6;
-            const data = [];
-            for (let m = 0; m <= monthsTotal; m++) {
-                data.push(Math.round(valueAt(m, v3, v6)));
-            }
-            out.datasets.push({
-                label: key + ' ' + (variant === 'worst' ? 'Worst' : variant === 'base' ? 'Base' : 'Best'),
-                data,
-                borderColor: colors[variant][key] || colors[variant].A,
-                backgroundColor: (colors[variant][key] || colors[variant].A).replace('0.8', '0.1'),
-                tension: 0.3,
-                fill: false
-            });
-        });
-    });
-
-    return out;
-}
-
-function valueAtMonth(month, v3, v6, growthPct) {
-    const g = growthPct / 100;
-    if (month <= 0) return 0;
-    if (month <= 3) return (v3 / 3) * month;
-    if (month <= 6) return v3 + ((v6 - v3) / 3) * (month - 3);
-    const monthlyRate = (v6 - v3) / 3;
-    return v6 + monthlyRate * (1 + g) * (month - 6);
-}
-
-function renderProjectionsSummary(projections, monthsTotal, growthPct) {
-    const wrap = document.getElementById('projectionsSummaryWrap');
-    const tbody = document.getElementById('projectionsSummaryBody');
-    const head12 = document.getElementById('projectionsSummary12moHead');
-    if (!wrap || !tbody) return;
-    if (projections.length === 0) {
-        wrap.style.display = 'none';
-        return;
-    }
-    if (head12) head12.textContent = monthsTotal + 'mo base';
-    const fmt = (n) => '$' + (Math.round(n)).toLocaleString();
-    tbody.innerHTML = projections.map(sc => {
-        const budget = sc.budget_cap_usd != null ? '$' + Math.round(sc.budget_cap_usd).toLocaleString() : '—';
-        const time = sc.time_available_hrs_per_week != null ? sc.time_available_hrs_per_week + 'h/wk' : '—';
-        const budgetTime = budget + ' · ' + time;
-        const r3 = sc.worst_3mo != null && sc.baseline_3mo != null && sc.best_3mo != null
-            ? fmt(sc.worst_3mo) + ' / ' + fmt(sc.baseline_3mo) + ' / ' + fmt(sc.best_3mo) : '—';
-        const r6 = sc.worst_6mo != null && sc.baseline_6mo != null && sc.best_6mo != null
-            ? fmt(sc.worst_6mo) + ' / ' + fmt(sc.baseline_6mo) + ' / ' + fmt(sc.best_6mo) : '—';
-        const atHorizon = monthsTotal > 0
-            ? fmt(valueAtMonth(monthsTotal, sc.baseline_3mo || 0, sc.baseline_6mo || 0, growthPct)) : '—';
-        return '<tr><td><strong>' + (sc.key || '') + '</strong> ' + (sc.name || '') + '</td><td>' + budgetTime + '</td><td>' + r3 + '</td><td>' + r6 + '</td><td>' + atHorizon + '</td></tr>';
-    }).join('');
-    wrap.style.display = 'block';
-}
-
-function renderProjectionsChart(projections, monthsTotal, growthPct) {
-    const canvas = document.getElementById('projectionsChart');
-    if (!canvas || !window.Chart) return;
-    if (projectionsChartInstance) {
-        projectionsChartInstance.destroy();
-        projectionsChartInstance = null;
-    }
-    const { labels, datasets } = buildProjectionsSeries(projections, monthsTotal, growthPct);
-    const ctx = canvas.getContext('2d');
-    projectionsChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: { labels, datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { display: true, position: 'top' },
-                tooltip: { callbacks: { label: (ctx) => ctx.dataset.label + ': $' + ctx.raw.toLocaleString() } }
-            },
-            scales: {
-                x: { title: { display: true, text: 'Month' }, ticks: { maxRotation: 0 } },
-                y: { beginAtZero: true, title: { display: true, text: 'Cumulative revenue ($)' } }
-            }
-        }
-    });
-}
-
-let currentProjectModalId = null;
-let currentProjectModalData = { project: null, analysis: null };
-
-async function openProjectModal(projectId) {
-    const modal = document.getElementById('projectModal');
-    if (!modal || !projectId) return;
-    currentProjectModalId = projectId;
-    modal.setAttribute('data-project-id', projectId);
-    try {
-        const projectRes = await fetch('/api/projects/' + projectId);
-        if (!projectRes.ok) {
-            if (typeof showToast === 'function') showToast('Could not load project', 'error');
-            return;
-        }
-        const project = await projectRes.json();
-        currentProjectModalData = { project, analysis: null };
-        
-        // Populate form
-        document.getElementById('projectModalName').value = project.name || '';
-        document.getElementById('pmDescription').value = project.description || '';
-        document.getElementById('pmHoursWeek').value = project.hours_per_week || 10;
-        document.getElementById('pmMonths').value = project.months_to_results || 6;
-        const statusEl = document.getElementById('pmStatus');
-        if (statusEl) statusEl.value = (project.status || 'active').toLowerCase();
-
-        const model = project.business_model || 'saas';
-        document.querySelectorAll('input[name="pmModel"]').forEach(r => r.checked = r.value === model);
-        
-        // Dashboard metrics — read KPI from project data (display_kpi_key/label columns)
-        const kpiKey = project.display_kpi_key;
-        const kpiLabel = project.display_kpi_label;
-        const metrics = project.metrics || {};
-        const current = metrics.current != null ? metrics.current : metrics;
-        const lastMonth = metrics.last_month != null ? metrics.last_month : null;
-        const primaryKey = kpiKey || pickPrimaryMetricKey(current, lastMonth, (project.business_model || project.name || '').toLowerCase());
-        const getVal = (obj) => {
-            if (!obj || !primaryKey) return null;
-            if (primaryKey === 'paid_members') return obj.paid_members != null ? obj.paid_members : obj.paid_member;
-            return obj[primaryKey];
-        };
-        modal.dataset.primaryMetricKey = primaryKey || '';
-        const labelEl = document.getElementById('pmDashboardMetricLabel');
-        const labelCopyEl = document.getElementById('pmDashboardMetricLabelCopy');
-        const labelText = kpiLabel || (primaryKey ? formatMetricLabel(primaryKey, (project.business_model || project.name || '').toLowerCase()) : 'Metric');
-        if (labelEl) labelEl.textContent = labelText;
-        if (labelCopyEl) labelCopyEl.textContent = labelText;
-        const lastMonthInput = document.getElementById('pmMetricLastMonth');
-        const thisMonthInput = document.getElementById('pmMetricThisMonth');
-        if (lastMonthInput) lastMonthInput.value = getVal(lastMonth) != null ? getVal(lastMonth) : '';
-        if (thisMonthInput) thisMonthInput.value = getVal(current) != null ? getVal(current) : '';
-        
-        // Show saved analysis if any
-        const numbersSection = document.getElementById('pmNumbersSection');
-        if (project.ai_analysis) {
-            try {
-                const analysis = JSON.parse(project.ai_analysis);
-                currentProjectModalData.analysis = analysis;
-                displayAnalysis(analysis);
-                if (numbersSection) numbersSection.style.display = 'block';
-            } catch (e) {
-                if (numbersSection) numbersSection.style.display = 'none';
-            }
-        } else {
-            document.getElementById('pmAnalysisResult').innerHTML = `<p class="pm-analysis-placeholder">Describe your project above, then click "Analyze with AI" to get:<br>
-                • Suggested pricing based on your market<br>
-                • Realistic customer acquisition estimates<br>
-                • Required budget breakdown (tools, marketing, etc.)<br>
-                • Probability assessment<br>
-                • Revenue projections with reasoning</p>`;
-            if (numbersSection) numbersSection.style.display = 'none';
-        }
-        
-        modal.style.display = 'flex';
-        modal.setAttribute('aria-hidden', 'false');
-    } catch (e) {
-        console.error('openProjectModal error:', e);
-        if (typeof showToast === 'function') showToast('Could not load project', 'error');
-    }
-}
-
-function displayAnalysis(analysis) {
-    // Display reasoning
-    document.getElementById('pmAnalysisResult').innerHTML = `<div class="pm-ai-result">${analysis.reasoning || ''}</div>`;
-    
-    // Display numbers
-    document.getElementById('pmSuggestedPrice').textContent = analysis.suggested_price || '—';
-    document.getElementById('pmTargetCustomers').textContent = analysis.target_customers || '—';
-    document.getElementById('pmBudgetNeeded').textContent = analysis.budget_needed || '—';
-    document.getElementById('pmProbability').textContent = analysis.probability || '—';
-    
-    // Display forecasts
-    document.getElementById('pmForecastWorst').textContent = '$' + (analysis.revenue_worst || 0) + '/mo';
-    document.getElementById('pmForecastBase').textContent = '$' + (analysis.revenue_base || 0) + '/mo';
-    document.getElementById('pmForecastBest').textContent = '$' + (analysis.revenue_best || 0) + '/mo';
-    
-    // Show numbers section
-    document.getElementById('pmNumbersSection').style.display = 'block';
-    
-    // Render chart
-    currentProjectModalData.analysis = analysis;
-    renderProjectionsChart();
-}
-
-function renderProjectionsChart() {
-    const analysis = currentProjectModalData.analysis;
-    if (!analysis) return;
-    
-    const canvas = document.getElementById('projectionsChart');
-    if (!canvas) return;
-    
-    if (projectionsChartInstance) {
-        projectionsChartInstance.destroy();
-        projectionsChartInstance = null;
-    }
-    
-    const months = parseInt(document.getElementById('pmMonths')?.value, 10) || 6;
-    const labels = Array.from({ length: months }, (_, i) => 'M' + (i + 1));
-    
-    const worst = analysis.revenue_worst || 0;
-    const base = analysis.revenue_base || 0;
-    const best = analysis.revenue_best || 0;
-    
-    // Cumulative revenue over months (with ramp-up: first 2 months slower)
-    const worstData = labels.map((_, i) => {
-        const ramp = i < 2 ? 0.3 + (i * 0.35) : 1;
-        return Math.round(worst * ramp * (i + 1));
-    });
-    const baseData = labels.map((_, i) => {
-        const ramp = i < 2 ? 0.3 + (i * 0.35) : 1;
-        return Math.round(base * ramp * (i + 1));
-    });
-    const bestData = labels.map((_, i) => {
-        const ramp = i < 2 ? 0.3 + (i * 0.35) : 1;
-        return Math.round(best * ramp * (i + 1));
-    });
-    
-    const ctx = canvas.getContext('2d');
-    projectionsChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                { label: 'Worst', data: worstData, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: false, tension: 0.3 },
-                { label: 'Realistic', data: baseData, borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,0.1)', fill: false, tension: 0.3, borderWidth: 3 },
-                { label: 'Best', data: bestData, borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,0.1)', fill: false, tension: 0.3 }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } },
-            scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'Cumulative Revenue ($)' } }
-            }
-        }
-    });
-}
-
-function closeProjectModal() {
-    const modal = document.getElementById('projectModal');
-    if (!modal) return;
-    modal.style.display = 'none';
-    modal.setAttribute('aria-hidden', 'true');
-    currentProjectModalId = null;
-    currentProjectModalData = { project: null, analysis: null };
-    if (projectionsChartInstance) {
-        projectionsChartInstance.destroy();
-        projectionsChartInstance = null;
-    }
-}
-
+// Socials panel: click project card → open project detail
 document.getElementById('panel-socials')?.addEventListener('click', function(e) {
     const card = e.target.closest('.project-card');
     if (!card) return;
@@ -1617,123 +1378,16 @@ document.getElementById('panel-socials')?.addEventListener('click', function(e) 
                 const p = list.find(pr => pr && (pr.name || '').trim() === name);
                 if (p && p.id != null) {
                     card.setAttribute('data-project-id', String(p.id));
-                    openProjectModal(p.id);
-                } else {
-                    if (typeof showToast === 'function') showToast('Could not load project', 'error');
+                    if (typeof window.showPanel === 'function') window.showPanel('project-' + p.id);
                 }
             }).catch(() => { if (typeof showToast === 'function') showToast('Could not load project', 'error'); });
             return;
         }
     }
-    if (projectId) openProjectModal(projectId);
-});
-
-document.getElementById('projectModalClose')?.addEventListener('click', closeProjectModal);
-document.querySelector('#projectModal .projections-modal-backdrop')?.addEventListener('click', closeProjectModal);
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        const modal = document.getElementById('projectModal');
-        if (modal && modal.style.display === 'flex') closeProjectModal();
+    if (projectId) {
+        if (typeof window.showPanel === 'function') window.showPanel('project-' + projectId);
     }
 });
-
-document.getElementById('projectModalSave')?.addEventListener('click', async function() {
-    const projectId = currentProjectModalId;
-    if (!projectId) return;
-    const analysis = currentProjectModalData.analysis;
-    const project = currentProjectModalData.project;
-    const body = {
-        name: document.getElementById('projectModalName')?.value?.trim() || undefined,
-        description: document.getElementById('pmDescription')?.value?.trim() || null,
-        hours_per_week: Number(document.getElementById('pmHoursWeek')?.value) || 10,
-        months_to_results: Number(document.getElementById('pmMonths')?.value) || 6,
-        business_model: document.querySelector('input[name="pmModel"]:checked')?.value || 'saas',
-        status: document.getElementById('pmStatus')?.value || 'active',
-        revenue_worst: analysis?.revenue_worst || null,
-        revenue_base: analysis?.revenue_base || null,
-        revenue_lucky: analysis?.revenue_best || null,
-        ai_analysis: analysis ? JSON.stringify(analysis) : null
-    };
-    // Include dashboard metrics so project cards update
-    const modal = document.getElementById('projectModal');
-    const primaryKey = modal?.dataset?.primaryMetricKey;
-    const lastMonthInput = document.getElementById('pmMetricLastMonth');
-    const thisMonthInput = document.getElementById('pmMetricThisMonth');
-    const lastMonthVal = lastMonthInput?.value !== '' && lastMonthInput?.value != null ? Number(lastMonthInput.value) : undefined;
-    const thisMonthVal = thisMonthInput?.value !== '' && thisMonthInput?.value != null ? Number(thisMonthInput.value) : undefined;
-    if (primaryKey && (lastMonthVal !== undefined || thisMonthVal !== undefined)) {
-        const existing = project?.metrics || {};
-        const existingCurrent = existing.current != null ? existing.current : existing;
-        const existingLastMonth = existing.last_month != null ? existing.last_month : {};
-        body.metrics = {
-            current: { ...existingCurrent, ...(thisMonthVal !== undefined && { [primaryKey]: thisMonthVal }) },
-            last_month: { ...existingLastMonth, ...(lastMonthVal !== undefined && { [primaryKey]: lastMonthVal }) }
-        };
-    }
-    try {
-        const res = await fetch('/api/projects/' + projectId, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        if (res.ok) {
-            if (typeof showToast === 'function') showToast('Plan saved', 'success');
-            loadSocialsData();
-        } else throw new Error('Failed');
-    } catch (err) {
-        if (typeof showToast === 'function') showToast('Failed to save', 'error');
-    }
-});
-
-document.getElementById('pmGenerateProjections')?.addEventListener('click', async function() {
-    const projectId = currentProjectModalId;
-    if (!projectId) return;
-    
-    const description = document.getElementById('pmDescription')?.value?.trim();
-    if (!description || description.length < 20) {
-        if (typeof showToast === 'function') showToast('Please describe your project in more detail', 'error');
-        return;
-    }
-    
-    const projectName = document.getElementById('projectModalName')?.value || 'This project';
-    const hoursWeek = Number(document.getElementById('pmHoursWeek')?.value) || 10;
-    const months = Number(document.getElementById('pmMonths')?.value) || 6;
-    const model = document.querySelector('input[name="pmModel"]:checked')?.value || 'saas';
-    
-    this.disabled = true;
-    this.textContent = 'Analyzing...';
-    document.getElementById('pmAnalysisResult').innerHTML = '<p class="pm-analysis-loading">Analyzing your project, market, and creating realistic projections...</p>';
-    document.getElementById('pmNumbersSection').style.display = 'none';
-    
-    try {
-        const res = await fetch('/api/projects/' + projectId + '/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                project_name: projectName,
-                description,
-                hours_per_week: hoursWeek, 
-                months_to_results: months, 
-                business_model: model
-            })
-        });
-        const data = await res.json();
-        
-        if (data.error) {
-            document.getElementById('pmAnalysisResult').innerHTML = '<p class="pm-analysis-error">' + data.error + '</p>';
-        } else {
-            displayAnalysis(data);
-            if (typeof showToast === 'function') showToast('Analysis complete', 'success');
-        }
-    } catch (err) {
-        document.getElementById('pmAnalysisResult').innerHTML = '<p class="pm-analysis-error">Failed to analyze. Check if AI is configured.</p>';
-    }
-    
-    this.disabled = false;
-    this.textContent = 'Analyze with AI';
-});
-
-document.getElementById('pmMonths')?.addEventListener('change', renderProjectionsChart);
 
 // Email clicks
 document.querySelectorAll('.email-item').forEach(email => {
@@ -1745,6 +1399,21 @@ document.querySelectorAll('.email-item').forEach(email => {
 
 // Todo List functionality
 let showAllCompleted = false;
+
+function todoDueTag(dueDate) {
+    if (!dueDate) return '';
+    const today = new Date(); today.setHours(0,0,0,0);
+    const due = new Date(dueDate + 'T00:00:00'); due.setHours(0,0,0,0);
+    const diff = Math.round((due - today) / 86400000);
+    let cls = 'todo-due';
+    let label;
+    if (diff < 0) { cls += ' todo-due-overdue'; label = Math.abs(diff) + 'd overdue'; }
+    else if (diff === 0) { cls += ' todo-due-today'; label = 'today'; }
+    else if (diff === 1) { cls += ' todo-due-soon'; label = 'tomorrow'; }
+    else if (diff <= 3) { cls += ' todo-due-soon'; label = diff + 'd'; }
+    else { label = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+    return '<span class="' + cls + '" data-due="' + dueDate + '" title="Due: ' + dueDate + '">' + label + '</span>';
+}
 
 async function loadTodos() {
     try {
@@ -1773,6 +1442,7 @@ async function loadTodos() {
                     ${dragHandleSvg}
                     <input type="checkbox" class="todo-checkbox" data-id="${todo.id}">
                     <span class="todo-text">${(todo.text || '').replace(/</g, '&lt;')}</span>
+                    ${todoDueTag(todo.due_date)}
                 </label>
             `;
         });
@@ -2359,7 +2029,7 @@ function renderTasks(tasks, phaseList, filter) {
         const tags = [
             blocker                            ? '<span class="pd-task-tag pd-tag-blocker">🚫 blocker</span>'                               : '',
             t.energy_required && !done         ? '<span class="pd-task-tag pd-tag-energy-' + t.energy_required + '">' + (energyEmoji[t.energy_required]||'') + ' ' + t.energy_required + '</span>' : '',
-            t.due_date && !done                ? '<span class="pd-task-tag pd-tag-due">due ' + t.due_date + '</span>'                       : '',
+            t.due_date && !done                ? '<span class="pd-task-tag pd-tag-due" data-due="' + t.due_date + '" data-task-id="' + t.id + '">due ' + t.due_date + '</span>' : '',
             t.project_phase && !done           ? '<span class="pd-task-tag pd-tag-phase">' + escHtml(t.project_phase.replace(/_/g,' ')) + '</span>' : '',
         ].filter(Boolean).join('');
         return '<div class="pd-task-item' + (done ? ' done' : '') + (blocker ? ' is-blocker' : '') + '" data-tid="' + t.id + '">' +
@@ -2498,16 +2168,6 @@ function setupProjectDetailHandlers() {
         if (typeof window.showPanel === 'function') window.showPanel('home');
     });
 
-    // ── Edit plan button ──
-    document.getElementById('pdEditBtn')?.addEventListener('click', () => {
-        if (!pdCurrentProject) return;
-        if (typeof window.openProjectModal === 'function') {
-            window.openProjectModal(pdCurrentProject.project.id);
-        } else {
-            if (typeof window.showPanel === 'function') window.showPanel('home');
-        }
-    });
-
     // ── Next action: click wrap to edit ──
     document.getElementById('pdNextActionWrap')?.addEventListener('click', function() {
         if (this.classList.contains('editing')) return;
@@ -2561,6 +2221,38 @@ function setupProjectDetailHandlers() {
     document.getElementById('pdTaskList')?.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action="toggle-task"]');
         if (btn) toggleTask(btn.dataset.id, btn.dataset.done === '1');
+
+        // Click due date tag → inline date picker
+        const dueTag = e.target.closest('.pd-tag-due');
+        if (dueTag && dueTag.dataset.taskId) {
+            e.preventDefault();
+            e.stopPropagation();
+            const taskId = dueTag.dataset.taskId;
+            const picker = document.createElement('input');
+            picker.type = 'date';
+            picker.className = 'todo-date-input';
+            picker.value = dueTag.dataset.due || '';
+            dueTag.replaceWith(picker);
+            picker.focus();
+            picker.showPicker?.();
+            const finish = async () => {
+                const newDate = picker.value || null;
+                try {
+                    await fetch('/api/project-tasks/task/' + taskId, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ due_date: newDate })
+                    });
+                    if (pdCurrentProject) loadProjectDetail(pdCurrentProject.project.id);
+                } catch (err) {
+                    if (typeof showToast === 'function') showToast('Failed to update due date', 'error');
+                }
+            };
+            picker.addEventListener('change', finish, { once: true });
+            picker.addEventListener('blur', () => {
+                setTimeout(() => { if (pdCurrentProject) loadProjectDetail(pdCurrentProject.project.id); }, 100);
+            }, { once: true });
+        }
     });
 
     // ── Add milestone form ──

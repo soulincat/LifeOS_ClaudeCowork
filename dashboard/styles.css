@@ -193,205 +193,6 @@ body {
 }
 
 
-/* Full-screen projections modal */
-.projections-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    box-sizing: border-box;
-}
-
-.projections-modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-}
-
-.projections-modal-box {
-    position: relative;
-    width: 100%;
-    max-width: 900px;
-    max-height: 90vh;
-    overflow: auto;
-    background: var(--surface);
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    padding: 24px;
-}
-
-.projections-modal-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-.projections-modal-title {
-    margin: 0 0 4px 0;
-    font-size: 1.25rem;
-}
-
-.projections-modal-subhead {
-    margin: 0;
-    font-size: 13px;
-    color: var(--text-dim);
-}
-
-.projections-summary-wrap {
-    margin-bottom: 20px;
-    overflow-x: auto;
-}
-
-.projections-summary-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-}
-
-.projections-summary-table th,
-.projections-summary-table td {
-    padding: 8px 10px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-}
-
-.projections-summary-table th {
-    color: var(--text-dim);
-    font-weight: 500;
-}
-
-.projections-summary-table td:first-child { white-space: nowrap; }
-
-.projections-variables {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-.projections-variables-label {
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-right: 4px;
-}
-
-.projections-modal-close {
-    width: 36px;
-    height: 36px;
-    border: none;
-    border-radius: 8px;
-    background: var(--border);
-    color: var(--text);
-    font-size: 1.5rem;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.projections-modal-close:hover {
-    background: var(--secondary);
-}
-
-.projections-modal-inputs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-.projections-input-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.projections-input-label {
-    font-size: 12px;
-    color: var(--text-dim);
-}
-
-.projections-input {
-    width: 120px;
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 14px;
-}
-
-.projections-modal-chart-wrap {
-    position: relative;
-    height: 400px;
-}
-
-.projections-modal-chart-wrap canvas {
-    max-height: 400px;
-}
-
-.projections-no-data {
-    margin: 0;
-    padding: 20px;
-    color: var(--text-dim);
-    font-size: 14px;
-}
-
-.projections-assumptions {
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
-    font-size: 11px;
-    color: var(--text-dim);
-}
-
-.projections-assumptions strong { color: var(--text); }
-
-.projections-actions {
-    margin-top: 12px;
-}
-
-.projections-link {
-    font-size: 13px;
-    color: var(--accent);
-    text-decoration: none;
-}
-
-.projections-link:hover {
-    text-decoration: underline;
-}
-
-/* Project modal: setup & edit */
-.project-modal-box { max-width: 640px; }
-.project-modal-title-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-.project-modal-name-input {
-    font-size: 1.25rem;
-    font-weight: 500;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 12px;
-    flex: 1;
-    min-width: 160px;
-}
-.project-modal-section {
-    margin-top: 24px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-}
-.project-modal-section-title { margin: 0 0 4px 0; font-size: 1rem; }
-.project-modal-section-hint { margin: 0 0 12px 0; font-size: 12px; color: var(--text-dim); }
-.project-modal-revenue-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-}
 .btn-small { padding: 6px 12px; font-size: 12px; }
 
 .project-card-tag {
@@ -1239,6 +1040,23 @@ body.update-banner-visible {
     background: var(--text-dim);
     color: white;
 }
+
+/* Todo due date tags */
+.todo-due {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--border);
+    color: var(--text-dim);
+    margin-left: auto;
+    flex-shrink: 0;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.todo-due-today { background: var(--accent); color: #fff; }
+.todo-due-soon { background: #f59e0b; color: #fff; }
+.todo-due-overdue { background: var(--warn); color: #fff; }
+.todo-date-input { width: 110px; font-size: 11px; padding: 4px 6px; }
 
 /* Inline Todo Editing */
 .todo-text[contenteditable="true"] {
@@ -5026,7 +4844,7 @@ body.update-banner-visible {
 .pd-tag-energy-high   { background: #fff7ed; color: #c2410c; }
 .pd-tag-energy-low    { background: #f0fdf4; color: #166534; }
 .pd-tag-energy-medium { background: var(--bg); color: var(--text-dim); }
-.pd-tag-due     { background: var(--bg); color: var(--text-dim); }
+.pd-tag-due     { background: var(--bg); color: var(--text-dim); cursor: pointer; }
 .pd-tag-phase   { background: #eff6ff; color: var(--accent); }
 
 /* Add forms */

@@ -85,17 +85,59 @@ router.delete('/:id', (req, res) => {
 
 /**
  * POST /api/upcoming/sync-calendar
- * Sync events from Apple Calendar into upcoming_items.
- * Optional body: { calendarNames: ['집', '직장'] }
+ * Sync events into upcoming_items.
+ * Tries Google Calendar API first (fast), falls back to Apple Calendar (AppleScript).
+ * Optional body: { calendarNames: ['집', '직장'], calendarIds: ['primary'] }
  */
-router.post('/sync-calendar', (req, res) => {
+router.post('/sync-calendar', async (req, res) => {
     try {
-        const { calendarNames } = req.body || {};
-        const { syncCalendarEvents } = require('../../integrations/apple/calendar-read');
-        const result = syncCalendarEvents({ calendarNames });
-        res.json({ success: true, ...result });
+        const { calendarNames, calendarIds } = req.body || {};
+        const results = [];
+
+        // 1. Try Google Calendar API (fast, async)
+        try {
+            const gcal = require('../../integrations/google-calendar');
+            if (gcal.hasCalendarScope()) {
+                const gResult = await gcal.syncGoogleCalendar({ calendarIds });
+                results.push({ source: 'google', ...gResult });
+            }
+        } catch (e) {
+            results.push({ source: 'google', synced: 0, error: e.message });
+        }
+
+        // 2. Apple Calendar (slow, sync — only if Google didn't provide events)
+        const googleSynced = results.find(r => r.source === 'google')?.synced || 0;
+        if (googleSynced === 0) {
+            try {
+                const { syncCalendarEvents } = require('../../integrations/apple/calendar-read');
+                const aResult = syncCalendarEvents({ calendarNames });
+                results.push({ source: 'apple', ...aResult });
+            } catch (e) {
+                results.push({ source: 'apple', synced: 0, error: e.message });
+            }
+        }
+
+        const totalSynced = results.reduce((s, r) => s + (r.synced || 0), 0);
+        res.json({ success: true, synced: totalSynced, details: results });
     } catch (error) {
         console.error('Calendar sync error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * GET /api/upcoming/calendars
+ * List available Google Calendar calendars.
+ */
+router.get('/calendars', async (req, res) => {
+    try {
+        const gcal = require('../../integrations/google-calendar');
+        if (!gcal.hasCalendarScope()) {
+            return res.json({ calendars: [], needsAuth: true });
+        }
+        const calendars = await gcal.listCalendars();
+        res.json({ calendars });
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });

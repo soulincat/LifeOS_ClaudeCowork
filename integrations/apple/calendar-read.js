@@ -18,7 +18,7 @@ function getCalendarNames() {
             if (Array.isArray(p.calendar_names) && p.calendar_names.length) return p.calendar_names;
         }
     } catch (e) { /* fall through */ }
-    return ['집']; // default
+    return ['집', '직장', '캘린더']; // default: Home + Work + Calendar
 }
 
 function syncCalendarEvents({ daysAhead = 14, calendarNames } = {}) {
@@ -67,7 +67,7 @@ end tell`;
     const tmpFile = path.join(os.tmpdir(), `lifeos-cal-${Date.now()}.applescript`);
     try {
         fs.writeFileSync(tmpFile, script, 'utf8');
-        raw = execSync(`osascript "${tmpFile}"`, { encoding: 'utf8', timeout: 30000 }).trim();
+        raw = execSync(`osascript "${tmpFile}"`, { encoding: 'utf8', timeout: 60000 }).trim();
     } catch (e) {
         return { synced: 0, skipped: 0, error: `Calendar read failed: ${e.message}` };
     } finally {

@@ -89,6 +89,7 @@
                 </div>
                 <div class="todo-add-form" id="todoAddForm" style="display: none;">
                     <input type="text" class="todo-input" id="todoInput" placeholder="Add new todo...">
+                    <input type="date" class="todo-input todo-date-input" id="todoDateInput" title="Due date (optional)">
                     <div class="todo-form-actions">
                         <button class="btn-save" id="saveTodoBtn">Add</button>
                         <button class="btn-cancel" id="cancelTodoBtn">Cancel</button>
@@ -133,20 +134,11 @@
                 <button type="button" class="todo-collapse-btn" id="todoCollapseBtn" style="display: none;" title="Show more / Show less">Show more</button>
             </div>
 
-            <!-- Important Emails -->
-            <div class="info-section sidebar-emails">
-                <div class="info-header">Important Emails (3)</div>
-                <div class="email-item">
-                    <div class="email-subject email-urgent">Payment overdue - Invoice #4521</div>
-                    <div class="email-from">Client Corp • 2h ago</div>
-                </div>
-                <div class="email-item">
-                    <div class="email-subject">Contract review needed</div>
-                    <div class="email-from">Legal Team • 5h ago</div>
-                </div>
-                <div class="email-item">
-                    <div class="email-subject">Intro: Potential collaboration</div>
-                    <div class="email-from">Sarah Chen • 1d ago</div>
+            <!-- Important Messages (live from inbox) -->
+            <div class="info-section sidebar-emails" id="sidebarEmailsSection">
+                <div class="info-header">Important <span id="sidebarEmailsCount"></span></div>
+                <div id="sidebarEmailsList">
+                    <div class="email-item" style="color:var(--text-dim);font-size:12px;">Loading...</div>
                 </div>
             </div>
 
@@ -171,121 +163,7 @@
                     </div>
                 </div>
                 <div id="upcomingContainer">
-                    <div class="email-item">
-                        <div class="email-subject">Q1 Report Deadline</div>
-                        <div class="email-from">Jan 31 • 2 days</div>
-                    </div>
-                    <div class="email-item">
-                        <div class="email-subject">Client Strategy Call</div>
-                        <div class="email-from">Tomorrow 3pm • TechCorp</div>
-                    </div>
-                    <div class="email-item">
-                        <div class="email-subject">Project Kickoff Meeting</div>
-                        <div class="email-from">Feb 3 • 5 days</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Full-screen modal: Project planning (describe project → AI analyzes and suggests realistic plan) -->
-        <div id="projectModal" class="projections-modal" aria-hidden="true" style="display: none;" data-project-id="">
-            <div class="projections-modal-backdrop"></div>
-            <div class="projections-modal-box project-modal-box">
-                <div class="projections-modal-header">
-                    <input type="text" id="projectModalName" class="project-modal-name-input" placeholder="Project name">
-                    <button type="button" class="projections-modal-close" id="projectModalClose" aria-label="Close">×</button>
-                </div>
-
-                <section class="project-modal-section">
-                    <h3 class="project-modal-section-title">What are you building?</h3>
-                    <textarea id="pmDescription" class="pm-textarea" rows="3" placeholder="Describe your project in detail. What problem does it solve? Who is it for? What makes it different? The more detail, the better the projections."></textarea>
-                </section>
-
-                <section class="project-modal-section">
-                    <h3 class="project-modal-section-title">Status</h3>
-                    <select id="pmStatus" class="pm-input pm-status-select">
-                        <option value="active">Active</option>
-                        <option value="paused">Paused</option>
-                        <option value="completed">Completed</option>
-                        <option value="archived">Archived</option>
-                    </select>
-                </section>
-
-                <section class="project-modal-section">
-                    <h3 class="project-modal-section-title">Business Model</h3>
-                    <div class="pm-model-options">
-                        <label class="pm-model-option"><input type="radio" name="pmModel" value="saas" checked> <span>SaaS</span><small>Subscription software</small></label>
-                        <label class="pm-model-option"><input type="radio" name="pmModel" value="consulting"> <span>Consulting</span><small>Services/freelance</small></label>
-                        <label class="pm-model-option"><input type="radio" name="pmModel" value="product"> <span>Product</span><small>One-time purchase</small></label>
-                        <label class="pm-model-option"><input type="radio" name="pmModel" value="content"> <span>Content</span><small>Ads, courses, sponsors</small></label>
-                    </div>
-                </section>
-
-                <section class="project-modal-section">
-                    <h3 class="project-modal-section-title">Your Capacity</h3>
-                    <p class="project-modal-section-hint">Solo founder. How much time can you dedicate?</p>
-                    <div class="pm-constraints-grid">
-                        <label class="pm-constraint"><span>Hours per week</span><input type="number" id="pmHoursWeek" min="1" max="60" value="10" class="pm-input"></label>
-                        <label class="pm-constraint"><span>Timeline (months)</span><input type="number" id="pmMonths" min="1" max="24" value="6" class="pm-input"></label>
-                    </div>
-                </section>
-
-                <section class="project-modal-section pm-section-dashboard-metrics">
-                    <h3 class="project-modal-section-title">Dashboard card (vs last month)</h3>
-                    <p class="project-modal-section-hint">These numbers drive the project cards on the main dashboard.</p>
-                    <div class="pm-constraints-grid">
-                        <label class="pm-constraint"><span><span id="pmDashboardMetricLabel">Metric</span> — last month</span><input type="number" id="pmMetricLastMonth" min="0" step="any" placeholder="—" class="pm-input"></label>
-                        <label class="pm-constraint"><span><span id="pmDashboardMetricLabelCopy">Metric</span> — this month</span><input type="number" id="pmMetricThisMonth" min="0" step="any" placeholder="—" class="pm-input"></label>
-                    </div>
-                </section>
-
-                <section class="project-modal-section pm-section-analysis">
-                    <div class="pm-analysis-header">
-                        <h3 class="project-modal-section-title">Business Plan Analysis</h3>
-                        <button type="button" class="btn-generate-projections" id="pmGenerateProjections">Analyze with AI</button>
-                    </div>
-                    <div id="pmAnalysisResult" class="pm-analysis-result">
-                        <p class="pm-analysis-placeholder">Describe your project above, then click "Analyze with AI" to get:<br>
-                        • Suggested pricing based on your market<br>
-                        • Realistic customer acquisition estimates<br>
-                        • Required budget breakdown (tools, marketing, etc.)<br>
-                        • Probability assessment<br>
-                        • Revenue projections with reasoning</p>
-                    </div>
-                </section>
-
-                <section class="project-modal-section pm-section-numbers" id="pmNumbersSection" style="display:none;">
-                    <h3 class="project-modal-section-title">The Numbers</h3>
-                    <div class="pm-numbers-grid">
-                        <div class="pm-number-card">
-                            <span class="pm-number-label">Suggested Price</span>
-                            <span class="pm-number-value" id="pmSuggestedPrice">—</span>
-                        </div>
-                        <div class="pm-number-card">
-                            <span class="pm-number-label">Target Customers</span>
-                            <span class="pm-number-value" id="pmTargetCustomers">—</span>
-                        </div>
-                        <div class="pm-number-card">
-                            <span class="pm-number-label">Budget Needed</span>
-                            <span class="pm-number-value" id="pmBudgetNeeded">—</span>
-                        </div>
-                        <div class="pm-number-card">
-                            <span class="pm-number-label">Success Probability</span>
-                            <span class="pm-number-value" id="pmProbability">—</span>
-                        </div>
-                    </div>
-                    <div class="pm-forecast-summary">
-                        <div class="pm-forecast-item pm-forecast-worst"><span class="pm-forecast-label">Worst case</span><span class="pm-forecast-value" id="pmForecastWorst">—</span></div>
-                        <div class="pm-forecast-item pm-forecast-base"><span class="pm-forecast-label">Realistic</span><span class="pm-forecast-value" id="pmForecastBase">—</span></div>
-                        <div class="pm-forecast-item pm-forecast-best"><span class="pm-forecast-label">Best case</span><span class="pm-forecast-value" id="pmForecastBest">—</span></div>
-                    </div>
-                    <div class="projections-modal-chart-wrap">
-                        <canvas id="projectionsChart"></canvas>
-                    </div>
-                </section>
-
-                <div class="pm-actions">
-                    <button type="button" class="btn-save" id="projectModalSave">Save Plan</button>
+                    <div class="email-item" style="color:var(--text-dim);font-size:12px;">Loading...</div>
                 </div>
             </div>
         </div>
@@ -1129,7 +1007,6 @@
                             </svg>
                             <span class="pd-progress-pct" id="pdProgressPct">0%</span>
                         </div>
-                        <button type="button" class="btn-small" id="pdEditBtn">Edit plan</button>
                     </div>
                 </div>
 

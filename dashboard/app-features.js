@@ -52,7 +52,8 @@ async function loadAllData() {
                 const done = todos.filter(t => t.completed);
                 let html = '';
                 undone.forEach(t => {
-                    html += '<label class="todo-item"><input type="checkbox" class="todo-checkbox" data-id="' + t.id + '"><span class="todo-text">' + (t.text || '').replace(/</g, '&lt;') + '</span></label>';
+                    const dueHtml = typeof todoDueTag === 'function' ? todoDueTag(t.due_date) : '';
+                    html += '<label class="todo-item"><input type="checkbox" class="todo-checkbox" data-id="' + t.id + '"><span class="todo-text">' + (t.text || '').replace(/</g, '&lt;') + '</span>' + dueHtml + '</label>';
                 });
                 if (done.length > 0) {
                     html += '<div class="todo-separator"></div><div class="todo-done-header"><button class="todo-expand-btn" id="expandDoneBtn" title="Show completed tasks"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="todo-done-label">Done today (' + done.length + ')</span></div><div class="todo-done-list" id="todoDoneList" style="display:none;">';
@@ -257,25 +258,31 @@ function initAddTodo() {
     cancelBtn?.addEventListener('click', () => {
         form.style.display = 'none';
         input.value = '';
+        if (dateInput) dateInput.value = '';
     });
     
+    const dateInput = document.getElementById('todoDateInput');
+
     const saveTodo = async () => {
         const text = input.value.trim();
         if (!text) {
             showToast('Please enter a todo', 'error');
             return;
         }
-        
+
         try {
+            const body = { text };
+            if (dateInput && dateInput.value) body.due_date = dateInput.value;
             const response = await fetch('/api/todos', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text })
+                body: JSON.stringify(body)
             });
-            
+
             if (response.ok) {
                 form.style.display = 'none';
                 input.value = '';
+                if (dateInput) dateInput.value = '';
                 await loadTodos();
                 showToast('Todo added', 'success');
             } else {
@@ -353,6 +360,47 @@ function initInlineTodoEdit() {
                 todoText.textContent = originalText;
                 todoText.contentEditable = 'false';
             }
+        }, { once: true });
+    });
+}
+
+// Inline Due Date Editing (click due tag → date picker)
+function initInlineDueDateEdit() {
+    document.addEventListener('click', (e) => {
+        const dueTag = e.target.closest('.todo-due');
+        if (!dueTag) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const todoItem = dueTag.closest('.todo-item');
+        const todoId = todoItem?.querySelector('.todo-checkbox')?.dataset.id;
+        if (!todoId) return;
+
+        const picker = document.createElement('input');
+        picker.type = 'date';
+        picker.className = 'todo-date-input';
+        picker.value = dueTag.dataset.due || '';
+        dueTag.replaceWith(picker);
+        picker.focus();
+        picker.showPicker?.();
+
+        const finish = async () => {
+            const newDate = picker.value || null;
+            try {
+                await fetch('/api/todos/' + todoId, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ due_date: newDate })
+                });
+                if (typeof loadTodos === 'function') loadTodos();
+            } catch (err) {
+                if (typeof showToast === 'function') showToast('Failed to update due date', 'error');
+            }
+        };
+
+        picker.addEventListener('change', finish, { once: true });
+        picker.addEventListener('blur', () => {
+            setTimeout(() => { if (typeof loadTodos === 'function') loadTodos(); }, 100);
         }, { once: true });
     });
 }
@@ -548,6 +596,7 @@ function init() {
     initRefreshButton();
     initAddTodo();
     initInlineTodoEdit();
+    initInlineDueDateEdit();
     initAddUpcoming();
     initAddFinance();
     // Load todos, finance, health, GitHub graph (self-contained, no app.js dependency)
