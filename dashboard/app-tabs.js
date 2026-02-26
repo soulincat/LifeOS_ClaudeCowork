@@ -357,8 +357,6 @@
         }
     }
 
-    const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
     /** Normalize monthly period_label to YYYY-MM so "February", "Feb", "February 2025", "2025-02" all match. */
     function normalizeMonthlyPeriodLabel(periodLabel, currentYear) {
         if (!periodLabel || typeof periodLabel !== 'string') return null;

@@ -1,3 +1,50 @@
+/* ================================================================
+   Life OS Dashboard — Stylesheet
+   ================================================================
+   TABLE OF CONTENTS
+   -----------------------------------------------------------------
+   1.  RESET & VARIABLES .............. CSS reset, color tokens
+   2.  LAYOUT GRID .................... 3-column grid, sidebar, main, right
+   3.  GITHUB ACTIVITY ................ Code contribution calendar
+   4.  PROJECT CARDS (DASHBOARD) ...... Card grid, hover, progress rings
+   5.  SOCIAL MEDIA PANEL ............. Social metrics, queue display
+   6.  SIDEBAR SECTIONS ............... Top priority, finance, health, sync
+   7.  TODO LIST ...................... Items, checkboxes, done section
+   8.  UPDATE BANNER .................. Version notification bar
+   9.  EMAILS COMPACT ................. Sidebar email list
+   10. SOCIAL PLATFORM CARDS .......... Platform icon grid
+   11. HEALTH COLORS & ALERTS ......... WHOOP recovery/sleep indicators
+   12. DARK THEME ..................... Dark mode variable overrides
+   13. HEADER CONTROLS ................ Refresh, theme toggle, chart buttons
+   14. TODO FORMS ..................... Add/edit todo inputs
+   15. LOADING & TOAST ................ Spinners, toast notifications
+   16. TAB BAR & NAVIGATION ........... Top tabs, sub-tabs, section switching
+   17. PANELS (COMMON) ................ Panel base, scroll, headers
+   18. WISHLIST ....................... Gallery grid, progress bars
+   19. GOALS .......................... Two-column layout, hierarchy, monthly
+   20. PROJECTIONS .................... Cards, charts, tables, calculator
+   21. SETUP .......................... Setup panel forms
+   22. RESPONSIVE ..................... Media queries for smaller screens
+   23. AI NOTEPAD ..................... Notepad input area
+   24. PA (PERSONAL ASSISTANT) ........ Sidebar chat, modal, confirmations
+   25. INBOX TAB ...................... Source tabs, tiered sections, badges
+   26. HOME PANEL ..................... Pulse strip, focus card, greeting
+   27. HOME INBOX ..................... Feed items, groups, conversations
+   28. HOME PROJECTS .................. Collapsible project cards
+   29. HOME SOCIAL .................... Compact social metrics
+   30. PA CHAT BAR .................... Sticky bottom chat, suggestions
+   31. CONTACTS ....................... Overlay, panel, cards, forms
+   32. PROJECT DETAIL ................. Detail panel, phases, milestones, tasks
+   33. TODO DUE DATES ................. Due date tags and priority colors
+   34. STRATEGY ....................... Strategy panel, flywheel, timeline
+   35. UTILITY CLASSES ................ Helpers (.hidden, etc.)
+   ================================================================ */
+
+
+/* ================================================================
+   1. RESET & VARIABLES
+   ================================================================ */
+
 * {
     margin: 0;
     padding: 0;
@@ -23,6 +70,10 @@ body {
     height: 100vh;
     overflow: hidden;
 }
+
+/* ================================================================
+   2. LAYOUT GRID
+   ================================================================ */
 
 .os-grid {
     display: grid;
@@ -89,7 +140,9 @@ body {
     height: 100vh;
 }
 
-/* GitHub Calendar (Code Activity) - fills remaining right sidebar space */
+/* ================================================================
+   3. GITHUB ACTIVITY
+   ================================================================ */
 .github-calendar {
     padding: 6px;
     background: var(--surface);
@@ -154,7 +207,9 @@ body {
     letter-spacing: 0.3px;
 }
 
-/* Project Cards (dashboard: projection-card style, last month → this month + growth) */
+/* ================================================================
+   4. PROJECT CARDS (DASHBOARD)
+   ================================================================ */
 .projects-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -282,7 +337,9 @@ body {
     margin-top: 4px;
 }
 
-/* Social Media Panel */
+/* ================================================================
+   5. SOCIAL MEDIA PANEL
+   ================================================================ */
 .social-panel {
     background: var(--surface);
     border-radius: 8px;
@@ -373,7 +430,9 @@ body {
     line-height: 1.35;
 }
 
-/* Finance & Health Compact */
+/* ================================================================
+   6. SIDEBAR SECTIONS — Finance, Health, Sync
+   ================================================================ */
 .info-section {
     background: var(--surface);
     border-radius: 8px;
@@ -489,7 +548,9 @@ body {
     font-weight: 400;
 }
 
-/* Todo List: scroll only when expanded; when collapsed, no scroll (Show more only) */
+/* ================================================================
+   7. TODO LIST
+   ================================================================ */
 .todo-list-wrapper {
     flex: 1 1 0;
     min-height: 0;
@@ -604,7 +665,9 @@ body {
     height: 16px;
 }
 
-/* ── Update Banner ── */
+/* ================================================================
+   8. UPDATE BANNER
+   ================================================================ */
 .update-banner {
     position: fixed;
     top: 0;
@@ -756,7 +819,9 @@ body.update-banner-visible {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Social Media Platform Cards */
+/* ================================================================
+   10. SOCIAL PLATFORM CARDS
+   ================================================================ */
 .social-platforms-grid {
     display: grid;
     grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -826,7 +891,9 @@ body.update-banner-visible {
     font-family: ui-monospace, monospace;
 }
 
-/* WHOOP-style Recovery & Sleep colors (green / yellow / red) */
+/* ================================================================
+   11. HEALTH COLORS & ALERTS
+   ================================================================ */
 .health-recovery-green,
 .health-sleep-green { color: #22c55e; font-weight: 400; }
 .health-recovery-yellow,
@@ -847,7 +914,9 @@ body.update-banner-visible {
     font-style: italic;
 }
 
-/* Dark Mode */
+/* ================================================================
+   12. DARK THEME
+   ================================================================ */
 .dark-theme {
     --bg: #0f0f0f;
     --surface: #1a1a1a;
@@ -892,7 +961,9 @@ body.update-banner-visible {
     stroke-width: 1.5;
 }
 
-/* Header Controls */
+/* ================================================================
+   13. HEADER CONTROLS
+   ================================================================ */
 .header-controls {
     position: fixed;
     top: 12px;
@@ -1049,7 +1120,9 @@ body.update-banner-visible {
     background: var(--bg);
 }
 
-/* Loading States */
+/* ================================================================
+   15. LOADING & TOAST
+   ================================================================ */
 .loading {
     opacity: 0.5;
     pointer-events: none;
@@ -1167,7 +1240,9 @@ body.update-banner-visible {
 
 /* Chart Toggle Button */
 
-/* Tab bar: top navigation row */
+/* ================================================================
+   16. TAB BAR & NAVIGATION
+   ================================================================ */
 .tab-bar {
     flex: 0 0 36px;
     height: 36px;
@@ -1274,7 +1349,9 @@ body.update-banner-visible {
     color: var(--text-dim);
 }
 
-/* Panel common: panels can grow; .os-main scrolls so tab bar sticks at bottom */
+/* ================================================================
+   17. PANELS (COMMON)
+   ================================================================ */
 .main-panel {
     padding: 0 4px;
     flex: 1 1 auto;
@@ -1367,7 +1444,9 @@ body.update-banner-visible {
     color: var(--text);
 }
 
-/* Wishlist gallery / moodboard */
+/* ================================================================
+   18. WISHLIST
+   ================================================================ */
 .wishlist-gallery {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -1610,7 +1689,9 @@ body.update-banner-visible {
     z-index: 1;
 }
 
-/* Goals: two columns – tree left, Nos + Uncertainties right */
+/* ================================================================
+   19. GOALS
+   ================================================================ */
 .goals-two-column {
     display: grid;
     grid-template-columns: 1fr 220px;
@@ -2160,9 +2241,9 @@ body.update-banner-visible {
     opacity: 0.9;
 }
 
-/* ==============================
-   PROJECTIONS TAB
-   ============================== */
+/* ================================================================
+   20. PROJECTIONS — Cards, charts, tables, calculator
+   ================================================================ */
 
 /* Let panel take natural height so os-main scrolls (not flex: 1) */
 .main-panel-projections {
@@ -2664,7 +2745,9 @@ body.update-banner-visible {
     font-weight: 500;
 }
 
-/* Setup panel */
+/* ================================================================
+   21. SETUP
+   ================================================================ */
 .main-panel-setup {
     padding: 20px;
     overflow-y: auto;
@@ -2782,6 +2865,258 @@ body.update-banner-visible {
 }
 .main-panel-setup .btn-small {
     margin-top: 8px;
+}
+
+/* ── Settings Layout (sidebar nav + content) ────────────────────────────── */
+.settings-layout {
+    display: flex;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.settings-nav {
+    width: 150px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.settings-nav-item {
+    background: none;
+    border: none;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: 6px 0 0 6px;
+    transition: background 0.15s, color 0.15s;
+    font-family: inherit;
+}
+.settings-nav-item:hover { background: var(--bg); color: var(--text); }
+.settings-nav-item.active { background: var(--surface); color: var(--text); font-weight: 600; border-right: 2px solid var(--accent); }
+.settings-content {
+    flex: 1;
+    padding: 0 24px 24px;
+    overflow-y: auto;
+}
+.settings-section { display: none; }
+.settings-section.active { display: block; }
+.settings-subtitle {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    margin: 18px 0 8px;
+}
+.settings-dim { font-size: 12px; color: var(--text-dim); }
+
+/* Settings toggle rows */
+.settings-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+}
+.settings-toggle-row .toggle-label { font-size: 13px; flex: 1; }
+.settings-toggle-row .toggle-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.settings-toggle {
+    width: 40px;
+    height: 22px;
+    background: var(--border);
+    border-radius: 11px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+.settings-toggle.on { background: var(--accent); }
+.settings-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: left 0.2s;
+}
+.settings-toggle.on::after { left: 20px; }
+
+/* Connector cards */
+.connector-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    background: var(--bg);
+}
+.connector-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.connector-status.connected { background: var(--secondary); }
+.connector-status.disconnected { background: var(--text-dim); }
+.connector-status.required { background: var(--warn); }
+.connector-name { font-size: 13px; font-weight: 500; flex: 1; }
+.connector-desc { font-size: 11px; color: var(--text-dim); }
+.connector-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--border);
+    color: var(--text-dim);
+}
+.connector-tag.required { background: rgba(245, 158, 11, 0.15); color: var(--warn); }
+
+/* Settings sync row */
+.settings-sync-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    font-size: 13px;
+}
+.settings-sync-row span:first-child { min-width: 80px; color: var(--text-dim); }
+.settings-sync-status { font-size: 11px; color: var(--text-dim); }
+
+/* Chip grid (for life areas, keywords) */
+.settings-chip-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.settings-chip {
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font-family: inherit;
+}
+.settings-chip.selected {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* VIP row */
+.settings-vip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.settings-vip-row input { flex: 1; }
+.settings-vip-row select { width: 130px; }
+.settings-vip-row .setup-remove-btn { cursor: pointer; background: none; border: none; color: var(--text-dim); font-size: 16px; }
+
+/* Radio group */
+.settings-radio-group {
+    display: flex;
+    gap: 8px;
+}
+.settings-radio-option {
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    font-family: inherit;
+}
+.settings-radio-option.selected {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* Scoring rules table */
+.settings-rules-table { margin-top: 4px; }
+.settings-rule-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+}
+.settings-rule-score { font-weight: 600; color: var(--accent); }
+
+/* Project row in Settings */
+.settings-project-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+.settings-project-name {
+    flex: 1;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--accent);
+}
+.settings-project-name:hover { text-decoration: underline; }
+.settings-project-progress { font-size: 11px; color: var(--text-dim); min-width: 35px; text-align: right; }
+.settings-project-rank {
+    font-size: 12px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+}
+
+/* Settings link button */
+.settings-link-btn {
+    font-size: 12px;
+    color: var(--accent);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 4px 0;
+    font-family: inherit;
+}
+.settings-link-btn:hover { text-decoration: underline; }
+
+/* Settings textarea */
+.settings-textarea { min-height: 40px; resize: vertical; }
+
+/* Widget list items in right panel */
+.widget-list-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+}
+.widget-list-item:last-child { border-bottom: none; }
+.widget-list-time { font-size: 11px; color: var(--text-dim); min-width: 50px; }
+.widget-list-label { flex: 1; }
+.widget-list-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
 }
 
 /* Dark mode adjustments for projections */
@@ -3010,7 +3345,9 @@ body.update-banner-visible {
     padding: 0 2px;
 }
 
-/* ── Inbox Tab ────────────────────────────────────────────────────────────── */
+/* ================================================================
+   25. INBOX TAB
+   ================================================================ */
 .inbox-header-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .inbox-source-tabs { display: flex; gap: 4px; }
 .inbox-source-tab { background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--text-dim); font-size: 11px; font-family: inherit; cursor: pointer; padding: 3px 8px; }
@@ -3164,7 +3501,9 @@ body.update-banner-visible {
 .contact-card.is-ignored { opacity: 0.6; border-left: 3px solid var(--text-dim); }
 .contact-label-icon { margin-right: 4px; }
 
-/* ── PA Sidebar Box (info-section pattern) ───────────────────────────────── */
+/* ================================================================
+   24. PA (PERSONAL ASSISTANT) — Sidebar, modal, confirmations
+   ================================================================ */
 
 /* Override github-calendar to not fill remaining space so PA fits below */
 .github-calendar { flex-shrink: 0; }
@@ -3344,9 +3683,9 @@ body.update-banner-visible {
 .pa-modal-body h1:first-child,
 .pa-modal-body h2:first-child { margin-top: 0; }
 
-/* ═══════════════════════════════════════════════════════════════════
-   HOME PANEL — unified overview (pulse strip, greeting, inbox, projects, PA bar)
-   ═══════════════════════════════════════════════════════════════════ */
+/* ================================================================
+   26. HOME PANEL — Pulse strip, greeting, inbox, projects, PA bar
+   ================================================================ */
 
 .main-panel-home {
     display: flex;
@@ -3773,7 +4112,9 @@ body.update-banner-visible {
 [data-theme="dark"] .dash-inbox-action-badge.action-question { background: #042f2e; color: #5eead4; }
 [data-theme="dark"] .dash-inbox-action-badge.action-fyi { background: var(--surface); color: var(--text-dim); }
 
-/* ── Project Cards (Home - collapsible) ──────────────────── */
+/* ================================================================
+   28. HOME PROJECTS — Collapsible project cards
+   ================================================================ */
 .dash-project-cards {
     display: flex;
     flex-direction: column;
@@ -4021,7 +4362,9 @@ body.update-banner-visible {
 .dash-project-blocker-item { color: #dc2626; }
 .dash-project-dep-warn { color: #92400e; }
 
-/* ── Social compact ─────────────────────────────────────────────── */
+/* ================================================================
+   29. HOME SOCIAL — Compact social metrics
+   ================================================================ */
 .dash-social-compact {
     margin-bottom: 24px;
 }
@@ -4086,7 +4429,9 @@ body.update-banner-visible {
     margin-top: 2px;
 }
 
-/* ── PA Chat Bar: sticky bottom, direct child of .os-main (same level as tab-bar) ─ */
+/* ================================================================
+   30. PA CHAT BAR — Sticky bottom chat, suggestions
+   ================================================================ */
 .dash-pa-wrap {
     flex: 0 0 auto;
     border-top: 1px solid var(--border);
@@ -4279,7 +4624,9 @@ body.update-banner-visible {
 .pa-confirm-error { color: #dc2626; padding: 4px 0; }
 .pa-confirm-cancelled { color: var(--text-dim); font-size: 11px; padding: 4px 0; }
 
-/* ── Contacts Overlay ─────────────────────────────────────────────────────── */
+/* ================================================================
+   31. CONTACTS — Overlay, panel, cards, forms
+   ================================================================ */
 .contacts-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -4375,9 +4722,9 @@ body.update-banner-visible {
 .btn-ghost { background: none; border: 1px solid var(--border); color: var(--text-dim); }
 .btn-ghost:hover { border-color: var(--text-dim); color: var(--text); }
 
-/* ═══════════════════════════════════════════════════════════════
-   PROJECT DETAIL PANEL
-   ═══════════════════════════════════════════════════════════════ */
+/* ================================================================
+   32. PROJECT DETAIL — Phases, milestones, tasks, dependencies
+   ================================================================ */
 
 #panel-project-detail {
     display: flex;
@@ -4979,7 +5326,9 @@ body.update-banner-visible {
 }
 .pd-tag-due { cursor: pointer; }
 
-/* ── Strategy panel ── */
+/* ================================================================
+   34. STRATEGY — Flywheel, timeline, goals
+   ================================================================ */
 .strategy-sections { display: flex; flex-direction: column; gap: 24px; padding: 16px 0; }
 .strategy-section-title { margin: 0 0 12px 0; font-size: 14px; font-weight: 600; }
 
@@ -5075,3 +5424,10 @@ body.update-banner-visible {
 .strategy-timeline-bar.phase-launch { background: #22c55e; }
 .strategy-timeline-bar.phase-grow { background: #8b5cf6; }
 .strategy-timeline-bar.phase-default { background: var(--text-dim); }
+
+
+/* ================================================================
+   35. UTILITY CLASSES
+   ================================================================ */
+
+.hidden { display: none !important; }

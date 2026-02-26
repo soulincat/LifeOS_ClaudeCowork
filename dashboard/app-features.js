@@ -34,12 +34,6 @@ function updateTodoCountLocal() {
 
 async function loadAllData() {
     const base = location.origin;
-    const formatCurrency = (amount) => {
-        if (amount == null || isNaN(Number(amount))) return '$0';
-        const n = Number(amount);
-        if (n >= 1000) return '$' + (n / 1000).toFixed(1) + 'k';
-        return '$' + (n >= 0 ? n.toFixed(0) : '-' + Math.abs(n).toFixed(0));
-    };
 
     // Todos
     try {
@@ -108,7 +102,7 @@ async function loadAllData() {
                 totalEl.textContent = formatCurrency(tn);
             }
             const monthEl = document.getElementById('financeMonth');
-            if (monthEl) monthEl.textContent = ['January','February','March','April','May','June','July','August','September','October','November','December'][new Date().getMonth()];
+            if (monthEl) monthEl.textContent = currentMonthName();
         }
     } catch (e) { console.warn('Finance load failed', e); }
 
@@ -155,13 +149,12 @@ async function loadAllData() {
             const goals = await goalsRes.json();
             const now = new Date();
             const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-            const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
             const monthly = (goals || []).filter(g => {
                 if (g.period_type !== 'monthly') return false;
                 const label = (g.period_label || '').trim();
                 if (label === currentMonth) return true;
                 if (label.includes(currentMonth)) return true;
-                if (label.includes(monthNames[now.getMonth()]) && label.includes(String(now.getFullYear()))) return true;
+                if (label.includes(MONTH_NAMES[now.getMonth()]) && label.includes(String(now.getFullYear()))) return true;
                 return false;
             });
             const nonArt = monthly.filter(g => (g.aspect || 'general') !== 'art');

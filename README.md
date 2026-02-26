@@ -1,279 +1,109 @@
 # Life OS Dashboard
 
-A personal dashboard that loads automatically when you open your laptop. Built as a local web application that displays your projects, health metrics, finances, emails, and more in a clean, organized interface.
+A personal command center that runs locally on your machine. Track projects, health, finances, emails, goals, and tasks — all in one place. Built with vanilla HTML/JS/CSS and Express, no build step required.
 
-## 🎉 New Features!
-
-See [README-FEATURES.md](README-FEATURES.md) for a complete guide to all new features including:
-- Dark mode toggle 🌙
-- Add/edit todos inline ✏️
-- Finance entry forms 💰
-- Historical charts 📊
-- Toast notifications 🔔
-- Auto-launch setup 🚀
-
-## Features
-
-- **AI Notepad**: Morning log for thoughts, tasks, and ideas
-- **GitHub Activity**: Code contribution calendar
-- **Project Cards**: Visual overview of your projects with metrics
-- **Social Media**: Track followers, posts, impressions, and scheduled content
-- **Finance Dashboard**: Quick view of revenue, profit, and outstanding payments
-- **Health Metrics**: Recovery, sleep, HRV, and cycle tracking
-- **Email Summary**: Important emails at a glance
-- **Task List**: Today's tasks overview
-
-## Setup
-
-### 1. Install Dependencies
+## Quick Start
 
 ```bash
+# 1. Clone and install
+git clone <your-repo-url> life-os
+cd life-os
 npm install
-```
 
-### 2. Setup Desktop Reminders (Optional)
+# 2. Configure (fill in only the integrations you want)
+cp .env.example .env
+cp -r config.example config
 
-To get automatic reminders for weekly updates and monthly finance input:
-
-```bash
-cd notifications
-./setup.sh
-```
-
-This sets up:
-- **Weekly reminder**: Every Monday morning (8-10 AM) to check dashboard updates
-- **Monthly reminder**: End of month (last 3 days, 9-11 AM) to input financial data
-
-See `notifications/README.md` for more details.
-
-### 3. Configure Claude API (Optional but Recommended)
-
-To enable the AGENT chat functionality:
-
-1. Get your API key from [Anthropic Console](https://console.anthropic.com/)
-2. Create a `.env` file in the project root:
-   ```bash
-   cp .env.example .env
-   ```
-3. Add your API key to `.env`:
-   ```
-   ANTHROPIC_API_KEY=your_api_key_here
-   ```
-
-### 3. Run Locally
-
-```bash
+# 3. Run
 npm start
+# Open http://localhost:3001
 ```
 
-The dashboard will be available at `http://localhost:3000`
+That's it. The dashboard works immediately — integrations are all optional.
 
-**Note**: Without the API key, the AGENT will show a placeholder message. The dashboard still works for everything else!
+## Integrations
 
-### 3. Open Directly in Browser (No Server)
+Connect only what you need. Leave the rest blank in `.env`.
 
-You can also open `index.html` directly in your browser - it works as a standalone file!
+| Integration | What it does | Required env vars |
+|---|---|---|
+| **Claude AI** | PA chat assistant on the dashboard | `ANTHROPIC_API_KEY` |
+| **Whoop** | Daily health metrics (recovery, sleep, HRV) | `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET` |
+| **Stripe** | Business revenue sync | `STRIPE_SECRET_KEY` |
+| **Wise** | Personal spending sync | `WISE_API_TOKEN`, `WISE_PROFILE_ID` |
+| **GitHub** | Project commit date tracking | `GITHUB_TOKEN` |
+| **Gmail** | Inbox sync and email sending | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET` |
+| **Telegram** | Daily briefing bot | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
+| **Apple Calendar** | Calendar events (macOS only) | None (uses native AppleScript) |
+| **Apple Reminders** | Task sync (macOS only) | None (uses native AppleScript) |
 
-## Auto-Load on macOS Startup
+## Project Structure
 
-To make the dashboard open automatically when you open your laptop:
+```
+core/               Server, database, API routes
+  api/              20 REST endpoint modules
+  db/               SQLite schema, migrations, derived state engine
+  server.js         Express entry point
+dashboard/          Frontend (no build step)
+  index.html        Single-page app shell
+  app.js            Main controller
+  styles.css        All styles (organized with section headers)
+  utils.js          Shared utilities
+integrations/       External service connectors
+  whoop/            Health metrics
+  stripe/           Business revenue
+  gmail/            Email sync
+  telegram/         Briefing bot
+  ...
+config/             Your instance config (gitignored)
+config.example/     Template config (committed)
+onboarding/         First-run setup wizard
+scripts/            Utility scripts
+```
 
-### Option 1: Using Automator (Recommended)
+## Key Features
 
-1. Open **Automator** (Applications > Automator)
-2. Create a new **Application**
-3. Add action: **Run Shell Script**
-4. Paste this script:
+- **Home panel** — Pulse strip (recovery, meetings, blockers), focus card, unified inbox
+- **Projects** — Health status (green/yellow/red), milestones, dependencies, phase tracking
+- **Goals** — Yearly → quarterly → monthly hierarchy with progress tracking
+- **Finance** — Revenue, expenses, spending, net assets with month-over-month charts
+- **Health** — WHOOP integration with recovery, sleep, HRV trends
+- **Inbox** — Unified messages from Gmail, WhatsApp, with urgency scoring
+- **PA Chat** — Claude-powered assistant with context about your data
+- **Dark mode** — Toggle between light and dark themes
+
+## Finance Setup
 
 ```bash
-sleep 5
-open -a "Google Chrome" "http://localhost:3000"
-# OR for Safari:
-# open -a "Safari" "http://localhost:3000"
-```
-
-5. Save as "Life OS" in Applications folder
-6. Go to **System Settings > General > Login Items**
-7. Click **+** and add the "Life OS" app
-
-**Note**: Make sure the server is running (`npm start`) before setting this up, or use the file:// method below.
-
-### Option 2: Direct File Opening
-
-1. Open **Automator**
-2. Create a new **Application**
-3. Add action: **Run Shell Script**
-4. Paste this script (update the path):
-
-```bash
-sleep 5
-open -a "Google Chrome" "/Users/cat/code/LifeOS_ClaudeCowork/index.html"
-# OR for Safari:
-# open -a "Safari" "/Users/cat/code/LifeOS_ClaudeCowork/index.html"
-```
-
-5. Save as "Life OS" in Applications folder
-6. Add to Login Items as described above
-
-### Option 3: Using launchd (Advanced)
-
-Create a plist file at `~/Library/LaunchAgents/com.lifeos.dashboard.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.lifeos.dashboard</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/bin/open</string>
-        <string>-a</string>
-        <string>Google Chrome</string>
-        <string>http://localhost:3000</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-```
-
-Then load it:
-```bash
-launchctl load ~/Library/LaunchAgents/com.lifeos.dashboard.plist
-```
-
-## Customization
-
-- Edit `styles.css` to change colors, fonts, and layout
-- Modify `app.js` to add interactivity and API integrations
-- Update `index.html` to add or remove dashboard sections
-- Replace placeholder data with real API calls or data sources
-
-## AGENT Integration
-
-The AGENT chat box connects to Claude via the Anthropic API. There are three ways to connect:
-
-### Option 1: Claude API (Current Implementation) ✅
-- Uses Anthropic's official API
-- Requires `ANTHROPIC_API_KEY` in `.env`
-- Works immediately once configured
-- **Recommended for most users**
-
-### Option 2: Claude Cowork Local Endpoint
-If Claude Cowork exposes a local API endpoint, you can modify `server.js` to connect to it instead:
-```javascript
-// In server.js, replace the Claude API call with:
-const coworkResponse = await fetch('http://localhost:PORT/api/chat', {
-    method: 'POST',
-    body: JSON.stringify({ message })
-});
-```
-
-### Option 3: MCP Bridge (Advanced)
-Set up an MCP (Model Context Protocol) server to bridge Claude Cowork to your dashboard. This requires:
-- Configuring an MCP server
-- Setting up a local bridge endpoint
-- More complex but allows deeper integration
-
-## Database & API Integration
-
-The dashboard now uses SQLite for data persistence and supports multiple API integrations.
-
-### Database
-
-- **Location**: `lifeos.db` in project root
-- **Full structure and write rules**: See [db/DB-STRUCTURE.md](db/DB-STRUCTURE.md) for all tables, backup locations, and which data can be overwritten vs protected
-- **Type**: SQLite (file-based, no server needed)
-- **Auto-initialization**: Tables are created automatically on first run
-- **Seeding**: No automatic seeding (your data is never overwritten on startup). To get demo data once, run `npm run seed`, or set `LIFEOS_SEED_IF_EMPTY=1` to seed only when the DB is empty
-
-### API Integrations
-
-**Configured Integrations:**
-- **Whoop** (Health): Daily sync for recovery, sleep, HRV
-- **GitHub** (Projects): On-demand sync for commit dates
-- **Soulinsocial** (Social): Reads from local project files/DB
-- **Stripe** (Finance): Optional, for business revenue
-- **Wise** (Finance): Optional, for personal spending
-
-**Setup API Keys:**
-
-Add to your `.env` file:
-```bash
-# Health
-WHOOP_API_TOKEN=your_whoop_token
-
-# Finance (optional)
-STRIPE_SECRET_KEY=your_stripe_key
-WISE_API_TOKEN=your_wise_token
-
-# Projects
-GITHUB_TOKEN=your_github_token
-```
-
-### Data Logging Frequency
-
-- **Daily**: Health metrics (Whoop), Spending (Wise/manual), Social followers
-- **Weekly**: Revenue/Profit (Stripe/manual), Social metrics snapshot
-- **Monthly**: Investment, Asset (snapshots), Finance aggregation
-- **Real-time**: Todos, Emails, Upcoming items, Scheduled posts, Agent conversations
-- **On-demand**: Projects (GitHub commits), Finance manual entries
-
-### API Endpoints
-
-- `GET /api/health` - Latest health metrics
-- `GET /api/health/history` - Health history (for charts)
-- `POST /api/health` - Update health metrics manually
-- `GET /api/finance` - Current month finance summary
-- `GET /api/projects` - All projects with last updated dates
-- `POST /api/projects/refresh` - Refresh project commit dates from GitHub
-- `GET /api/social/metrics` - Social media metrics
-- `GET /api/social/scheduled-posts` - Next 3 scheduled posts
-- `GET /api/todos` - Get all todos
-- `POST /api/todos` - Create todo
-- `PATCH /api/todos/:id` - Update todo
-- `GET /api/upcoming` - Get upcoming deadlines/meetings
-
-## Manual Finance Input
-
-To set up your initial finance data manually:
-
-### Quick Setup (Recommended for first time)
-```bash
+# Quick setup (first time)
 npm run setup-finance
-```
-This guides you through entering common finance entries for the current month.
 
-### Detailed Input (For multiple entries)
-```bash
+# Detailed input (multiple entries)
 npm run input-finance
 ```
-This allows you to add multiple finance entries with full control over dates, types, and amounts.
 
-### Finance Types
-- **Revenue**: Business income (month-to-date: 1st to today, from Stripe API)
-- **Profit**: Revenue minus expenses (auto-calculated, month-to-date)
-- **Expense**: Business costs (month-to-date: 1st to today, from Stripe API)
-- **Spending**: Personal spending (month-to-date: 1st to today, from Wise API)
-- **Investment**: Total investments (monthly snapshot)
-- **Asset**: Total assets (monthly snapshot)
-- **Total Net**: Net worth (monthly snapshot)
+## Docker
 
-## Future Enhancements
+```bash
+docker-compose up
+```
 
-- [x] Claude API integration for AGENT
-- [x] Database setup with SQLite
-- [x] API endpoints for all data
-- [x] Whoop integration for health
-- [x] GitHub integration for projects
-- [x] Stripe/Wise integration
-- [x] Auto-refresh functionality
-- [x] Dark mode toggle
-- [x] Historical charts/graphs
-- [x] Manual finance input tools
-- [ ] Email API integration (Gmail, etc.)
+## Database
+
+- **Type**: SQLite (file-based, no server needed)
+- **Location**: `lifeos.db` in project root
+- **Auto-initialization**: Tables created on first run
+- **Migrations**: Run automatically on startup
+- **Schema docs**: See `db/DB-STRUCTURE.md`
+
+## Documentation
+
+- [Features Guide](README-FEATURES.md)
+- [Integration Setup](README-INTEGRATIONS.md)
+- [Month-End Workflow](README-MONTH-END.md)
+- [Database Structure](db/DB-STRUCTURE.md)
+- [Deployment](DEPLOY.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
 
 ## License
 
