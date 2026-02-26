@@ -381,4 +381,67 @@ router.get('/urgent-feed', (req, res) => {
     }
 });
 
+// ── Right Panel Widget Endpoints ──────────────────────────────────────────────
+
+/**
+ * GET /api/home/upcoming-widget
+ * Upcoming calendar events within 48 hours, limit 5.
+ */
+router.get('/upcoming-widget', (req, res) => {
+    try {
+        const now = new Date().toISOString();
+        const twoDays = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+        const items = db.prepare(`
+            SELECT id, title, type, due_date, description
+            FROM upcoming_items
+            WHERE due_date >= ? AND due_date <= ?
+            ORDER BY due_date ASC
+            LIMIT 5
+        `).all(now, twoDays);
+        res.json(items);
+    } catch (e) {
+        res.json([]);
+    }
+});
+
+/**
+ * GET /api/home/active-tasks-widget
+ * In-progress and open project tasks, ordered by due date, limit 8.
+ */
+router.get('/active-tasks-widget', (req, res) => {
+    try {
+        const tasks = db.prepare(`
+            SELECT t.id, t.text, t.status, t.due_date, t.is_blocker,
+                   p.name AS project_name, p.short_name AS project_short_name
+            FROM project_tasks t
+            JOIN projects p ON t.project_id = p.id
+            WHERE t.status IN ('in_progress', 'open') AND p.status = 'active'
+            ORDER BY t.due_date IS NULL ASC, t.due_date ASC, t.is_blocker DESC
+            LIMIT 8
+        `).all();
+        res.json(tasks);
+    } catch (e) {
+        res.json([]);
+    }
+});
+
+/**
+ * GET /api/home/urgent-widget
+ * Urgent inbox items (urgency_score >= 50), limit 5.
+ */
+router.get('/urgent-widget', (req, res) => {
+    try {
+        const items = db.prepare(`
+            SELECT id, sender_name, sender_address, subject, preview, source, urgency_score, received_at
+            FROM inbox_items
+            WHERE urgency_score >= 50 AND is_dismissed = 0
+            ORDER BY urgency_score DESC, received_at DESC
+            LIMIT 5
+        `).all();
+        res.json(items);
+    } catch (e) {
+        res.json([]);
+    }
+});
+
 module.exports = router;

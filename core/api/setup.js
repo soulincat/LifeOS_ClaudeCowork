@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db/database');
 
 const SECTIONS = ['tax_residency', 'tax_residency_history', 'companies', 'reporting_periods', 'health_insurance'];
-const OPEN_SECTIONS = [...SECTIONS, 'integrations']; // sections accessible via GET/PUT without strict list
+const OPEN_SECTIONS = [...SECTIONS, 'integrations', 'pa_config']; // sections accessible via GET/PUT without strict list
 
 function parsePayload(row) {
     if (!row || row.payload == null) return null;
@@ -34,6 +34,161 @@ router.get('/', (req, res) => {
         res.status(500).json({ error: 'Failed to fetch setup' });
     }
 });
+
+// ── Named routes MUST come before the generic /:section route ──────────────
+
+/**
+ * GET /api/setup/connectors
+ * Returns connector status for the Settings integrations section.
+ */
+router.get('/connectors', async (req, res) => {
+    try {
+        const registry = require('../../integrations/registry');
+        const status = await registry.statusAll();
+        res.json(status);
+    } catch (e) {
+        res.json([]);
+    }
+});
+
+/**
+ * GET /api/setup/integrations-status
+ * Get status of all loaded connectors (legacy endpoint).
+ */
+router.get('/integrations-status', async (req, res) => {
+    try {
+        const registry = require('../../integrations/registry');
+        const status = await registry.statusAll();
+        res.json(status);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * GET /api/setup/priorities
+ * Returns user priorities (life areas, VIP people, urgency keywords, PA style).
+ */
+router.get('/priorities', (req, res) => {
+    try {
+        const row = db.prepare("SELECT payload FROM setup_sections WHERE section_key = 'user_priorities'").get();
+        if (row && row.payload) {
+            res.json(JSON.parse(row.payload));
+        } else {
+            res.json({ life_areas: [], vip_people: [], urgency_keywords: [], pa_style: 'direct' });
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * PUT /api/setup/priorities
+ * Saves user priorities, syncs VIP contacts, clears urgency keyword cache.
+ */
+router.put('/priorities', (req, res) => {
+    try {
+        const { life_areas, vip_people, urgency_keywords, pa_style } = req.body;
+        const payload = {
+            life_areas: life_areas || [],
+            vip_people: vip_people || [],
+            urgency_keywords: urgency_keywords || [],
+            pa_style: pa_style || 'direct'
+        };
+
+        db.prepare(`
+            INSERT INTO setup_sections (section_key, payload, updated_at) VALUES ('user_priorities', ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(section_key) DO UPDATE SET payload = excluded.payload, updated_at = CURRENT_TIMESTAMP
+        `).run(JSON.stringify(payload));
+
+        // Sync VIP people to contacts table
+        if (Array.isArray(vip_people)) {
+            for (const person of vip_people) {
+                if (!person.name) continue;
+                const existing = db.prepare(
+                    "SELECT id FROM contacts WHERE name = ? AND label = 'vip'"
+                ).get(person.name);
+                if (existing) {
+                    db.prepare('UPDATE contacts SET relationship = ? WHERE id = ?')
+                        .run(person.relationship || null, existing.id);
+                } else {
+                    db.prepare("INSERT INTO contacts (name, label, relationship) VALUES (?, 'vip', ?)")
+                        .run(person.name, person.relationship || null);
+                }
+            }
+        }
+
+        // Clear urgency keyword cache so new keywords take effect immediately
+        try {
+            const { clearUrgencyKeywordCache } = require('../db/derived-state');
+            clearUrgencyKeywordCache();
+        } catch (e) { /* non-blocking */ }
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * POST /api/setup/apply-integrations
+ * Apply stored integration keys to the running process.env (Stripe, Wise).
+ */
+router.post('/apply-integrations', (req, res) => {
+    try {
+        const row = db.prepare("SELECT payload FROM setup_sections WHERE section_key = 'integrations'").get();
+        if (!row) return res.json({ applied: [] });
+        const p = JSON.parse(row.payload || '{}');
+        const applied = [];
+        if (p.stripe_key) { process.env.STRIPE_SECRET_KEY = p.stripe_key; applied.push('stripe'); }
+        if (p.wise_token) { process.env.WISE_API_TOKEN = p.wise_token; applied.push('wise_token'); }
+        if (p.wise_profile_id) { process.env.WISE_PROFILE_ID = p.wise_profile_id; applied.push('wise_profile'); }
+        res.json({ success: true, applied });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/setup/test-pa
+ * Test a Claude API key by making a minimal call.
+ */
+router.post('/test-pa', async (req, res) => {
+    try {
+        const { api_key } = req.body;
+        if (!api_key) return res.status(400).json({ valid: false, error: 'No API key provided' });
+        const { testApiKey } = require('../claude-client');
+        const result = await testApiKey(api_key);
+        res.json(result);
+    } catch (e) {
+        res.status(500).json({ valid: false, error: e.message });
+    }
+});
+
+/**
+ * POST /api/setup
+ * Save multiple sections. Body: { tax_residency?: {}, tax_residency_history?: [], companies?: [], reporting_periods?: [] }
+ */
+router.post('/', (req, res) => {
+    try {
+        const body = req.body || {};
+        for (const key of SECTIONS) {
+            if (body[key] !== undefined) {
+                const json = JSON.stringify(body[key]);
+                db.prepare(`
+                    INSERT INTO setup_sections (section_key, payload, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(section_key) DO UPDATE SET payload = excluded.payload, updated_at = CURRENT_TIMESTAMP
+                `).run(key, json);
+            }
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error saving setup:', error);
+        res.status(500).json({ error: 'Failed to save setup' });
+    }
+});
+
+// ── Generic section routes (MUST be last — /:section matches anything) ─────
 
 /**
  * GET /api/setup/:section
@@ -76,78 +231,6 @@ router.put('/:section', (req, res) => {
     } catch (error) {
         console.error('Error saving setup:', error);
         res.status(500).json({ error: 'Failed to save setup' });
-    }
-});
-
-/**
- * POST /api/setup/apply-integrations
- * Apply stored integration keys to the running process.env (Stripe, Wise).
- */
-router.post('/apply-integrations', (req, res) => {
-    try {
-        const row = db.prepare("SELECT payload FROM setup_sections WHERE section_key = 'integrations'").get();
-        if (!row) return res.json({ applied: [] });
-        const p = JSON.parse(row.payload || '{}');
-        const applied = [];
-        if (p.stripe_key) { process.env.STRIPE_SECRET_KEY = p.stripe_key; applied.push('stripe'); }
-        if (p.wise_token) { process.env.WISE_API_TOKEN = p.wise_token; applied.push('wise_token'); }
-        if (p.wise_profile_id) { process.env.WISE_PROFILE_ID = p.wise_profile_id; applied.push('wise_profile'); }
-        res.json({ success: true, applied });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-/**
- * POST /api/setup
- * Save multiple sections. Body: { tax_residency?: {}, tax_residency_history?: [], companies?: [], reporting_periods?: [] }
- */
-router.post('/', (req, res) => {
-    try {
-        const body = req.body || {};
-        for (const key of SECTIONS) {
-            if (body[key] !== undefined) {
-                const json = JSON.stringify(body[key]);
-                db.prepare(`
-                    INSERT INTO setup_sections (section_key, payload, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(section_key) DO UPDATE SET payload = excluded.payload, updated_at = CURRENT_TIMESTAMP
-                `).run(key, json);
-            }
-        }
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Error saving setup:', error);
-        res.status(500).json({ error: 'Failed to save setup' });
-    }
-});
-
-/**
- * POST /api/setup/test-pa
- * Test a Claude API key by making a minimal call.
- */
-router.post('/test-pa', async (req, res) => {
-    try {
-        const { api_key } = req.body;
-        if (!api_key) return res.status(400).json({ valid: false, error: 'No API key provided' });
-        const { testApiKey } = require('../claude-client');
-        const result = await testApiKey(api_key);
-        res.json(result);
-    } catch (e) {
-        res.status(500).json({ valid: false, error: e.message });
-    }
-});
-
-/**
- * GET /api/setup/integrations-status
- * Get status of all loaded connectors.
- */
-router.get('/integrations-status', async (req, res) => {
-    try {
-        const registry = require('../../integrations/registry');
-        const status = await registry.statusAll();
-        res.json(status);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
     }
 });
 

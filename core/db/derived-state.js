@@ -416,6 +416,10 @@ function detectActionTag(content, subject) {
     return 'fyi';
 }
 
+function clearUrgencyKeywordCache() {
+    _cachedUrgentKeywords = null;
+}
+
 module.exports = {
     deriveHealthStatus,
     deriveProgress,
@@ -424,5 +428,6 @@ module.exports = {
     computeUrgencyScore,
     lookupContact,
     scoreFocusCard,
-    detectActionTag
+    detectActionTag,
+    clearUrgencyKeywordCache
 };

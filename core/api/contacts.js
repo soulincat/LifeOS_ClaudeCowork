@@ -7,6 +7,16 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/database');
 
+/** GET /api/contacts/summary — label counts for inbox rules display */
+router.get('/summary', (req, res) => {
+    try {
+        const counts = db.prepare('SELECT label, COUNT(*) as count FROM contacts GROUP BY label').all();
+        res.json(counts);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 /** GET /api/contacts — list all, optional ?q= search, ?label=vip, ?type=business */
 router.get('/', (req, res) => {
     try {
