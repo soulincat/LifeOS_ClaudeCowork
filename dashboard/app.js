@@ -616,18 +616,16 @@ async function loadSocialsData() {
         }
     } catch (e) { console.warn('Social overview failed', e); }
 
-    // --- Project cards (dashboard): same structure as Projections, data from /api/projects ---
+    // --- Project cards (Socials tab grid) ---
     try {
             const projectsResponse = await fetch('/api/projects');
             const data = await projectsResponse.json();
             const projects = Array.isArray(data) ? data : [];
 
-            // Same card structure as Projections tab: now → target, label, mini-chart, footer (effort + growth)
             const gridEl = document.getElementById('dashboardProjectsGrid');
             if (!gridEl) {
-                console.warn('Dashboard projects grid not found');
-                return;
-            }
+                // Grid removed from HTML; skip card rendering
+            } else {
             if (projects.length === 0) {
                 console.warn('No projects returned from API');
             }
@@ -694,6 +692,7 @@ async function loadSocialsData() {
                     + '<span class="projection-growth' + growthClass + '">' + growthText + '</span></div>';
                 gridEl.appendChild(card);
             });
+            }
     } catch (err) {
         console.warn('Dashboard project cards failed', err);
     }
@@ -732,8 +731,7 @@ async function loadSocialsData() {
     }
 }
 
-// Expose for refresh button (before any code that might throw)
-window.loadSocialsData = loadSocialsData;
+// (exposed globally below in bootstrap section)
 
 // ── Metric helpers ──────────────────────────────────────────────────────────
 function pickPrimaryMetricKey(current, lastMonth, projectType) {

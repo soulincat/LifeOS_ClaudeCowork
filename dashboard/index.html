@@ -740,225 +740,225 @@
                 </div>
             </div>
             <!-- Panel: Settings (was Setup — now with sidebar nav) -->
-            <div id=”panel-setup” class=”main-panel more-section main-panel-setup” style=”display: none;”>
-                <div class=”panel-header”>
-                    <h2 class=”panel-title”>Settings</h2>
+            <div id="panel-setup" class="main-panel more-section main-panel-setup" style="display: none;">
+                <div class="panel-header">
+                    <h2 class="panel-title">Settings</h2>
                 </div>
-                <div class=”settings-layout”>
-                    <nav class=”settings-nav”>
-                        <button type=”button” class=”settings-nav-item active” data-settings=”integrations”>Integrations</button>
-                        <button type=”button” class=”settings-nav-item” data-settings=”appearance”>Appearance</button>
-                        <button type=”button” class=”settings-nav-item” data-settings=”priorities”>Priorities</button>
-                        <button type=”button” class=”settings-nav-item” data-settings=”inbox-rules”>Inbox Rules</button>
-                        <button type=”button” class=”settings-nav-item” data-settings=”projects”>Projects</button>
-                        <button type=”button” class=”settings-nav-item” data-settings=”personal”>Personal</button>
+                <div class="settings-layout">
+                    <nav class="settings-nav">
+                        <button type="button" class="settings-nav-item active" data-settings="integrations">Integrations</button>
+                        <button type="button" class="settings-nav-item" data-settings="appearance">Appearance</button>
+                        <button type="button" class="settings-nav-item" data-settings="priorities">Priorities</button>
+                        <button type="button" class="settings-nav-item" data-settings="inbox-rules">Inbox Rules</button>
+                        <button type="button" class="settings-nav-item" data-settings="projects">Projects</button>
+                        <button type="button" class="settings-nav-item" data-settings="personal">Personal</button>
                     </nav>
-                    <div class=”settings-content”>
+                    <div class="settings-content">
 
                         <!-- Section: Integrations -->
-                        <div class=”settings-section active” id=”settingsIntegrations”>
-                            <h3 class=”setup-section-title”>Integrations</h3>
-                            <p class=”setup-section-desc”>Connect services to power your dashboard. Required integrations are marked.</p>
-                            <div class=”settings-subtitle”>CONNECTORS</div>
-                            <div id=”settingsConnectorCards”><p class=”settings-dim”>Loading...</p></div>
+                        <div class="settings-section active" id="settingsIntegrations">
+                            <h3 class="setup-section-title">Integrations</h3>
+                            <p class="setup-section-desc">Connect services to power your dashboard. Required integrations are marked.</p>
+                            <div class="settings-subtitle">CONNECTORS</div>
+                            <div id="settingsConnectorCards"><p class="settings-dim">Loading...</p></div>
 
-                            <div class=”settings-subtitle”>API KEYS &amp; CREDENTIALS</div>
-                            <div class=”setup-form-row”>
+                            <div class="settings-subtitle">API KEYS &amp; CREDENTIALS</div>
+                            <div class="setup-form-row">
                                 <label>Claude API Key</label>
-                                <div style=”display:flex;gap:6px;flex:1;”>
-                                    <input type=”password” id=”settingsClaudeKey” class=”todo-input” placeholder=”sk-ant-...” autocomplete=”off” style=”flex:1;”>
-                                    <button type=”button” class=”btn-small” id=”settingsTestClaudeKey”>Test</button>
+                                <div style="display:flex;gap:6px;flex:1;">
+                                    <input type="password" id="settingsClaudeKey" class="todo-input" placeholder="sk-ant-..." autocomplete="off" style="flex:1;">
+                                    <button type="button" class="btn-small" id="settingsTestClaudeKey">Test</button>
                                 </div>
                             </div>
-                            <div class=”setup-form-row”>
+                            <div class="setup-form-row">
                                 <label>Stripe Secret Key</label>
-                                <input type=”password” id=”setupStripeKey” class=”todo-input” placeholder=”sk_live_... or sk_test_...” autocomplete=”off”>
+                                <input type="password" id="setupStripeKey" class="todo-input" placeholder="sk_live_... or sk_test_..." autocomplete="off">
                             </div>
-                            <div class=”setup-form-row”>
+                            <div class="setup-form-row">
                                 <label>Wise API Token</label>
-                                <input type=”password” id=”setupWiseToken” class=”todo-input” placeholder=”Wise personal access token” autocomplete=”off”>
+                                <input type="password" id="setupWiseToken" class="todo-input" placeholder="Wise personal access token" autocomplete="off">
                             </div>
-                            <div class=”setup-form-row”>
+                            <div class="setup-form-row">
                                 <label>Wise Profile ID</label>
-                                <input type=”text” id=”setupWiseProfileId” class=”todo-input” placeholder=”Numeric profile ID from Wise”>
+                                <input type="text" id="setupWiseProfileId" class="todo-input" placeholder="Numeric profile ID from Wise">
                             </div>
 
-                            <div class=”settings-subtitle”>SYNC CONTROLS</div>
-                            <div class=”settings-sync-row”>
+                            <div class="settings-subtitle">SYNC CONTROLS</div>
+                            <div class="settings-sync-row">
                                 <span>Calendar</span>
-                                <input type=”text” id=”setupCalendarNames” class=”todo-input” placeholder=”Calendar names (comma-sep)” style=”flex:1;max-width:220px;”>
-                                <button type=”button” class=”btn-small” id=”setupCalendarSyncBtn”>Sync</button>
-                                <span id=”setupCalendarSyncStatus” class=”settings-sync-status”></span>
+                                <input type="text" id="setupCalendarNames" class="todo-input" placeholder="Calendar names (comma-sep)" style="flex:1;max-width:220px;">
+                                <button type="button" class="btn-small" id="setupCalendarSyncBtn">Sync</button>
+                                <span id="setupCalendarSyncStatus" class="settings-sync-status"></span>
                             </div>
-                            <div class=”settings-sync-row”>
+                            <div class="settings-sync-row">
                                 <span>Email</span>
-                                <div id=”setupMailboxList” style=”display:flex;flex-wrap:wrap;gap:4px;flex:1;”></div>
-                                <button type=”button” class=”btn-small” id=”setupMailSyncBtn”>Sync</button>
-                                <span id=”setupMailSyncStatus” class=”settings-sync-status”></span>
+                                <div id="setupMailboxList" style="display:flex;flex-wrap:wrap;gap:4px;flex:1;"></div>
+                                <button type="button" class="btn-small" id="setupMailSyncBtn">Sync</button>
+                                <span id="setupMailSyncStatus" class="settings-sync-status"></span>
                             </div>
-                            <div class=”settings-sync-row”>
+                            <div class="settings-sync-row">
                                 <span>Reminders</span>
-                                <button type=”button” class=”btn-small” id=”settingsRemindersSyncBtn”>Sync Now</button>
-                                <span id=”settingsRemindersSyncStatus” class=”settings-sync-status”></span>
+                                <button type="button" class="btn-small" id="settingsRemindersSyncBtn">Sync Now</button>
+                                <span id="settingsRemindersSyncStatus" class="settings-sync-status"></span>
                             </div>
 
-                            <div style=”margin-top:14px;”>
-                                <button type=”button” class=”btn-save btn-small” id=”setupIntegrationsSaveBtn”>Save</button>
-                                <span id=”setupIntegrationsSaveStatus” class=”settings-sync-status”></span>
+                            <div style="margin-top:14px;">
+                                <button type="button" class="btn-save btn-small" id="setupIntegrationsSaveBtn">Save</button>
+                                <span id="setupIntegrationsSaveStatus" class="settings-sync-status"></span>
                             </div>
                         </div>
 
                         <!-- Section: Appearance -->
-                        <div class=”settings-section” id=”settingsAppearance”>
-                            <h3 class=”setup-section-title”>Appearance</h3>
-                            <p class=”setup-section-desc”>Choose which tabs and sidebar widgets are visible.</p>
-                            <div class=”settings-subtitle”>OPTIONAL TABS</div>
-                            <div id=”settingsTabToggles”></div>
-                            <div class=”settings-subtitle”>RIGHT SIDEBAR WIDGETS</div>
-                            <div id=”settingsWidgetToggles”></div>
-                            <div style=”margin-top:14px;”>
-                                <button type=”button” class=”btn-save btn-small” id=”settingsAppearanceSave”>Save</button>
+                        <div class="settings-section" id="settingsAppearance">
+                            <h3 class="setup-section-title">Appearance</h3>
+                            <p class="setup-section-desc">Choose which tabs and sidebar widgets are visible.</p>
+                            <div class="settings-subtitle">OPTIONAL TABS</div>
+                            <div id="settingsTabToggles"></div>
+                            <div class="settings-subtitle">RIGHT SIDEBAR WIDGETS</div>
+                            <div id="settingsWidgetToggles"></div>
+                            <div style="margin-top:14px;">
+                                <button type="button" class="btn-save btn-small" id="settingsAppearanceSave">Save</button>
                             </div>
                         </div>
 
                         <!-- Section: Priorities -->
-                        <div class=”settings-section” id=”settingsPriorities”>
-                            <h3 class=”setup-section-title”>Priorities</h3>
-                            <p class=”setup-section-desc”>Set your life focus areas, VIP contacts, and communication preferences.</p>
-                            <div class=”settings-subtitle”>LIFE AREAS</div>
-                            <div class=”settings-chip-grid” id=”settingsLifeAreas”></div>
-                            <div class=”settings-subtitle”>VIP PEOPLE</div>
-                            <div id=”settingsVipList”></div>
-                            <button type=”button” class=”btn-small” id=”settingsAddVip” style=”margin-top:6px;”>+ Add VIP</button>
-                            <div class=”settings-subtitle”>URGENCY KEYWORDS</div>
-                            <p class=”setup-section-desc”>Messages containing these words get a +30 urgency boost.</p>
-                            <textarea id=”settingsUrgencyKeywords” class=”todo-input settings-textarea” rows=”2” placeholder=”deadline, payment, urgent, asap, confirm”></textarea>
-                            <div class=”settings-subtitle”>PA COMMUNICATION STYLE</div>
-                            <div class=”settings-radio-group” id=”settingsPaStyle”></div>
-                            <div style=”margin-top:14px;”>
-                                <button type=”button” class=”btn-save btn-small” id=”settingsPrioritiesSave”>Save</button>
+                        <div class="settings-section" id="settingsPriorities">
+                            <h3 class="setup-section-title">Priorities</h3>
+                            <p class="setup-section-desc">Set your life focus areas, VIP contacts, and communication preferences.</p>
+                            <div class="settings-subtitle">LIFE AREAS</div>
+                            <div class="settings-chip-grid" id="settingsLifeAreas"></div>
+                            <div class="settings-subtitle">VIP PEOPLE</div>
+                            <div id="settingsVipList"></div>
+                            <button type="button" class="btn-small" id="settingsAddVip" style="margin-top:6px;">+ Add VIP</button>
+                            <div class="settings-subtitle">URGENCY KEYWORDS</div>
+                            <p class="setup-section-desc">Messages containing these words get a +30 urgency boost.</p>
+                            <textarea id="settingsUrgencyKeywords" class="todo-input settings-textarea" rows="2" placeholder="deadline, payment, urgent, asap, confirm"></textarea>
+                            <div class="settings-subtitle">PA COMMUNICATION STYLE</div>
+                            <div class="settings-radio-group" id="settingsPaStyle"></div>
+                            <div style="margin-top:14px;">
+                                <button type="button" class="btn-save btn-small" id="settingsPrioritiesSave">Save</button>
                             </div>
                         </div>
 
                         <!-- Section: Inbox Rules -->
-                        <div class=”settings-section” id=”settingsInboxRules”>
-                            <h3 class=”setup-section-title”>Inbox Filtering</h3>
-                            <p class=”setup-section-desc”>How messages are scored and prioritized.</p>
-                            <div class=”settings-subtitle”>URGENCY KEYWORDS</div>
-                            <div id=”settingsKeywordsDisplay” class=”settings-chip-grid”></div>
-                            <button type=”button” class=”btn-small settings-link-btn” id=”settingsEditKeywords”>Edit in Priorities</button>
-                            <div class=”settings-subtitle”>CONTACTS</div>
-                            <div id=”settingsContactSummary” class=”settings-dim”>Loading...</div>
-                            <div class=”settings-subtitle”>SCORING RULES</div>
-                            <div class=”settings-rules-table”>
-                                <div class=”settings-rule-row”><span>VIP contact</span><span class=”settings-rule-score”>+40</span></div>
-                                <div class=”settings-rule-row”><span>Urgency keyword match</span><span class=”settings-rule-score”>+30</span></div>
-                                <div class=”settings-rule-row”><span>Relationship boost</span><span class=”settings-rule-score”>+5 to +30</span></div>
-                                <div class=”settings-rule-row”><span>Project keyword match</span><span class=”settings-rule-score”>+20</span></div>
-                                <div class=”settings-rule-row”><span>Unread &gt; 6 hours</span><span class=”settings-rule-score”>+15</span></div>
-                                <div class=”settings-rule-row”><span>WhatsApp source</span><span class=”settings-rule-score”>+10</span></div>
-                                <div class=”settings-rule-row”><span>Newsletter / automated</span><span class=”settings-rule-score”>-40</span></div>
+                        <div class="settings-section" id="settingsInboxRules">
+                            <h3 class="setup-section-title">Inbox Filtering</h3>
+                            <p class="setup-section-desc">How messages are scored and prioritized.</p>
+                            <div class="settings-subtitle">URGENCY KEYWORDS</div>
+                            <div id="settingsKeywordsDisplay" class="settings-chip-grid"></div>
+                            <button type="button" class="btn-small settings-link-btn" id="settingsEditKeywords">Edit in Priorities</button>
+                            <div class="settings-subtitle">CONTACTS</div>
+                            <div id="settingsContactSummary" class="settings-dim">Loading...</div>
+                            <div class="settings-subtitle">SCORING RULES</div>
+                            <div class="settings-rules-table">
+                                <div class="settings-rule-row"><span>VIP contact</span><span class="settings-rule-score">+40</span></div>
+                                <div class="settings-rule-row"><span>Urgency keyword match</span><span class="settings-rule-score">+30</span></div>
+                                <div class="settings-rule-row"><span>Relationship boost</span><span class="settings-rule-score">+5 to +30</span></div>
+                                <div class="settings-rule-row"><span>Project keyword match</span><span class="settings-rule-score">+20</span></div>
+                                <div class="settings-rule-row"><span>Unread &gt; 6 hours</span><span class="settings-rule-score">+15</span></div>
+                                <div class="settings-rule-row"><span>WhatsApp source</span><span class="settings-rule-score">+10</span></div>
+                                <div class="settings-rule-row"><span>Newsletter / automated</span><span class="settings-rule-score">-40</span></div>
                             </div>
                         </div>
 
                         <!-- Section: Projects -->
-                        <div class=”settings-section” id=”settingsProjects”>
-                            <h3 class=”setup-section-title”>Projects</h3>
-                            <p class=”setup-section-desc”>Set project priorities. Higher priority projects get more weight in focus scoring.</p>
-                            <div id=”settingsProjectList”><p class=”settings-dim”>Loading...</p></div>
-                            <div class=”settings-subtitle” style=”margin-top:18px;”>STRATEGY</div>
-                            <p class=”setup-section-desc”>View project dependencies, flywheel, and timeline.</p>
-                            <button type=”button” class=”btn-small” id=”settingsOpenStrategy”>Open Strategy View</button>
+                        <div class="settings-section" id="settingsProjects">
+                            <h3 class="setup-section-title">Projects</h3>
+                            <p class="setup-section-desc">Set project priorities. Higher priority projects get more weight in focus scoring.</p>
+                            <div id="settingsProjectList"><p class="settings-dim">Loading...</p></div>
+                            <div class="settings-subtitle" style="margin-top:18px;">STRATEGY</div>
+                            <p class="setup-section-desc">View project dependencies, flywheel, and timeline.</p>
+                            <button type="button" class="btn-small" id="settingsOpenStrategy">Open Strategy View</button>
                         </div>
 
                         <!-- Section: Personal -->
-                        <div class=”settings-section” id=”settingsPersonal”>
-                            <h3 class=”setup-section-title”>Personal</h3>
-                            <p class=”setup-section-desc”>Tax residency, companies, health insurance, and cycle tracking.</p>
-                            <button type=”button” class=”btn-save btn-small” id=”setupSaveBtn” title=”Save all personal settings” style=”margin-bottom:12px;”>Save</button>
-                            <section class=”setup-section”>
-                                <h3 class=”setup-section-title”>Tax residency</h3>
-                                <p class=”setup-section-desc”>Current tax residency and history of changes.</p>
-                                <div class=”setup-form-row”>
+                        <div class="settings-section" id="settingsPersonal">
+                            <h3 class="setup-section-title">Personal</h3>
+                            <p class="setup-section-desc">Tax residency, companies, health insurance, and cycle tracking.</p>
+                            <button type="button" class="btn-save btn-small" id="setupSaveBtn" title="Save all personal settings" style="margin-bottom:12px;">Save</button>
+                            <section class="setup-section">
+                                <h3 class="setup-section-title">Tax residency</h3>
+                                <p class="setup-section-desc">Current tax residency and history of changes.</p>
+                                <div class="setup-form-row">
                                     <label>Country / jurisdiction</label>
-                                    <input type=”text” id=”setupTaxCountry” class=”todo-input” placeholder=”e.g. United States, Germany”>
+                                    <input type="text" id="setupTaxCountry" class="todo-input" placeholder="e.g. United States, Germany">
                                 </div>
-                                <div class=”setup-form-row”>
+                                <div class="setup-form-row">
                                     <label>Effective from</label>
-                                    <input type=”date” id=”setupTaxEffectiveFrom” class=”todo-input”>
+                                    <input type="date" id="setupTaxEffectiveFrom" class="todo-input">
                                 </div>
-                                <div class=”setup-form-row”>
+                                <div class="setup-form-row">
                                     <label>Notes</label>
-                                    <input type=”text” id=”setupTaxNotes” class=”todo-input” placeholder=”e.g. Split year, treaty”>
+                                    <input type="text" id="setupTaxNotes" class="todo-input" placeholder="e.g. Split year, treaty">
                                 </div>
-                                <div class=”setup-history” id=”setupTaxHistory”>
-                                    <div class=”setup-history-label”>Residency history</div>
-                                    <ul id=”setupTaxHistoryList” class=”setup-history-list”></ul>
-                                    <button type=”button” class=”btn-small” id=”setupTaxAddHistory”>+ Add past residency</button>
+                                <div class="setup-history" id="setupTaxHistory">
+                                    <div class="setup-history-label">Residency history</div>
+                                    <ul id="setupTaxHistoryList" class="setup-history-list"></ul>
+                                    <button type="button" class="btn-small" id="setupTaxAddHistory">+ Add past residency</button>
                                 </div>
                             </section>
-                            <section class=”setup-section”>
-                                <h3 class=”setup-section-title”>Companies I own</h3>
-                                <p class=”setup-section-desc”>Entities you own or control.</p>
-                                <div id=”setupCompaniesList” class=”setup-entity-list”></div>
-                                <button type=”button” class=”btn-small” id=”setupAddCompany”>+ Add company</button>
+                            <section class="setup-section">
+                                <h3 class="setup-section-title">Companies I own</h3>
+                                <p class="setup-section-desc">Entities you own or control.</p>
+                                <div id="setupCompaniesList" class="setup-entity-list"></div>
+                                <button type="button" class="btn-small" id="setupAddCompany">+ Add company</button>
                             </section>
-                            <section class=”setup-section”>
-                                <h3 class=”setup-section-title”>Reporting periods</h3>
-                                <p class=”setup-section-desc”>Filing deadlines: personal tax, VAT, company returns.</p>
-                                <div id=”setupReportingList” class=”setup-entity-list”></div>
-                                <button type=”button” class=”btn-small” id=”setupAddReporting”>+ Add reporting period</button>
+                            <section class="setup-section">
+                                <h3 class="setup-section-title">Reporting periods</h3>
+                                <p class="setup-section-desc">Filing deadlines: personal tax, VAT, company returns.</p>
+                                <div id="setupReportingList" class="setup-entity-list"></div>
+                                <button type="button" class="btn-small" id="setupAddReporting">+ Add reporting period</button>
                             </section>
-                            <section class=”setup-section”>
-                                <h3 class=”setup-section-title”>Cycle tracking</h3>
-                                <p class=”setup-section-desc”>Auto-calculates cycle phase on the dashboard.</p>
-                                <div class=”setup-form-row”>
+                            <section class="setup-section">
+                                <h3 class="setup-section-title">Cycle tracking</h3>
+                                <p class="setup-section-desc">Auto-calculates cycle phase on the dashboard.</p>
+                                <div class="setup-form-row">
                                     <label>Last period start</label>
-                                    <input type=”date” id=”setupCycleLastPeriodStart” class=”todo-input”>
+                                    <input type="date" id="setupCycleLastPeriodStart" class="todo-input">
                                 </div>
-                                <div class=”setup-form-row setup-form-row-inline”>
+                                <div class="setup-form-row setup-form-row-inline">
                                     <label>Period length (days)</label>
-                                    <input type=”number” id=”setupCyclePeriodLength” class=”todo-input” min=”1” max=”10” placeholder=”4” style=”width:4rem”>
+                                    <input type="number" id="setupCyclePeriodLength" class="todo-input" min="1" max="10" placeholder="4" style="width:4rem">
                                 </div>
-                                <div class=”setup-form-row setup-form-row-inline”>
+                                <div class="setup-form-row setup-form-row-inline">
                                     <label>Cycle length (days)</label>
-                                    <input type=”number” id=”setupCycleLength” class=”todo-input” min=”21” max=”45” placeholder=”31” style=”width:4rem”>
+                                    <input type="number" id="setupCycleLength" class="todo-input" min="21" max="45" placeholder="31" style="width:4rem">
                                 </div>
-                                <div class=”setup-form-row setup-form-row-inline”>
+                                <div class="setup-form-row setup-form-row-inline">
                                     <label>Follicular (days after period)</label>
-                                    <input type=”number” id=”setupCycleFollicular” class=”todo-input” min=”1” max=”21” placeholder=”14” style=”width:4rem”>
+                                    <input type="number" id="setupCycleFollicular" class="todo-input" min="1" max="21" placeholder="14" style="width:4rem">
                                 </div>
-                                <div class=”setup-form-row setup-form-row-inline”>
+                                <div class="setup-form-row setup-form-row-inline">
                                     <label>Ovulatory (days)</label>
-                                    <input type=”number” id=”setupCycleOvulatory” class=”todo-input” min=”1” max=”7” placeholder=”2” style=”width:4rem”>
+                                    <input type="number" id="setupCycleOvulatory" class="todo-input" min="1" max="7" placeholder="2" style="width:4rem">
                                 </div>
-                                <div class=”setup-form-row setup-form-row-inline”>
+                                <div class="setup-form-row setup-form-row-inline">
                                     <label>PMS (days before period)</label>
-                                    <input type=”number” id=”setupCyclePms” class=”todo-input” min=”1” max=”7” placeholder=”3” style=”width:4rem”>
+                                    <input type="number" id="setupCyclePms" class="todo-input" min="1" max="7" placeholder="3" style="width:4rem">
                                 </div>
                             </section>
-                            <section class=”setup-section”>
-                                <h3 class=”setup-section-title”>Health insurance</h3>
-                                <p class=”setup-section-desc”>Insurance info and annual checkup benefits.</p>
-                                <div class=”setup-form-row”>
+                            <section class="setup-section">
+                                <h3 class="setup-section-title">Health insurance</h3>
+                                <p class="setup-section-desc">Insurance info and annual checkup benefits.</p>
+                                <div class="setup-form-row">
                                     <label>Insurer / plan name</label>
-                                    <input type=”text” id=”setupHealthInsurer” class=”todo-input” placeholder=”e.g. NHIS, private plan name”>
+                                    <input type="text" id="setupHealthInsurer" class="todo-input" placeholder="e.g. NHIS, private plan name">
                                 </div>
-                                <div class=”setup-form-row”>
+                                <div class="setup-form-row">
                                     <label>Year</label>
-                                    <input type=”text” id=”setupHealthYear” class=”todo-input” placeholder=”e.g. 2025”>
+                                    <input type="text" id="setupHealthYear" class="todo-input" placeholder="e.g. 2025">
                                 </div>
-                                <div class=”setup-form-row”>
+                                <div class="setup-form-row">
                                     <label>Checkup benefits</label>
-                                    <textarea id=”setupHealthCheckupBenefits” class=”todo-input setup-textarea” rows=”3” placeholder=”e.g. 1 general checkup, dental scaling, eye exam”></textarea>
+                                    <textarea id="setupHealthCheckupBenefits" class="todo-input setup-textarea" rows="3" placeholder="e.g. 1 general checkup, dental scaling, eye exam"></textarea>
                                 </div>
-                                <div class=”setup-form-row”>
+                                <div class="setup-form-row">
                                     <label>Renewal / expiry date</label>
-                                    <input type=”date” id=”setupHealthRenewalDate” class=”todo-input”>
+                                    <input type="date" id="setupHealthRenewalDate" class="todo-input">
                                 </div>
-                                <div class=”setup-form-row”>
+                                <div class="setup-form-row">
                                     <label>Notes</label>
-                                    <input type=”text” id=”setupHealthNotes” class=”todo-input” placeholder=”Policy number, contact, etc.”>
+                                    <input type="text" id="setupHealthNotes" class="todo-input" placeholder="Policy number, contact, etc.">
                                 </div>
                             </section>
                         </div>

@@ -566,8 +566,8 @@ function setupInboxHandlers() {
 
 // ── Polling & init ───────────────────────────────────────────────────────────
 
+// Poll inbox counts every 60s; first call happens via initInboxTab when tab opens
 setInterval(() => loadInboxCounts(), 60000);
-loadInboxCounts();
 
 // Expose globally
 window.initInboxTab = initInboxTab;
