@@ -49,23 +49,15 @@ function isWidgetEnabled(name) {
             const updateBtn = document.getElementById('updateBtn');
             const dismissBtn = document.getElementById('dismissUpdateBtn');
 
-            if (banner && versionText) {
+            if (banner && versionText && sessionStorage.getItem('update_dismissed') !== '1') {
                 versionText.textContent = `v${data.latest_version}`;
-                banner.style.display = 'block';
                 document.body.classList.add('update-banner-visible');
 
                 updateBtn.addEventListener('click', performUpdate);
                 dismissBtn.addEventListener('click', () => {
-                    banner.style.display = 'none';
                     document.body.classList.remove('update-banner-visible');
                     sessionStorage.setItem('update_dismissed', '1');
                 });
-
-                // Don't show if already dismissed this session
-                if (sessionStorage.getItem('update_dismissed') === '1') {
-                    banner.style.display = 'none';
-                    document.body.classList.remove('update-banner-visible');
-                }
             }
         }
     } catch (e) {
@@ -746,7 +738,7 @@ function renderProjectTabs(projects) {
         btn.type = 'button';
         btn.className = 'tab-bar-tab tab-bar-tab-project';
         btn.dataset.tab = 'project-' + project.id;
-        btn.textContent = project.name || 'Project';
+        btn.textContent = project.short_name || project.name || 'Project';
         btn.title = project.name || 'Project';
         slot.appendChild(btn);
     });
