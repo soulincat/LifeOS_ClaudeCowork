@@ -221,24 +221,56 @@ router.get('/projects-expanded', (req, res) => {
             ORDER BY priority_rank ASC, name ASC
         `).all();
 
-        const result = projects.map(p => {
-            // Current phase tasks (cap at 7 + count of more)
-            const tasks = db.prepare(`
-                SELECT * FROM project_tasks
-                WHERE project_id = ? AND status != 'cancelled'
-                AND (project_phase = ? OR project_phase IS NULL)
-                ORDER BY
-                    CASE WHEN status = 'done' THEN 1 ELSE 0 END ASC,
-                    priority_within_project ASC,
-                    created_at ASC
-                LIMIT 8
-            `).all(p.id, p.current_phase);
+        if (projects.length === 0) return res.json([]);
+        const projectIds = projects.map(p => p.id);
+        const placeholders = projectIds.map(() => '?').join(',');
 
-            const totalTasks = db.prepare(`
-                SELECT COUNT(*) as c FROM project_tasks
-                WHERE project_id = ? AND status != 'cancelled'
-                AND (project_phase = ? OR project_phase IS NULL)
-            `).get(p.id, p.current_phase);
+        // Batch: all tasks for active projects (non-cancelled) — 1 query instead of 2N
+        const allTasks = db.prepare(`
+            SELECT * FROM project_tasks
+            WHERE project_id IN (${placeholders}) AND status != 'cancelled'
+            ORDER BY
+                CASE WHEN status = 'done' THEN 1 ELSE 0 END ASC,
+                priority_within_project ASC,
+                created_at ASC
+        `).all(...projectIds);
+
+        // Batch: all blockers — 1 query instead of N
+        const allBlockers = db.prepare(`
+            SELECT project_id, text FROM project_tasks
+            WHERE project_id IN (${placeholders}) AND is_blocker = 1 AND status IN ('open', 'blocked')
+        `).all(...projectIds);
+
+        // Batch: all pending milestones — 1 query instead of N
+        const allMilestones = db.prepare(`
+            SELECT project_id, name, phase, target_date FROM project_milestones
+            WHERE project_id IN (${placeholders}) AND status = 'pending'
+            ORDER BY target_date ASC NULLS LAST
+        `).all(...projectIds);
+
+        // Batch: dependency warnings — 1 query instead of N
+        const allDepWarnings = db.prepare(`
+            SELECT d.downstream_project_id, d.dependency_description, up.name as upstream_name, up.health_status
+            FROM project_dependencies d
+            JOIN projects up ON up.id = d.upstream_project_id
+            WHERE d.downstream_project_id IN (${placeholders}) AND d.is_hard_block = 1 AND up.health_status = 'red'
+        `).all(...projectIds);
+
+        // Index by project_id for O(1) lookup
+        const tasksByProject = {};
+        for (const t of allTasks) (tasksByProject[t.project_id] ||= []).push(t);
+        const blockersByProject = {};
+        for (const b of allBlockers) (blockersByProject[b.project_id] ||= []).push(b.text);
+        const milestonesByProject = {};
+        for (const m of allMilestones) (milestonesByProject[m.project_id] ||= []).push(m);
+        const depWarningsByProject = {};
+        for (const d of allDepWarnings) (depWarningsByProject[d.downstream_project_id] ||= []).push(d);
+
+        const result = projects.map(p => {
+            // Filter tasks for current phase (already fetched in batch)
+            const projectTasks = (tasksByProject[p.id] || []).filter(
+                t => t.project_phase === p.current_phase || t.project_phase == null
+            );
 
             // Next phase horizon milestone
             let horizonMilestone = null;
@@ -248,39 +280,21 @@ router.get('/projects-expanded', (req, res) => {
                     const currentIdx = phases.indexOf(p.current_phase);
                     if (currentIdx >= 0 && currentIdx < phases.length - 1) {
                         const nextPhase = phases[currentIdx + 1];
-                        horizonMilestone = db.prepare(`
-                            SELECT name, phase FROM project_milestones
-                            WHERE project_id = ? AND phase = ? AND status = 'pending'
-                            ORDER BY target_date ASC NULLS LAST LIMIT 1
-                        `).get(p.id, nextPhase);
+                        horizonMilestone = (milestonesByProject[p.id] || []).find(m => m.phase === nextPhase) || null;
                     }
                 } catch (e) { /* */ }
             }
-
-            // Active blockers
-            const blockers = db.prepare(`
-                SELECT text FROM project_tasks
-                WHERE project_id = ? AND is_blocker = 1 AND status IN ('open', 'blocked')
-            `).all(p.id);
-
-            // Dependency warnings
-            const depWarnings = db.prepare(`
-                SELECT d.dependency_description, up.name as upstream_name, up.health_status
-                FROM project_dependencies d
-                JOIN projects up ON up.id = d.upstream_project_id
-                WHERE d.downstream_project_id = ? AND d.is_hard_block = 1 AND up.health_status = 'red'
-            `).all(p.id);
 
             return {
                 ...p,
                 phase_list: p.phase_list ? JSON.parse(p.phase_list) : [],
                 metrics: typeof p.metrics === 'string' ? (() => { try { return JSON.parse(p.metrics); } catch (e) { return null; } })() : p.metrics,
-                tasks: tasks.slice(0, 7),
-                total_task_count: totalTasks.c,
-                more_tasks: Math.max(0, totalTasks.c - 7),
+                tasks: projectTasks.slice(0, 7),
+                total_task_count: projectTasks.length,
+                more_tasks: Math.max(0, projectTasks.length - 7),
                 horizon_milestone: horizonMilestone,
-                blockers: blockers.map(b => b.text),
-                dependency_warnings: depWarnings
+                blockers: blockersByProject[p.id] || [],
+                dependency_warnings: depWarningsByProject[p.id] || []
             };
         });
 

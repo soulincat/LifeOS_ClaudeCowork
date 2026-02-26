@@ -37,7 +37,13 @@ function getUserUrgencyKeywords() {
 // YELLOW: timeline at risk (end within 7 days, progress < 80%) OR upstream hard-block is RED
 // GREEN: everything else
 
-function deriveHealthStatus(projectId) {
+const MAX_CASCADE_DEPTH = 10;
+
+function deriveHealthStatus(projectId, _depth = 0, _visited = new Set()) {
+    if (_depth > MAX_CASCADE_DEPTH) return null;
+    if (_visited.has(projectId)) return null; // cycle guard
+    _visited.add(projectId);
+
     const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId);
     if (!project) return null;
 
@@ -90,7 +96,7 @@ function deriveHealthStatus(projectId) {
             WHERE upstream_project_id = ?
         `).all(projectId);
         for (const dep of downstream) {
-            deriveHealthStatus(dep.downstream_project_id);
+            deriveHealthStatus(dep.downstream_project_id, _depth + 1, _visited);
         }
     }
 
@@ -285,71 +291,64 @@ function computeUrgencyScore(item) {
 function scoreFocusCard(whoopRecovery) {
     const recovery = whoopRecovery || 70; // default moderate
     const now = new Date();
-    const today = now.toISOString().slice(0, 10);
     const hour = now.getHours();
 
-    // Get all active projects with their current phase
-    const projects = db.prepare(`
-        SELECT id, name, current_phase, priority_rank FROM projects
-        WHERE status = 'active' ORDER BY priority_rank ASC
+    // Single query: join tasks with their project info (instead of N+1)
+    const tasks = db.prepare(`
+        SELECT t.*, p.name AS project_name, p.priority_rank, p.current_phase
+        FROM project_tasks t
+        JOIN projects p ON t.project_id = p.id
+        WHERE p.status = 'active'
+          AND t.status IN ('open', 'in_progress')
+          AND (t.project_phase = p.current_phase OR t.project_phase IS NULL)
     `).all();
 
     let bestTask = null;
     let bestScore = -Infinity;
 
-    for (const project of projects) {
-        const tasks = db.prepare(`
-            SELECT * FROM project_tasks
-            WHERE project_id = ? AND status IN ('open', 'in_progress')
-            AND (project_phase = ? OR project_phase IS NULL)
-        `).all(project.id, project.current_phase);
+    for (const task of tasks) {
+        let score = 0;
 
-        for (const task of tasks) {
-            let score = 0;
+        // Time pressure
+        if (task.due_date) {
+            const dueDate = new Date(task.due_date);
+            const daysUntil = (dueDate - now) / (1000 * 60 * 60 * 24);
+            if (daysUntil <= 0) score += 50;
+            else if (daysUntil <= 3) score += 30;
+            else if (daysUntil <= 7) score += 15;
+        }
 
-            // Time pressure
-            if (task.due_date) {
-                const dueDate = new Date(task.due_date);
-                const daysUntil = (dueDate - now) / (1000 * 60 * 60 * 24);
-                if (daysUntil <= 0) score += 50;
-                else if (daysUntil <= 3) score += 30;
-                else if (daysUntil <= 7) score += 15;
-            }
+        // Blocking coefficient
+        if (task.is_blocker) score += 40;
+        if (task.blocks_task_ids) {
+            try {
+                const blocked = JSON.parse(task.blocks_task_ids);
+                if (Array.isArray(blocked) && blocked.length > 0) score += 20;
+            } catch (e) { /* */ }
+        }
 
-            // Blocking coefficient
-            if (task.is_blocker) score += 40;
-            if (task.blocks_task_ids) {
-                try {
-                    const blocked = JSON.parse(task.blocks_task_ids);
-                    if (Array.isArray(blocked) && blocked.length > 0) score += 20;
-                } catch (e) { /* */ }
-            }
+        // Project strategic weight multiplier
+        const rank = task.priority_rank || 4;
+        const multiplier = rank === 1 ? 1.8 : rank === 2 ? 1.5 : rank === 3 ? 1.2 : 1.0;
+        score *= multiplier;
 
-            // Project strategic weight multiplier
-            const rank = project.priority_rank || 4;
-            const multiplier = rank === 1 ? 1.8 : rank === 2 ? 1.5 : rank === 3 ? 1.2 : 1.0;
-            score *= multiplier;
+        // Energy match
+        if (task.energy_required === 'high') {
+            if (recovery < 60) score -= 30;
+            else if (recovery >= 80) score += 15;
+        }
 
-            // Energy match
-            if (task.energy_required === 'high') {
-                if (recovery < 60) score -= 30;
-                else if (recovery >= 80) score += 15;
-            }
+        // Time of day
+        if (task.type === 'deep_work' && hour < 12) score += 20;
+        if (task.type === 'communication' && hour >= 13 && hour <= 16) score += 20;
+        if (task.type === 'admin' && hour > 16) score += 15;
 
-            // Time of day
-            if (task.type === 'deep_work' && hour < 12) score += 20;
-            if (task.type === 'communication' && hour >= 13 && hour <= 16) score += 20;
-            if (task.type === 'admin' && hour > 16) score += 15;
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestTask = {
-                    ...task,
-                    project_name: project.name,
-                    project_priority: project.priority_rank,
-                    score
-                };
-            }
+        if (score > bestScore) {
+            bestScore = score;
+            bestTask = {
+                ...task,
+                score
+            };
         }
     }
 
