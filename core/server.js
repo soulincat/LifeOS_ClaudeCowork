@@ -76,7 +76,6 @@ app.get('/api/gmail/connect', (req, res) => {
             'https://www.googleapis.com/auth/gmail.readonly',
             'https://www.googleapis.com/auth/gmail.send',
             'https://www.googleapis.com/auth/gmail.modify',
-            'https://www.googleapis.com/auth/calendar.readonly',
         ],
     });
     res.redirect(302, url);
@@ -136,6 +135,7 @@ app.use('/api/project-tasks', require('./api/project-tasks'));
 app.use('/api/decision-triggers', require('./api/decision-triggers'));
 app.use('/api/system', require('./api/system'));
 app.use('/api/inbox', require('./api/inbox'));
+app.use('/api/strategy', require('./api/strategy'));
 app.use('/api/contacts', require('./api/contacts'));
 app.use('/api/project-keywords', require('./api/project-keywords'));
 app.use('/api/onboarding', require('../onboarding/setup-api'));

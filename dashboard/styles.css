@@ -1041,23 +1041,6 @@ body.update-banner-visible {
     color: white;
 }
 
-/* Todo due date tags */
-.todo-due {
-    font-size: 9px;
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: var(--border);
-    color: var(--text-dim);
-    margin-left: auto;
-    flex-shrink: 0;
-    cursor: pointer;
-    white-space: nowrap;
-}
-.todo-due-today { background: var(--accent); color: #fff; }
-.todo-due-soon { background: #f59e0b; color: #fff; }
-.todo-due-overdue { background: var(--warn); color: #fff; }
-.todo-date-input { width: 110px; font-size: 11px; padding: 4px 6px; }
-
 /* Inline Todo Editing */
 .todo-text[contenteditable="true"] {
     outline: 1px solid var(--accent);
@@ -4844,7 +4827,7 @@ body.update-banner-visible {
 .pd-tag-energy-high   { background: #fff7ed; color: #c2410c; }
 .pd-tag-energy-low    { background: #f0fdf4; color: #166534; }
 .pd-tag-energy-medium { background: var(--bg); color: var(--text-dim); }
-.pd-tag-due     { background: var(--bg); color: var(--text-dim); cursor: pointer; }
+.pd-tag-due     { background: var(--bg); color: var(--text-dim); }
 .pd-tag-phase   { background: #eff6ff; color: var(--accent); }
 
 /* Add forms */
@@ -4970,3 +4953,125 @@ body.update-banner-visible {
     background: #eff6ff;
     border-color: var(--accent);
 }
+
+/* ── Todo due date tags ── */
+.todo-due {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--border);
+    color: var(--text-dim);
+    margin-left: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.todo-due-today { background: rgba(59, 130, 246, 0.15); color: var(--accent); font-weight: 600; }
+.todo-due-soon { background: rgba(234, 179, 8, 0.15); color: #b45309; }
+.todo-due-overdue { background: rgba(220, 38, 38, 0.15); color: #dc2626; font-weight: 600; }
+.todo-date-input {
+    width: 120px;
+    padding: 2px 6px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text);
+}
+.pd-tag-due { cursor: pointer; }
+
+/* ── Strategy panel ── */
+.strategy-sections { display: flex; flex-direction: column; gap: 24px; padding: 16px 0; }
+.strategy-section-title { margin: 0 0 12px 0; font-size: 14px; font-weight: 600; }
+
+.flywheel-graph {
+    position: relative;
+    min-height: 200px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    align-items: center;
+}
+.flywheel-node {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    min-width: 100px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    position: relative;
+    z-index: 1;
+}
+.flywheel-node.health-green { border-color: #22c55e; }
+.flywheel-node.health-yellow { border-color: #eab308; }
+.flywheel-node.health-red { border-color: #dc2626; }
+.flywheel-node-progress { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+.flywheel-edges {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.flywheel-edges svg { width: 100%; height: 100%; }
+
+.strategy-goals-list { display: flex; flex-direction: column; gap: 8px; }
+.strategy-goal-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+}
+.strategy-goal-project {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+}
+.strategy-goal-project:hover { background: var(--accent); color: #fff; }
+
+.strategy-timeline-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.strategy-timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.strategy-timeline-label {
+    width: 80px;
+    font-size: 12px;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+.strategy-timeline-bar-wrap {
+    flex: 1;
+    height: 24px;
+    background: var(--border);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+.strategy-timeline-bar {
+    height: 100%;
+    border-radius: 4px;
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #fff;
+    font-weight: 500;
+}
+.strategy-timeline-bar.phase-build { background: var(--accent); }
+.strategy-timeline-bar.phase-launch { background: #22c55e; }
+.strategy-timeline-bar.phase-grow { background: #8b5cf6; }
+.strategy-timeline-bar.phase-default { background: var(--text-dim); }

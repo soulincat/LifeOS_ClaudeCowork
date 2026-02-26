@@ -134,11 +134,20 @@
                 <button type="button" class="todo-collapse-btn" id="todoCollapseBtn" style="display: none;" title="Show more / Show less">Show more</button>
             </div>
 
-            <!-- Important Messages (live from inbox) -->
-            <div class="info-section sidebar-emails" id="sidebarEmailsSection">
-                <div class="info-header">Important <span id="sidebarEmailsCount"></span></div>
-                <div id="sidebarEmailsList">
-                    <div class="email-item" style="color:var(--text-dim);font-size:12px;">Loading...</div>
+            <!-- Important Emails -->
+            <div class="info-section sidebar-emails">
+                <div class="info-header">Important Emails (3)</div>
+                <div class="email-item">
+                    <div class="email-subject email-urgent">Payment overdue - Invoice #4521</div>
+                    <div class="email-from">Client Corp • 2h ago</div>
+                </div>
+                <div class="email-item">
+                    <div class="email-subject">Contract review needed</div>
+                    <div class="email-from">Legal Team • 5h ago</div>
+                </div>
+                <div class="email-item">
+                    <div class="email-subject">Intro: Potential collaboration</div>
+                    <div class="email-from">Sarah Chen • 1d ago</div>
                 </div>
             </div>
 
@@ -163,7 +172,18 @@
                     </div>
                 </div>
                 <div id="upcomingContainer">
-                    <div class="email-item" style="color:var(--text-dim);font-size:12px;">Loading...</div>
+                    <div class="email-item">
+                        <div class="email-subject">Q1 Report Deadline</div>
+                        <div class="email-from">Jan 31 • 2 days</div>
+                    </div>
+                    <div class="email-item">
+                        <div class="email-subject">Client Strategy Call</div>
+                        <div class="email-from">Tomorrow 3pm • TechCorp</div>
+                    </div>
+                    <div class="email-item">
+                        <div class="email-subject">Project Kickoff Meeting</div>
+                        <div class="email-from">Feb 3 • 5 days</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -190,7 +210,7 @@
                 <div class="pulse-chip pulse-chip-good" id="pulseRecovery"><span class="pulse-dot"></span><span id="pulseRecoveryText">Recovery —</span></div>
                 <div class="pulse-chip pulse-chip-warn" id="pulseUnread"><span class="pulse-dot"></span><span id="pulseUnreadText">0 unread</span></div>
                 <div class="pulse-chip pulse-chip-blue" id="pulseMeetings" style="display:none;"><span class="pulse-dot"></span><span id="pulseMeetingsText">0 meetings</span></div>
-                <div class="pulse-fire" id="pulseBlocker" style="display:none;"><span id="pulseBlockerText">0 blockers</span></div>
+                <div class="pulse-chip pulse-chip-neutral" id="pulseContext" style="display:none;"><span class="pulse-dot"></span><span id="pulseContextText"></span></div>
             </div>
 
             <!-- Scrollable dashboard content -->
@@ -290,6 +310,7 @@
             <div id="panel-more" class="main-panel panel-more" style="display: none;">
                 <div class="more-sub-tabs" id="moreSubTabs">
                     <button type="button" class="more-sub-tab active" data-section="goals">Goals</button>
+                    <button type="button" class="more-sub-tab" data-section="strategy">Strategy</button>
                     <button type="button" class="more-sub-tab" data-section="scenarios">Projections</button>
                     <button type="button" class="more-sub-tab" data-section="wishlist">Wishlist</button>
                     <button type="button" class="more-sub-tab" data-section="setup">Setup</button>
@@ -297,6 +318,23 @@
             </div>
 
             <!-- More sub-panels (shown alongside panel-more when active) -->
+            <div id="panel-strategy" class="main-panel more-section" style="display: none;">
+                <div class="panel-header"><h2 class="panel-title">Strategy</h2></div>
+                <div class="strategy-sections">
+                    <section class="strategy-section">
+                        <h3 class="strategy-section-title">Project Flywheel</h3>
+                        <div class="strategy-flywheel" id="strategyFlywheel"><p style="color:var(--text-dim);font-size:12px;">Loading...</p></div>
+                    </section>
+                    <section class="strategy-section">
+                        <h3 class="strategy-section-title">Goals &amp; Projects</h3>
+                        <div class="strategy-goals" id="strategyGoals"><p style="color:var(--text-dim);font-size:12px;">Loading...</p></div>
+                    </section>
+                    <section class="strategy-section">
+                        <h3 class="strategy-section-title">Cross-project Timeline</h3>
+                        <div class="strategy-timeline" id="strategyTimeline"><p style="color:var(--text-dim);font-size:12px;">Loading...</p></div>
+                    </section>
+                </div>
+            </div>
             <div id="panel-goals" class="main-panel more-section" style="display: none;">
                 <div class="panel-header panel-header-goals">
                     <button type="button" class="btn-add-todo" id="addGoalBtn" title="Add goal">+</button>

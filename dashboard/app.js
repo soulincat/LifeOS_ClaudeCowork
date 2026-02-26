@@ -640,17 +640,6 @@ function formatNumber(num) {
     return num.toString();
 }
 
-function timeAgo(date) {
-    const diff = Date.now() - date.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'now';
-    if (mins < 60) return mins + 'm ago';
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return hrs + 'h ago';
-    const days = Math.floor(hrs / 24);
-    return days + 'd ago';
-}
-
 function pickPrimaryMetricKey(current, lastMonth, projectType) {
     const obj = current || lastMonth || {};
     const keys = Object.keys(obj).filter(k => k !== 'current' && k !== 'last_month' && obj[k] != null);
@@ -808,44 +797,13 @@ async function loadHomeData() {
             if (meetEl) meetEl.textContent = pulse.meetings + ' meeting' + (pulse.meetings > 1 ? 's' : '');
             if (meetChip) meetChip.style.display = '';
         } else if (meetChip) { meetChip.style.display = 'none'; }
-        const blockerEl = document.getElementById('pulseBlockerText');
-        const blockerChip = document.getElementById('pulseBlocker');
-        if (pulse.blocker) {
-            if (blockerEl) blockerEl.textContent = pulse.blocker;
-            if (blockerChip) blockerChip.style.display = '';
-        } else if (blockerChip) { blockerChip.style.display = 'none'; }
+        const ctxEl = document.getElementById('pulseContextText');
+        const ctxChip = document.getElementById('pulseContext');
+        if (pulse.context_line) {
+            if (ctxEl) ctxEl.textContent = pulse.context_line;
+            if (ctxChip) ctxChip.style.display = '';
+        } else if (ctxChip) { ctxChip.style.display = 'none'; }
     } catch (e) { /* pulse endpoint not available, fall back silently */ }
-
-    // ── Sidebar: Important Messages (high urgency from inbox) ──
-    try {
-        const imRes = await fetch(base + '/api/messages/tiered?');
-        const { urgent, medium } = await imRes.json();
-        const important = [...(urgent || []), ...(medium || [])].slice(0, 5);
-        const listEl = document.getElementById('sidebarEmailsList');
-        const countEl = document.getElementById('sidebarEmailsCount');
-        if (countEl) countEl.textContent = important.length > 0 ? '(' + important.length + ')' : '';
-        if (listEl) {
-            if (important.length === 0) {
-                listEl.innerHTML = '<div class="email-item" style="color:var(--text-dim);font-size:12px;">No important messages</div>';
-            } else {
-                const escH = (s) => s ? String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
-                listEl.innerHTML = important.map(m => {
-                    const date = m.received_at ? new Date(m.received_at) : null;
-                    const ago = date ? timeAgo(date) : '';
-                    const icon = m.source === 'whatsapp' ? '\ud83d\udcac' : '\u2709';
-                    const urgCls = (m.urgency_score || 3) >= 4 ? ' email-urgent' : '';
-                    const text = escH(m.subject || m.preview || m.ai_summary || '').slice(0, 60);
-                    return '<div class="email-item">' +
-                        '<div class="email-subject' + urgCls + '">' + text + '</div>' +
-                        '<div class="email-from">' + icon + ' ' + escH(m.sender_name || m.sender_address || 'Unknown') + (ago ? ' \u2022 ' + ago : '') + '</div>' +
-                        '</div>';
-                }).join('');
-            }
-        }
-    } catch (e) { console.warn('Sidebar emails failed', e); }
-
-    // ── Sidebar: Trigger calendar sync for upcoming events ──
-    fetch(base + '/api/upcoming/sync-calendar', { method: 'POST' }).catch(() => {});
 
     // ── Focus Card (scored task from derived state engine) ──
     try {
@@ -1018,7 +976,7 @@ async function loadHomeData() {
             chip.className = 'dash-pa-chip';
             chip.setAttribute('data-dynamic', '1');
             chip.setAttribute('data-prompt', 'How is ' + p.name + ' progressing? What\'s the next critical step?');
-            chip.textContent = p.name + ' status';
+            chip.textContent = (p.short_name || p.name) + ' status';
             if (revenueChip) chipsContainer.insertBefore(chip, revenueChip);
             else chipsContainer?.appendChild(chip);
         });
@@ -1363,7 +1321,7 @@ scheduleGitHubRefresh();
 // Refresh data every 5 minutes
 setInterval(() => { loadSocialsData(); loadHomeData(); }, 5 * 60 * 1000);
 
-// Socials panel: click project card → open project detail
+// Navigate to project detail when clicking project cards
 document.getElementById('panel-socials')?.addEventListener('click', function(e) {
     const card = e.target.closest('.project-card');
     if (!card) return;
@@ -1379,14 +1337,14 @@ document.getElementById('panel-socials')?.addEventListener('click', function(e) 
                 if (p && p.id != null) {
                     card.setAttribute('data-project-id', String(p.id));
                     if (typeof window.showPanel === 'function') window.showPanel('project-' + p.id);
+                } else {
+                    if (typeof showToast === 'function') showToast('Could not load project', 'error');
                 }
             }).catch(() => { if (typeof showToast === 'function') showToast('Could not load project', 'error'); });
             return;
         }
     }
-    if (projectId) {
-        if (typeof window.showPanel === 'function') window.showPanel('project-' + projectId);
-    }
+    if (projectId && typeof window.showPanel === 'function') window.showPanel('project-' + projectId);
 });
 
 // Email clicks
@@ -1397,16 +1355,13 @@ document.querySelectorAll('.email-item').forEach(email => {
     });
 });
 
-// Todo List functionality
-let showAllCompleted = false;
-
+// Due date tag helper — returns colored label for todo/task due dates
 function todoDueTag(dueDate) {
     if (!dueDate) return '';
     const today = new Date(); today.setHours(0,0,0,0);
     const due = new Date(dueDate + 'T00:00:00'); due.setHours(0,0,0,0);
     const diff = Math.round((due - today) / 86400000);
-    let cls = 'todo-due';
-    let label;
+    let cls = 'todo-due'; let label;
     if (diff < 0) { cls += ' todo-due-overdue'; label = Math.abs(diff) + 'd overdue'; }
     else if (diff === 0) { cls += ' todo-due-today'; label = 'today'; }
     else if (diff === 1) { cls += ' todo-due-soon'; label = 'tomorrow'; }
@@ -1414,6 +1369,9 @@ function todoDueTag(dueDate) {
     else { label = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
     return '<span class="' + cls + '" data-due="' + dueDate + '" title="Due: ' + dueDate + '">' + label + '</span>';
 }
+
+// Todo List functionality
+let showAllCompleted = false;
 
 async function loadTodos() {
     try {
@@ -2225,33 +2183,28 @@ function setupProjectDetailHandlers() {
         // Click due date tag → inline date picker
         const dueTag = e.target.closest('.pd-tag-due');
         if (dueTag && dueTag.dataset.taskId) {
-            e.preventDefault();
             e.stopPropagation();
-            const taskId = dueTag.dataset.taskId;
-            const picker = document.createElement('input');
-            picker.type = 'date';
-            picker.className = 'todo-date-input';
-            picker.value = dueTag.dataset.due || '';
-            dueTag.replaceWith(picker);
-            picker.focus();
-            picker.showPicker?.();
+            const input = document.createElement('input');
+            input.type = 'date';
+            input.className = 'todo-date-input';
+            input.value = dueTag.dataset.due || '';
+            input.style.position = 'absolute';
+            input.style.zIndex = '100';
+            dueTag.style.position = 'relative';
+            dueTag.replaceWith(input);
+            input.focus();
             const finish = async () => {
-                const newDate = picker.value || null;
-                try {
-                    await fetch('/api/project-tasks/task/' + taskId, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ due_date: newDate })
-                    });
-                    if (pdCurrentProject) loadProjectDetail(pdCurrentProject.project.id);
-                } catch (err) {
-                    if (typeof showToast === 'function') showToast('Failed to update due date', 'error');
-                }
+                const newDate = input.value || null;
+                await fetch('/api/project-tasks/' + pdCurrentProject.project.id + '/tasks/' + dueTag.dataset.taskId, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ due_date: newDate })
+                });
+                openProjectDetail(pdCurrentProject.project.id, true);
             };
-            picker.addEventListener('change', finish, { once: true });
-            picker.addEventListener('blur', () => {
-                setTimeout(() => { if (pdCurrentProject) loadProjectDetail(pdCurrentProject.project.id); }, 100);
-            }, { once: true });
+            input.addEventListener('change', finish);
+            input.addEventListener('blur', () => { if (!input._changed) openProjectDetail(pdCurrentProject.project.id, true); });
+            input.addEventListener('change', () => { input._changed = true; });
         }
     });
 

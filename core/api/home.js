@@ -8,6 +8,71 @@ const router = express.Router();
 const db = require('../db/database');
 const { scoreFocusCard } = require('../db/derived-state');
 
+// ── Weather cache (refreshed every 30 min) ──────────────────────────────────
+let _weatherCache = { data: null, ts: 0 };
+
+async function fetchWeather() {
+    const now = Date.now();
+    if (_weatherCache.data && now - _weatherCache.ts < 30 * 60 * 1000) return _weatherCache.data;
+    try {
+        const https = require('https');
+        const data = await new Promise((resolve, reject) => {
+            const req = https.get('https://wttr.in/?format=j1', { timeout: 5000 }, res => {
+                let body = '';
+                res.on('data', chunk => body += chunk);
+                res.on('end', () => {
+                    try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+                });
+            });
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+        });
+        const cur = data.current_condition?.[0] || {};
+        const result = {
+            temp_c: parseInt(cur.temp_C, 10),
+            desc: (cur.weatherDesc?.[0]?.value || '').toLowerCase(),
+            humidity: parseInt(cur.humidity, 10),
+            feelslike_c: parseInt(cur.FeelsLikeC, 10),
+            wind_kmph: parseInt(cur.windspeedKmph, 10),
+        };
+        _weatherCache = { data: result, ts: now };
+        return result;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function buildContextLine(recovery) {
+    const weather = await fetchWeather();
+    const parts = [];
+
+    // Weather part
+    if (weather) {
+        parts.push(`${weather.temp_c}°C ${weather.desc}`);
+        const d = weather.desc;
+        const t = weather.temp_c;
+        if (d.includes('rain') || d.includes('drizzle') || d.includes('shower'))
+            parts.push('bring an umbrella');
+        else if (d.includes('snow') || d.includes('blizzard') || t <= -5)
+            parts.push('bundle up');
+        else if (t >= 33)
+            parts.push('stay hydrated');
+        else if (t <= 5)
+            parts.push('dress warm');
+        else if ((d.includes('sunny') || d.includes('clear')) && t >= 15)
+            parts.push('nice day outside');
+    }
+
+    // Recovery-based nudge
+    if (recovery != null) {
+        if (recovery < 33) parts.push('take it easy today');
+        else if (recovery < 50) parts.push('pace yourself');
+        else if (recovery >= 80) parts.push('high energy — tackle the hard stuff');
+    }
+
+    return parts.length ? parts.join(' · ') : null;
+}
+
 /**
  * GET /api/home/focus
  * Returns the Focus Card — the single most important task right now.
@@ -89,19 +154,13 @@ router.get('/pulse', async (req, res) => {
             meetings = r.c;
         } catch (e) { /* */ }
 
-        // Top blocker: any open blocker task across active projects
-        let blocker = null;
+        // Context line: weather + recovery-based one-liner
+        let context_line = null;
         try {
-            const b = db.prepare(`
-                SELECT t.text, p.name as project_name FROM project_tasks t
-                JOIN projects p ON p.id = t.project_id
-                WHERE t.is_blocker = 1 AND t.status IN ('open', 'blocked') AND p.status = 'active'
-                ORDER BY p.priority_rank ASC LIMIT 1
-            `).get();
-            if (b) blocker = `${b.project_name}: ${b.text}`;
-        } catch (e) { /* */ }
+            context_line = await buildContextLine(recovery);
+        } catch (e) { /* non-blocking */ }
 
-        res.json({ recovery, unread, meetings, blocker });
+        res.json({ recovery, unread, meetings, context_line });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch pulse data' });
     }

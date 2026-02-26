@@ -10,6 +10,7 @@ const { execSync } = require('child_process');
 const db = require('../../core/db/database');
 
 const REMINDERS_LIST = 'Life OS';
+const TASK_TAG_PREFIX = 'lifeos-task:';
 
 /**
  * Escape a string for safe embedding in an AppleScript string literal.
@@ -190,8 +191,139 @@ async function syncTodos() {
         }
     }
 
-    console.log(`✅ Apple Reminders sync done — pushed: ${pushed}, completed: ${completed}`);
-    return { pushed, completed };
+    // ── Push: project tasks → per-project Reminders lists ────────────────
+    let tasksPushed = 0;
+    let tasksCompleted = 0;
+    try {
+        const projects = db.prepare("SELECT id, short_name, name FROM projects WHERE status = 'active'").all();
+        for (const proj of projects) {
+            const listName = proj.short_name || proj.name;
+            try { ensureNamedList(listName); } catch (e) { continue; }
+
+            const tasks = db.prepare(`
+                SELECT id, text, due_date, apple_reminder_id
+                FROM project_tasks
+                WHERE project_id = ? AND status = 'open' AND due_date IS NOT NULL
+            `).all(proj.id);
+
+            for (const task of tasks) {
+                try {
+                    if (!task.apple_reminder_id) {
+                        const newId = createReminderInList(listName, task, TASK_TAG_PREFIX);
+                        db.prepare('UPDATE project_tasks SET apple_reminder_id = ?, apple_synced_at = CURRENT_TIMESTAMP WHERE id = ?')
+                            .run(newId, task.id);
+                        tasksPushed++;
+                    } else {
+                        updateReminderInList(listName, task.apple_reminder_id, task);
+                    }
+                } catch (e) {
+                    console.warn(`  ⚠️  Failed to sync task ${task.id}: ${e.message}`);
+                }
+            }
+
+            // Pull completions back
+            const reminders = getRemindersFromList(listName);
+            for (const ar of reminders) {
+                if (!ar.completed) continue;
+                const match = ar.body.match(/lifeos-task:(\d+)/);
+                if (!match) continue;
+                const taskId = parseInt(match[1]);
+                const t = db.prepare("SELECT id, status FROM project_tasks WHERE id = ?").get(taskId);
+                if (t && t.status !== 'done') {
+                    db.prepare("UPDATE project_tasks SET status = 'done', completed_at = CURRENT_TIMESTAMP WHERE id = ?").run(taskId);
+                    tasksCompleted++;
+                    console.log(`  ✅ Marked complete from Reminders: task ${taskId}`);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Project tasks sync error:', e.message);
+    }
+
+    console.log(`✅ Apple Reminders sync done — todos pushed: ${pushed}, completed: ${completed}, tasks pushed: ${tasksPushed}, tasks completed: ${tasksCompleted}`);
+    return { pushed, completed, tasksPushed, tasksCompleted };
+}
+
+/**
+ * Ensure a named list exists in Reminders.
+ */
+function ensureNamedList(listName) {
+    const safe = escapeAS(listName);
+    const script = `
+tell application "Reminders"
+    if not (exists list "${safe}") then
+        make new list with properties {name: "${safe}"}
+    end if
+    return name of list "${safe}"
+end tell`;
+    runASScript(script);
+}
+
+/**
+ * Create a reminder in a specific list. Returns the new reminder's ID.
+ */
+function createReminderInList(listName, task, tagPrefix) {
+    const name = escapeAS(task.text);
+    const safe = escapeAS(listName);
+    const dueDateLine = task.due_date
+        ? `set due date of newReminder to date "${new Date(task.due_date + 'T09:00:00').toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' })}"`
+        : '';
+    const script = `
+tell application "Reminders"
+    tell list "${safe}"
+        set newReminder to make new reminder with properties {name: "${name}", body: "${tagPrefix}${task.id}"}
+        ${dueDateLine}
+        return id of newReminder
+    end tell
+end tell`;
+    return runASScript(script);
+}
+
+/**
+ * Update a reminder's name and due date in a specific list.
+ */
+function updateReminderInList(listName, appleId, task) {
+    const name = escapeAS(task.text);
+    const safe = escapeAS(listName);
+    const dueDateLine = task.due_date
+        ? `set due date of r to date "${new Date(task.due_date + 'T09:00:00').toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' })}"`
+        : 'set due date of r to missing value';
+    const script = `
+tell application "Reminders"
+    tell list "${safe}"
+        set r to reminder id "${escapeAS(appleId)}"
+        set name of r to "${name}"
+        ${dueDateLine}
+    end tell
+end tell`;
+    try { runASScript(script); } catch (e) { /* reminder may have been deleted */ }
+}
+
+/**
+ * Get all reminders from a named list with completion status.
+ */
+function getRemindersFromList(listName) {
+    const safe = escapeAS(listName);
+    const script = `
+tell application "Reminders"
+    if not (exists list "${safe}") then return ""
+    set output to ""
+    repeat with r in reminders of list "${safe}"
+        set rId to id of r
+        set rName to name of r
+        set rDone to completed of r
+        set rBody to body of r
+        set output to output & rId & "|" & rName & "|" & rDone & "|" & rBody & "\\\\n"
+    end repeat
+    return output
+end tell`;
+    try {
+        const raw = runASScript(script);
+        return raw.split('\n').filter(Boolean).map(line => {
+            const parts = line.split('|');
+            return { id: parts[0] || '', name: parts[1] || '', completed: parts[2] === 'true', body: parts[3] || '' };
+        });
+    } catch (e) { return []; }
 }
 
 module.exports = { syncTodos, ensureList };

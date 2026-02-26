@@ -5,6 +5,7 @@
     // More tab sub-sections — maps section key to panel id and loader
     const moreSections = {
         goals:     { panel: 'panel-goals',     loader: () => { if (typeof loadGoals === 'function') loadGoals(); } },
+        strategy:  { panel: 'panel-strategy',  loader: () => { loadStrategy(); } },
         scenarios: { panel: 'panel-scenarios',  loader: () => { if (typeof initProjectionTab === 'function') initProjectionTab(); } },
         wishlist:  { panel: 'panel-wishlist',   loader: () => { loadWishlist(); } },
         setup:     { panel: 'panel-setup',      loader: () => { if (typeof loadSetup === 'function') loadSetup(); } }
@@ -54,6 +55,112 @@
             const projectId = tab.replace('project-', '');
             if (typeof openProjectDetail === 'function') openProjectDetail(parseInt(projectId, 10), true);
         }
+    }
+
+    // ── Strategy tab ──────────────────────────────────────────────────────
+    async function loadStrategy() {
+        try {
+            const res = await fetch('/api/strategy');
+            if (!res.ok) throw new Error('API ' + res.status);
+            const data = await res.json();
+            renderFlywheel(data.projects || []);
+            renderGoalsProjects(data.goals || [], data.projects || []);
+            renderTimeline(data.projects || []);
+        } catch (e) {
+            console.warn('Strategy load failed', e);
+            const el = document.getElementById('strategyFlywheel');
+            if (el) el.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">Could not load strategy data.</p>';
+        }
+    }
+
+    function renderFlywheel(projects) {
+        const el = document.getElementById('strategyFlywheel');
+        if (!el) return;
+        if (!projects.length) { el.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">No active projects.</p>'; return; }
+        const nodes = projects.map(p => {
+            const health = (p.health_status || 'green').toLowerCase();
+            return '<div class="flywheel-node health-' + health + '">' +
+                '<div>' + (p.short_name || p.name) + '</div>' +
+                '<div class="flywheel-node-progress">' + (p.progress_pct || 0) + '% · ' + (p.current_phase || 'no phase') + '</div>' +
+                '</div>';
+        });
+        // Show dependency arrows as text list below
+        const deps = [];
+        projects.forEach(p => {
+            let depIds = [];
+            try { depIds = JSON.parse(p.depends_on_project_ids || '[]'); } catch (e) {}
+            depIds.forEach(did => {
+                const upstream = projects.find(x => x.id === did);
+                if (upstream) deps.push((upstream.short_name || upstream.name) + ' → ' + (p.short_name || p.name));
+            });
+        });
+        const depsHtml = deps.length
+            ? '<div style="margin-top:12px;font-size:11px;color:var(--text-dim);">Dependencies: ' + deps.join(' · ') + '</div>'
+            : '';
+        el.innerHTML = '<div class="flywheel-graph">' + nodes.join('') + '</div>' + depsHtml;
+    }
+
+    function renderGoalsProjects(goals, projects) {
+        const el = document.getElementById('strategyGoals');
+        if (!el) return;
+        if (!goals.length) { el.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">No goals found.</p>'; return; }
+        const projMap = {};
+        projects.forEach(p => { projMap[p.id] = p.short_name || p.name; });
+        const rows = goals.map(g => {
+            const projLabel = g.project_id && projMap[g.project_id]
+                ? '<span class="strategy-goal-project">' + projMap[g.project_id] + '</span>'
+                : '<span class="strategy-goal-project" data-goal-id="' + g.id + '" style="opacity:0.5;cursor:pointer;" title="Click to link a project">link project</span>';
+            return '<div class="strategy-goal-row">' +
+                '<span style="flex:1;">' + (g.title || '') + '</span>' +
+                '<span style="font-size:11px;color:var(--text-dim);">' + (g.period_label || '') + '</span>' +
+                projLabel +
+                '</div>';
+        });
+        el.innerHTML = '<div class="strategy-goals-list">' + rows.join('') + '</div>';
+        // Click to link goal to project
+        el.querySelectorAll('.strategy-goal-project[data-goal-id]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const goalId = btn.dataset.goalId;
+                const pid = prompt('Enter project ID to link (or leave empty to unlink):');
+                if (pid === null) return;
+                await fetch('/api/strategy/goal/' + goalId, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ project_id: pid ? parseInt(pid) : null })
+                });
+                loadStrategy();
+            });
+        });
+    }
+
+    function renderTimeline(projects) {
+        const el = document.getElementById('strategyTimeline');
+        if (!el) return;
+        const withDates = projects.filter(p => p.timeline_start || p.timeline_end);
+        if (!withDates.length) { el.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">No project timelines set.</p>'; return; }
+        // Find global range
+        const now = new Date();
+        let minDate = new Date(now); minDate.setMonth(minDate.getMonth() - 1);
+        let maxDate = new Date(now); maxDate.setMonth(maxDate.getMonth() + 12);
+        withDates.forEach(p => {
+            if (p.timeline_start) { const d = new Date(p.timeline_start); if (d < minDate) minDate = d; }
+            if (p.timeline_end) { const d = new Date(p.timeline_end); if (d > maxDate) maxDate = d; }
+        });
+        const totalMs = maxDate - minDate || 1;
+        const rows = withDates.map(p => {
+            const start = p.timeline_start ? new Date(p.timeline_start) : now;
+            const end = p.timeline_end ? new Date(p.timeline_end) : maxDate;
+            const left = Math.max(0, ((start - minDate) / totalMs) * 100);
+            const width = Math.max(5, ((end - start) / totalMs) * 100);
+            const phase = (p.current_phase || 'default').toLowerCase();
+            const phaseClass = phase.includes('build') ? 'phase-build' : phase.includes('launch') ? 'phase-launch' : phase.includes('grow') ? 'phase-grow' : 'phase-default';
+            return '<div class="strategy-timeline-row">' +
+                '<div class="strategy-timeline-label">' + (p.short_name || p.name) + '</div>' +
+                '<div class="strategy-timeline-bar-wrap">' +
+                '<div class="strategy-timeline-bar ' + phaseClass + '" style="left:' + left + '%;width:' + width + '%;">' + (p.current_phase || '') + '</div>' +
+                '</div></div>';
+        });
+        el.innerHTML = '<div class="strategy-timeline-grid">' + rows.join('') + '</div>';
     }
 
     async function loadWishlist() {

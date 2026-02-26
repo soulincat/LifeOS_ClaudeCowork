@@ -277,6 +277,13 @@ if (fs.existsSync(schemaPath)) {
         addG('outcome_notes', 'TEXT');
         addG('lessons_learned', 'TEXT');
         addG('completed_date', 'DATE');
+        addG('project_id', 'INTEGER');
+    } catch (e) { /* */ }
+    // Migrate project_tasks: add Apple Reminders sync columns
+    try {
+        const ptCols = db.prepare("PRAGMA table_info(project_tasks)").all().map(r => r.name);
+        if (!ptCols.includes('apple_reminder_id')) db.exec('ALTER TABLE project_tasks ADD COLUMN apple_reminder_id TEXT');
+        if (!ptCols.includes('apple_synced_at')) db.exec('ALTER TABLE project_tasks ADD COLUMN apple_synced_at TIMESTAMP');
     } catch (e) { /* */ }
     // Migrate goal_uncertainties: add sort_order for drag reorder
     try {
